@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* -------------------------
+   Enums
+   ------------------------- */
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+}
+
+/* -------------------------
+   Models
+   ------------------------- */
+
+model Teams {
+  id               String              @id @default(uuid())
+  name             String
+  logo_url         String?
+  stadium          String?
+  foundation_year  Int?
+  country          String?
+  created_at       DateTime            @default(now())
+  updated_at       DateTime            @updatedAt
+
+  matches_home     Matches[]           @relation("HomeMatches")
+  matches_away     Matches[]           @relation("AwayMatches")
+
+  nicknames        Teams_nicknames[]   @relation("TeamsNicknames")
+  stats            Stats_team_match[]  @relation("TeamStats")
+  goals            Goals[]             @relation("TeamGoals")
+  teams_users      Users[]             @relation("TeamsUsers")
+
+  @@index([name])
+  @@unique([name]) // opcional: evita equipos duplicados por nombre
+}
+
+model Teams_nicknames {
+  id               String     @id @default(uuid())
+  nickname         String
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+
+  // FK
+  team_id          String
+  team             Teams      @relation("TeamsNicknames", fields: [team_id], references: [id])
+
+  @@unique([team_id, nickname])
+  @@index([team_id])
+}
+
+model Matches {
+  id              String   @id @default(uuid())
+  season          String?
+  status          MatchStatus?  // enum
+  date            DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  home_team_id    String
+  home_team       Teams   @relation("HomeMatches", fields: [home_team_id], references: [id])
+
+  away_team_id    String
+  away_team       Teams   @relation("AwayMatches", fields: [away_team_id], references: [id])
+
+  league_id       String
+  league          League  @relation("LeagueMatches", fields: [league_id], references: [id])
+
+  chat            ChatMatch?
+  stats           Stats_team_match[]  @relation("MatchStats")
+  goals           Goals[]             @relation("MatchGoals")
+
+  @@index([date])
+  @@index([home_team_id])
+  @@index([away_team_id])
+}
+
+model Stats_team_match {
+  id              String      @id @default(uuid())
+  shots_total     Int?
+  fouls_total     Int?
+  corners_total   Int?
+  possession_pct  Float?      
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  match_id        String
+  match           Matches     @relation("MatchStats", fields: [match_id], references: [id])
+
+  team_id         String 
+  team            Teams       @relation("TeamStats", fields: [team_id], references: [id])
+
+  @@unique([match_id, team_id])
+  @@index([match_id])
+  @@index([team_id])
+}
+
+model Goals {
+  id              String      @id @default(uuid())
+  player_name     String
+  minute          Int?
+  type            String?
+  assistance      String?
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  match_id        String
+  match           Matches     @relation("MatchGoals", fields: [match_id], references: [id])
+
+  team_id         String    
+  team            Teams       @relation("TeamGoals", fields: [team_id], references: [id])
+
+  @@index([match_id])
+  @@index([team_id])
+}
+
+model League {
+  id              String      @id @default(uuid())
+  name            String
+
+  matches         Matches[]   @relation("LeagueMatches")
+}
+
+model Users {
+  id                 String      @id @default(uuid())
+  name               String
+  password           String
+  created_at         DateTime    @default(now())
+  updated_at         DateTime    @updatedAt
+
+  team_id            String
+  team               Teams?      @relation("TeamsUsers", fields: [team_id], references: [id])  
+
+  messages_global    Messages_global[]
+  messages_match     Messages_match[]     // un usuario puede tener muchos mensajes en chats de match
+
+  @@index([team_id])
+}
+
+model Messages_global {
+  id                String    @id @default(uuid())
+  message           String
+  timestamp         DateTime  @default(now())
+
+  user_id           String
+  user              Users     @relation(fields: [user_id], references: [id])
+
+  chat_id           String
+  chat              ChatGlobal @relation(fields: [chat_id], references: [id])
+
+  @@index([user_id])
+  @@index([chat_id])
+}
+
+model ChatGlobal {
+  id                String            @id @default(uuid())
+  created_at        DateTime          @default(now())
+
+  messages          Messages_global[]
+}
+
+model Messages_match {
+  id                String    @id @default(uuid())
+  message           String
+  timestamp         DateTime  @default(now())
+
+  user_id           String
+  user              Users     @relation(fields: [user_id], references: [id])
+
+  chat_id           String
+  chat              ChatMatch @relation(fields: [chat_id], references: [id])
+
+  @@index([user_id])
+  @@index([chat_id])
+}
+
+model ChatMatch {
+  id                String           @id @default(uuid())
+  created_at        DateTime         @default(now())
+
+  match_id          String           @unique           
+  match             Matches          @relation(fields: [match_id], references: [id])
+
+  messages          Messages_match[]
+}
