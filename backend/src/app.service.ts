@@ -9,9 +9,9 @@ export class AppService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async getHello(): Promise<any> {
-    const users = await this.prisma.users.findMany()
+  getHello(): string {
+    // const users = await this.prisma.users.findMany()
 
-    return 'ja de jode nashe'
+    return 'Hola'
   }
 }
