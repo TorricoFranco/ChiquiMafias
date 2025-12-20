@@ -10,7 +10,8 @@ import { MatchesModule } from './matches/matches.module'
 import { StatsModule } from './stats/stats.module'
 import { TableModule } from './table/table.module'
 import { PrismaService } from './prisma.service'
-import { ApiFootballModule } from './api-football/api-football.module';
+import { ApiFootballModule } from './api-football/api-football.module'
+import { AuthModule } from './auth/auth.module'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ApiFootballModule } from './api-football/api-football.module';
     StatsModule,
     TableModule,
     ApiFootballModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
