@@ -24,7 +24,12 @@ import { WsException } from '@nestjs/websockets'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 import { SanitizeMessagePipe } from 'src/pipes/sanitize-message.pipe'
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: {
+    origin: 'http://localhost:3000',
+    credentials: true,
+  },
+})
 export class ChatGateway implements OnModuleInit {
   @WebSocketServer()
   public server: Server

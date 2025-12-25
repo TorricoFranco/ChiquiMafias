@@ -1,5 +1,5 @@
  interface ChatMessage {
-  avatar: string;
+  avatar?: string;
   user: string;
   time: string;
   message: string;
