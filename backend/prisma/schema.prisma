@@ -37,7 +37,6 @@ model Teams {
   nicknames        Teams_nicknames[]   @relation("TeamsNicknames")
   stats            Stats_team_match[]  @relation("TeamStats")
   goals            Goals[]             @relation("TeamGoals")
-  teams_users      Users[]             @relation("TeamsUsers")
 
   @@index([name])
   @@unique([name]) // opcional: evita equipos duplicados por nombre
@@ -130,19 +129,19 @@ model League {
 }
 
 model Users {
-  id                 String      @id @default(uuid())
-  name               String
-  password           String
-  created_at         DateTime    @default(now())
-  updated_at         DateTime    @updatedAt
+  id              String   @id @default(uuid())
+  email           String   @unique
+  googleId        String   @unique
+  name            String
+  username        String?  @unique // Para el chat
+  team            String?
 
-  team_id            String
-  team               Teams?      @relation("TeamsUsers", fields: [team_id], references: [id])  
+  isFirstLogin    Boolean  @default(true) 
 
   messages_global    Messages_global[]
   messages_match     Messages_match[]     // un usuario puede tener muchos mensajes en chats de match
 
-  @@index([team_id])
+
 }
 
 model Messages_global {

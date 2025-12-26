@@ -9,7 +9,7 @@ import { TeamsModule } from './teams/teams.module'
 import { MatchesModule } from './matches/matches.module'
 import { StatsModule } from './stats/stats.module'
 import { TableModule } from './table/table.module'
-import { PrismaService } from './prisma.service'
+import { PrismaModule } from './prisma/prisma.module'
 import { ApiFootballModule } from './api-football/api-football.module'
 import { AuthModule } from './auth/auth.module'
 
@@ -26,8 +26,9 @@ import { AuthModule } from './auth/auth.module'
     TableModule,
     ApiFootballModule,
     AuthModule,
+    PrismaModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [AppService],
 })
 export class AppModule {}
