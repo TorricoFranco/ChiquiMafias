@@ -38,6 +38,7 @@ export class UsersService {
     }
   }
 
+  // Borrar despues es solo para probar no est validado ni nada
   async findAll() {
     return this.prisma.users.findMany({
       select: {
@@ -48,6 +49,12 @@ export class UsersService {
         team: true,
         isFirstLogin: true,
       },
+    })
+  }
+
+  async deleteById(username: string) {
+    return this.prisma.users.delete({
+      where: { username },
     })
   }
 }

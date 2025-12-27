@@ -1,4 +1,13 @@
-import { Controller, Patch, Body, UseGuards, Req, Get } from '@nestjs/common'
+import {
+  Controller,
+  Patch,
+  Body,
+  UseGuards,
+  Req,
+  Get,
+  Delete,
+  Query,
+} from '@nestjs/common'
 import { UsersService } from './users.service'
 // import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard' // Tu guard de JWT
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
@@ -23,5 +32,10 @@ export class UsersController {
   @Get()
   async getAllUsers() {
     return this.usersService.findAll()
+  }
+
+  @Delete()
+  deleteUser(@Query('user') user: string) {
+    return this.usersService.deleteById(user)
   }
 }

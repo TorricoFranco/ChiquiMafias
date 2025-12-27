@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useUserStore } from "@/store/useUserStore";
+
 
 declare global {
   interface Window {
@@ -15,6 +17,9 @@ interface GoogleLoginButtonProps {
 
 export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
+
+  const { setUserInfo } = useUserStore();
+  
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -38,11 +43,17 @@ export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps)
 
               if (!res.ok) throw new Error("Error en la autenticación");
 
-            const { token } = await res.json();
-            localStorage.setItem("token", token.access_token);
 
-              // Ejecutamos la función pasando el objeto user completo { id, name, isFirstLogin }
-              onSuccess(token.user);
+              const { token } = await res.json();
+              localStorage.setItem("token", token.access_token);
+              setUserInfo({
+                id: token.user.id,
+                username: token.user.username ?? token.user.name,
+                isFirstLogin: token.user.isFirstLogin
+              });
+
+                // Ejecutamos la función pasando el objeto user completo { id, name, isFirstLogin }
+                onSuccess(token.user);
               
             } catch (error) {
               console.error("Error al loguear con Google:", error);
