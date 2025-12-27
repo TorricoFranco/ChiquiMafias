@@ -4,15 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { CompleteProfileDto } from './complete-profile.dto'
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async completeProfile(
-    userId: string,
-    data: { username: string; team: string },
-  ) {
+  async completeProfile(userId: string, data: CompleteProfileDto) {
     // 1. Verificar si el username ya existe (y no es el del propio usuario)
     const existingUser = await this.prisma.users.findUnique({
       where: { username: data.username },
