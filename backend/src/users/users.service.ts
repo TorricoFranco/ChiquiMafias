@@ -37,4 +37,17 @@ export class UsersService {
       throw new NotFoundException('Usuario no encontrado')
     }
   }
+
+  async findAll() {
+    return this.prisma.users.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        username: true,
+        team: true,
+        isFirstLogin: true,
+      },
+    })
+  }
 }

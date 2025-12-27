@@ -8,13 +8,14 @@ declare global {
   }
 }
 
-export default function GoogleLoginButton({
-  onSuccess,
-}: {
-  onSuccess: () => void;
-}) {
+// Definimos la interfaz para recibir los datos del usuario
+interface GoogleLoginButtonProps {
+  onSuccess: (user: any) => void;
+}
+
+export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
-  console.log(process.env.NEXT_PUBLIC_API_URL,process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (window.google && buttonRef.current) {
@@ -23,27 +24,36 @@ export default function GoogleLoginButton({
         window.google.accounts.id.initialize({
           client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
           callback: async (response: any) => {
-            const res = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/auth/google`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  credential: response.credential,
-                }),
-              }
-            );
+            try {
+              const res = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/auth/google`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    credential: response.credential,
+                  }),
+                }
+              );
+
+              if (!res.ok) throw new Error("Error en la autenticación");
 
             const { token } = await res.json();
-            localStorage.setItem("token", token);
+            localStorage.setItem("token", token.access_token);
 
-            onSuccess();
+              // Ejecutamos la función pasando el objeto user completo { id, name, isFirstLogin }
+              onSuccess(token.user);
+              
+            } catch (error) {
+              console.error("Error al loguear con Google:", error);
+            }
           },
         });
 
         window.google.accounts.id.renderButton(buttonRef.current, {
           theme: "outline",
           size: "large",
+          shape: "pill",
         });
       }
     }, 100);
@@ -51,5 +61,5 @@ export default function GoogleLoginButton({
     return () => clearInterval(interval);
   }, [onSuccess]);
 
-  return <div ref={buttonRef} />;
+  return <div ref={buttonRef} className="flex justify-center w-full" />;
 }

@@ -7,7 +7,7 @@ import { useChatSocket } from "@/hook/useChatSocket";
 import LoginModal from "@/components/auth/LoginModal";
 
 export default function ChatPanel({ title }: { title?: string }) {
-  const { messages, sendMessage } = useChatSocket();
+  const { messages, sendMessage, reconnect } = useChatSocket();
   const [input, setInput] = useState("");
   const [showLogin, setShowLogin] = useState(false);
 
@@ -57,7 +57,11 @@ export default function ChatPanel({ title }: { title?: string }) {
       {showLogin && (
         <LoginModal
           onClose={() => setShowLogin(false)}
-        />
+          onSuccess={() => {
+            reconnect();      
+            setShowLogin(false);
+          }}
+       />
       )}
     </>
   );

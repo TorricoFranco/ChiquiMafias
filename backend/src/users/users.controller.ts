@@ -1,4 +1,4 @@
-import { Controller, Patch, Body, UseGuards, Req } from '@nestjs/common'
+import { Controller, Patch, Body, UseGuards, Req, Get } from '@nestjs/common'
 import { UsersService } from './users.service'
 // import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard' // Tu guard de JWT
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
@@ -18,5 +18,10 @@ export class UsersController {
     const userId = req.user.id
 
     return await this.usersService.completeProfile(userId, body)
+  }
+
+  @Get()
+  async getAllUsers() {
+    return this.usersService.findAll()
   }
 }

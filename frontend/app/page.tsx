@@ -19,7 +19,7 @@ export default function Page() {
 
             <Panel defaultSize={75}>
               <PanelGroup direction="vertical">
-                <Panel defaultSize={70}><ChatPanel title="Chat Global 🎇" messages={MOCK_CHAT} className="h-full" /></Panel>
+                <Panel defaultSize={70}><ChatPanel title="Chat Global 🎇" className="h-full" /></Panel>
 
                 {/* 👇 otro handle vertical */}
                 <ResizeHandle direction="vertical" />

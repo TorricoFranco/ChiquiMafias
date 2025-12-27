@@ -1,48 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { connectSocket } from "@/services/socket";
-// import { ChatMessage } from "@/types/messages";
 import { ChatMessagesProps } from "@/types/messages";
+import { Socket } from "socket.io-client";
 
 export function useChatSocket() {
+  const socketRef = useRef<Socket | null>(null);
+
   const [messages, setMessages] = useState<ChatMessagesProps[]>([]);
-  const [users, setUsers] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
 
-  useEffect(() => {
+  const connect = () => {
     const token = localStorage.getItem("token");
-    const socket = connectSocket(token ?? undefined);
 
-    socket.on("connect", () => setConnected(true));
+    // 1. Si ya existe un socket, lo matamos completamente
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners(); // Limpiamos eventos viejos
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    // 2. Creamos la conexión nueva
+    // Es vital que tu función connectSocket use el token en la propiedad 'auth'
+    socketRef.current = connectSocket(token ?? undefined);
+
+    const socket = socketRef.current;
+
+    socket.on("connect", () => {
+      console.log("Socket Conectado con ID:", socket.id);
+      setConnected(true);
+    });
+
     socket.on("disconnect", () => setConnected(false));
 
     socket.on("on-message", (msg) => {
       setMessages((prev) => [...prev, msg]);
     });
 
-    socket.on("on-clients-changed", (users) => {
-      setUsers(users.map((u: any) => u.name));
+    // IMPORTANTE: Escuchar errores de conexión (auth errors)
+    socket.on("connect_error", (err) => {
+      console.error("Error de conexión (posible token vencido):", err.message);
     });
-
-    socket.on("ws-error", (err) => {
-      console.error("WS ERROR", err);
-    });
+  };
+  
+  useEffect(() => {
+    connect();
 
     return () => {
-      socket.off();
+      socketRef.current?.disconnect();
     };
   }, []);
 
   const sendMessage = (body: string) => {
-    const socket = connectSocket();
-    socket.emit("send-message", { body });
+    if (!socketRef.current || !connected) return;
+    socketRef.current.emit("send-message", { body });
   };
 
   return {
     messages,
-    users,
     connected,
     sendMessage,
+    reconnect: connect,
   };
 }
