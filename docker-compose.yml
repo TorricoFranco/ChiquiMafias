@@ -1,6 +1,15 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
   postgres:
     image: postgres:15
     container_name: football_postgres
@@ -43,4 +52,5 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 

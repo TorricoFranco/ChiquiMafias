@@ -141,7 +141,32 @@ model Users {
   messages_global    Messages_global[]
   messages_match     Messages_match[]     // un usuario puede tener muchos mensajes en chats de match
 
+  votes Vote[] 
+}
 
+// SISTEMA DE VOTACIÓN
+model Poll {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  options     Json     // Ejemplo: [{id: 1, name: "Messi"}, {id: 2, name: "Dibu"}]
+  status      String   @default("PENDING") // PENDING, ACTIVE, CLOSED
+  createdAt   DateTime @default(now())
+  startsAt    DateTime
+  endsAt      DateTime
+  votes       Vote[]
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  pollId    String
+  userId    String
+  optionId  Int
+
+  poll Poll @relation(fields: [pollId], references: [id])
+  user Users @relation(fields: [userId], references: [id])
+
+  @@unique([pollId, userId])
 }
 
 model Messages_global {

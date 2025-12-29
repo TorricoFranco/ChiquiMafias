@@ -12,6 +12,9 @@ import { TableModule } from './table/table.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ApiFootballModule } from './api-football/api-football.module'
 import { AuthModule } from './auth/auth.module'
+import { PollsModule } from './polls/polls.module'
+import { RedisModule } from './redis/redis.module'
+import { ScheduleModule } from '@nestjs/schedule'
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import { AuthModule } from './auth/auth.module'
     ApiFootballModule,
     AuthModule,
     PrismaModule,
+    PollsModule,
+    RedisModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService],
