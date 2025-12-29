@@ -152,6 +152,7 @@ model Poll {
   options     Json     // Ejemplo: [{id: 1, name: "Messi"}, {id: 2, name: "Dibu"}]
   status      String   @default("PENDING") // PENDING, ACTIVE, CLOSED
   createdAt   DateTime @default(now())
+  icon        String   @default("USER")
   startsAt    DateTime
   endsAt      DateTime
   votes       Vote[]

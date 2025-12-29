@@ -36,4 +36,8 @@ export class CreatePollDto {
 
   @IsDateString()
   endsAt: string
+
+  @IsOptional()
+  @IsString()
+  icon?: string
 }

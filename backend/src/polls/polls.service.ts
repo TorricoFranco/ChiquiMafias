@@ -20,6 +20,7 @@ export class PollsService {
         options: JSON.parse(JSON.stringify(dto.options)),
         startsAt: new Date(dto.startsAt),
         endsAt: new Date(dto.endsAt),
+        icon: dto.icon,
       },
     })
   }
@@ -28,7 +29,13 @@ export class PollsService {
   async getActivePolls() {
     return this.prisma.poll.findMany({
       where: { status: 'ACTIVE' },
-      select: { id: true, title: true, endsAt: true }, // Solo lo necesario
+      select: {
+        id: true,
+        title: true,
+        endsAt: true,
+        icon: true,
+        description: true,
+      }, // Solo lo necesario
     })
   }
 
@@ -69,6 +76,7 @@ export class PollsService {
         createdAt: true,
         startsAt: true,
         endsAt: true,
+        icon: true,
       },
     })
   }
