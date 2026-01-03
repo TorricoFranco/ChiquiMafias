@@ -11,7 +11,6 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async completeProfile(userId: string, data: CompleteProfileDto) {
-    // 1. Verificar si el username ya existe (y no es el del propio usuario)
     const existingUser = await this.prisma.users.findUnique({
       where: { username: data.username },
     })
@@ -20,14 +19,13 @@ export class UsersService {
       throw new ConflictException('El nombre de usuario ya está en uso')
     }
 
-    // 2. Actualizar el usuario
     try {
       return await this.prisma.users.update({
         where: { id: userId },
         data: {
           username: data.username,
           team: data.team,
-          isFirstLogin: false, // ¡Aquí cerramos el ciclo de onboarding!
+          isFirstLogin: false,
         },
       })
     } catch (error) {
@@ -36,7 +34,6 @@ export class UsersService {
     }
   }
 
-  // Borrar despues es solo para probar no est validado ni nada
   async findAll() {
     return this.prisma.users.findMany({
       select: {

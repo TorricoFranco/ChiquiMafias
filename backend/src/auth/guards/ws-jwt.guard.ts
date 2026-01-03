@@ -15,8 +15,9 @@ export class WsJwtGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client = context.switchToWs().getClient<SocketWithUser>()
     const token = client.handshake.auth?.token as string
-
-    if (!token) throw new WsException('No token provided')
+    if (!token) {
+      throw new WsException('No token provided')
+    }
 
     try {
       const payload = this.jwtService.verify<JwtPayload>(token)
@@ -32,7 +33,8 @@ export class WsJwtGuard implements CanActivate {
       client.data.user = user
       return true
     } catch (error) {
-      throw new WsException('Unauthorized')
+      if (error instanceof WsException) throw error
+      throw new WsException('Invalid or expired token')
     }
   }
 }

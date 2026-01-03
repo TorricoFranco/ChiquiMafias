@@ -1,26 +1,57 @@
-// src/components/votaciones/VotacionesResumen.tsx
 "use client";
-import { MOCK_VOTACIONES } from "@/lib/mocks";
-import { ChevronRight } from "lucide-react";
+
+import { useEffect, useState } from "react";
+import { VoteCard } from "./VoteCard";
+
+interface Poll {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  endsAt: string;
+}
 
 export default function VotingSummary() {
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchPolls() {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/polls/active`);
+        const data = await response.json();
+        setPolls(data);
+      } catch (error) {
+        console.error("Error cargando votaciones:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPolls();
+  }, []);
+
+  if (loading) return <div className="p-4 text-white">Cargando votaciones...</div>;
+
   return (
     <div className="bg-[#181818] p-4 flex flex-col h-full">
       <h2 className="text-lg font-semibold text-white mb-3">Votaciones Destacadas</h2>
-      <div className="flex space-x-4 overflow-x-auto pb-2 custom-scrollbar">
-        {MOCK_VOTACIONES.map((vote, i) => (
-          <div key={i} className="flex-shrink-0 w-64 p-4 bg-[#1f1f1f] rounded-xl border border-[#2b2b2b]">
-            <div className="flex items-center justify-between mb-2">
-              <div>{vote.icon}</div>
-              <span className="text-sm font-medium text-yellow-400">{vote.subtitle}</span>
-            </div>
-            <p className="text-base font-semibold text-white truncate mb-2">{vote.title}</p>
-            <button className="text-xs text-gray-400 flex items-center bg-[#2b2b2b] px-2 py-1 rounded-full">
-              Ver votación <ChevronRight className="w-3 h-3 ml-1" />
-            </button>
-          </div>
-        ))}
-      </div>
+      
+      {polls.length === 0 ? (
+        <p className="text-gray-500 text-sm">No hay votaciones activas en este momento.</p>
+      ) : (
+        <div className="flex space-x-4 overflow-x-auto pb-2 custom-scrollbar">
+          {polls.map((poll) => (
+            <VoteCard
+              key={poll.id}
+              id={poll.id}
+              title={poll.title}
+              description={poll.description}
+              iconKey={poll.icon}
+              endsAt={poll.endsAt}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -18,13 +18,11 @@ export class PollsController {
     return this.pollsService.getFindPolls()
   }
 
-  //  Listar encuestas activas (Para el front principal)
   @Get('active')
   async findActive() {
     return this.pollsService.getActivePolls()
   }
 
-  //  Ver detalle de una encuesta (Datos de DB + Votos de Redis)
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.pollsService.getPollWithResults(id)

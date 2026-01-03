@@ -14,7 +14,7 @@ export class TasksService {
 
   // DETECTAR CUANDO UNA POLL DEBE PASAR A ACTIVE O  CLOSE
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async handlePollStatus() {
     const now = new Date()
 

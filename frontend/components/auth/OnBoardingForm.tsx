@@ -23,14 +23,14 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
     });
 
     if (res.ok) {
-        //  const { token } = await res.json();
+
         console.log(res.body)
-        // Actualizamos Zustand y automáticamente se guarda en LocalStorage
+        // Actualizamos Zustand
         setUserInfo({
         username: username,
         team: team,
         isFirstLogin: false
-  });
+      });
  
       onComplete(); // Cerramos todo y vamos al chat
     } else {

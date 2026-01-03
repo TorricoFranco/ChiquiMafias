@@ -14,15 +14,14 @@ export function useChatSocket() {
   const connect = () => {
     const token = localStorage.getItem("token");
 
-    // 1. Si ya existe un socket, lo matamos completamente
+    //  Si ya existe un socket, lo matamos completamente
     if (socketRef.current) {
       socketRef.current.removeAllListeners(); // Limpiamos eventos viejos
       socketRef.current.disconnect();
       socketRef.current = null;
     }
 
-    // 2. Creamos la conexión nueva
-    // Es vital que tu función connectSocket use el token en la propiedad 'auth'
+    // Creamos la conexión nueva
     socketRef.current = connectSocket(token ?? undefined);
 
     const socket = socketRef.current;
@@ -38,9 +37,9 @@ export function useChatSocket() {
       setMessages((prev) => [...prev, msg]);
     });
 
-    // IMPORTANTE: Escuchar errores de conexión (auth errors)
+
     socket.on("connect_error", (err) => {
-      console.error("Error de conexión (posible token vencido):", err.message);
+      console.error("Error de conexión");
     });
   };
   

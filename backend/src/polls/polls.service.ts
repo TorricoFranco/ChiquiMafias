@@ -3,7 +3,6 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 import { CreatePollDto } from './dto/create-poll.dto'
 
-// En tu PollsService
 @Injectable()
 export class PollsService {
   constructor(

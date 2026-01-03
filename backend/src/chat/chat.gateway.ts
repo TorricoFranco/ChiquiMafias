@@ -4,6 +4,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets'
 import {
   OnModuleInit,
@@ -20,7 +21,6 @@ import { SendMessageDto } from './send-message.dto'
 import type { SocketWithUser } from 'src/auth/interfaces/jwt-payload.interface'
 import { WsJwtGuard } from 'src/auth/guards/ws-jwt.guard'
 
-import { WsException } from '@nestjs/websockets'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 import { SanitizeMessagePipe } from 'src/pipes/sanitize-message.pipe'
 
@@ -78,6 +78,9 @@ export class ChatGateway implements OnModuleInit {
     @ConnectedSocket() client: SocketWithUser,
   ) {
     // client.data.user ahora viene de la DB gracias al Guard
+    if (!client.data?.user?.id) {
+      throw new WsException('No autenticado')
+    }
     const user = client.data.user
 
     const rate = this.chatService.checkMessageRate(user.id)
@@ -97,7 +100,7 @@ export class ChatGateway implements OnModuleInit {
     this.server.emit('on-message', {
       userId: user.id,
       name: user.username || user.name, // Usamos el username si ya hizo el onboarding
-      teamName: user.team, // ¡Ya tienes el equipo disponible!
+      teamName: user.team,
       message: body.body,
     })
   }
