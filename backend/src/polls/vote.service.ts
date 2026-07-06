@@ -21,7 +21,6 @@ export class VoteService {
     const hasVoted = await this.redisService.redis.sismember(voterKey, userId)
 
     if (hasVoted) {
-      // Lanzamos WsException con un objeto para que el front reciba el código
       throw new WsException({
         status: 'error',
         code: 'ALREADY_VOTED',
@@ -29,14 +28,13 @@ export class VoteService {
       })
     }
 
-    // Bloqueo de 2 seg despues de votar
     await this.redisService.redis.set(cooldownKey, '1', 'EX', 2)
 
     await this.redisService.redis
       .multi()
       .hincrby(resultsKey, optionId.toString(), 1)
       .sadd(voterKey, userId)
-      .hset(detailKey, userId, optionId.toString()) // Guardamos la relación
+      .hset(detailKey, userId, optionId.toString())
       .exec()
 
     return this.redisService.redis.hgetall(resultsKey)

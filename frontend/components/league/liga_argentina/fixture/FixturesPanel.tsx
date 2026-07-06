@@ -1,100 +1,161 @@
-"use client";
-import {  AlertTriangle, ChevronRight, ChevronLeft, Calendar, CheckCircle } from 'lucide-react';
-import { Matchday, Match } from '@/lib/mocks';
+'use client'
 
-import { useState } from "react";
+import { AlertTriangle, Calendar } from 'lucide-react'
+import Link from 'next/link'
+import { FixtureMatch } from './fixtureMatch'
 
-export const FixturesPanel: React.FC<{ tournament: 'apertura' | 'clausura', fixtures: Matchday[] }> = ({ tournament, fixtures }) => {
-    const [activeMatchday, setActiveMatchday] = useState(fixtures.length > 0 ? 8 : 1); // Empezamos en la jornada 8
-
-    if (fixtures.length === 0) {
-        return (
-            <div className="p-6 bg-gray-800 rounded-xl shadow-2xl">
-                <AlertTriangle className="w-8 h-8 text-yellow-500 mx-auto mb-3" />
-                <h3 className="text-xl font-bold text-white text-center">Calendario No Disponible</h3>
-                <p className="text-gray-400 text-sm text-center mt-2">
-                    El Torneo {tournament === 'apertura' ? 'Clausura' : 'Apertura'} aún no ha terminado. Los partidos se anuncian al finalizar la fase anterior.
-                </p>
-            </div>
-        );
-    }
-
-    const currentMatchdayData = fixtures.find(f => f.matchday === activeMatchday);
-    const totalMatchdays = fixtures.length;
-
-    const handleNext = () => setActiveMatchday(prev => Math.min(prev + 1, totalMatchdays));
-    const handlePrev = () => setActiveMatchday(prev => Math.max(prev - 1, 1));
-    const handleGoTo = (day: number) => setActiveMatchday(day);
-
-    const renderMatch = (match: Match, index: number) => (
-        <div key={index} className="flex justify-between items-center p-3 bg-gray-700/40 rounded-lg shadow-inner text-sm mb-2 hover:bg-gray-700 transition duration-150">
-            <div className="font-medium text-right w-5/12 truncate pr-1">
-                {match.homeTeam}
-            </div>
-            <div className={`font-extrabold w-2/12 text-center flex-shrink-0 px-1 rounded-full ${match.status === 'played' ? 'text-yellow-400 bg-gray-900/50' : 'text-gray-400'}`}>
-                {match.result}
-            </div>
-            <div className="font-medium text-left w-5/12 truncate pl-1">
-                {match.awayTeam}
-            </div>
-        </div>
-    );
-
-    return (
-        <div className="p-4 bg-gray-800 rounded-xl shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center border-b border-gray-700 pb-2">
-                <Calendar className="w-5 h-5 mr-2 text-green-400" /> Partidos - {tournament === 'apertura' ? 'Apertura' : 'Clausura'}
-            </h3>
-
-            {/* Selector de Jornada */}
-            <div className="flex items-center justify-between bg-gray-900 p-2 rounded-lg mb-4 shadow-md">
-                <button 
-                    onClick={handlePrev} 
-                    disabled={activeMatchday === 1}
-                    className="p-1 rounded-full text-gray-400 disabled:opacity-30 hover:bg-gray-700 transition-colors"
-                >
-                    <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="flex-1 text-center">
-                    <span className="text-lg font-extrabold text-sky-400">Jornada {activeMatchday}</span>
-                    <span className="text-xs text-gray-500 block">({currentMatchdayData?.matches.length} partidos)</span>
-                </div>
-                <button 
-                    onClick={handleNext} 
-                    disabled={activeMatchday === totalMatchdays}
-                    className="p-1 rounded-full text-gray-400 disabled:opacity-30 hover:bg-gray-700 transition-colors"
-                >
-                    <ChevronRight className="w-5 h-5" />
-                </button>
-            </div>
-            
-            {/* Scroll de Jornadas (Números) */}
-            <div className="flex overflow-x-auto whitespace-nowrap space-x-2 pb-2 custom-scrollbar-horizontal mb-4">
-                {Array.from({ length: totalMatchdays }, (_, i) => i + 1).map(day => (
-                    <button
-                        key={day}
-                        onClick={() => handleGoTo(day)}
-                        className={`flex-shrink-0 w-8 h-8 rounded-full text-sm font-bold transition-all duration-200 ${
-                            day === activeMatchday
-                                ? 'bg-sky-600 text-white shadow-lg border-2 border-sky-300 scale-110'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                        title={`Ir a Jornada ${day}`}
-                    >
-                        {day}
-                    </button>
-                ))}
-            </div>
-
-            {/* Lista de Partidos */}
-            <div className="h-96 overflow-y-auto pr-2 custom-scrollbar-vertical">
-                {currentMatchdayData?.matches.map(renderMatch)}
-            </div>
-
-            <div className="mt-4 p-2 text-xs text-gray-500 border-t border-gray-700 flex items-center">
-                <CheckCircle className="w-3 h-3 mr-1 text-yellow-400" /> 
-                <span className="font-semibold text-white">Estado:</span> Los partidos hasta la Jornada 8 han finalizado (simulado).
-            </div>
-        </div>
-    );
+interface Props {
+  tournament: 'APERTURA' | 'CLAUSURA'
+  matches: any[]
+  activeMatchday: number | string
+  onSelectMatchday: (m: any) => void
+  availableStages?: { regular: number[]; playoffs: string[] }
+  liveResults?: Record<string, any>
 }
+
+
+const STAGE_LABELS: Record<string, { short: string; full: string }> = {
+  'octavos': { short: '8vos', full: 'Octavos de Final' },
+  'cuartos': { short: '4tos', full: 'Cuartos de Final' },
+  'semifinal': { short: 'Semi', full: 'Semifinales' },
+  'final': { short: 'Final', full: 'Final' },
+};
+
+const formatMatchDate = (dateString: string) => {
+  const matchDate = new Date(dateString);
+  const now = new Date();
+  const isToday = matchDate.toDateString() === now.toDateString();
+
+  const tomorrow = new Date();
+  tomorrow.setDate(now.getDate() + 1);
+  const isTomorrow = matchDate.toDateString() === tomorrow.toDateString();
+
+  const time = matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) return `Hoy ${time}`;
+  if (isTomorrow) return `Mañ. ${time}`;
+
+  return matchDate.toLocaleDateString([], { day: '2-digit', month: '2-digit' }) + ` ${time}`;
+};
+
+export const FixturesPanel = ({
+  tournament,
+  matches,
+  activeMatchday,
+  onSelectMatchday,
+  availableStages = { regular: Array.from({ length: 14 }, (_, i) => i + 1), playoffs: [] },
+  liveResults = {}
+}: Props) => {
+  const currentStageLabel = typeof activeMatchday === 'number'
+    ? `FECHA ${activeMatchday}`
+    : (STAGE_LABELS[activeMatchday as string]?.full.toUpperCase() || activeMatchday);
+
+  return (
+    <div className="p-4 bg-[#161616] rounded-xl border border-gray-800/50 shadow-2xl">
+      <div className="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
+        <h3 className="text-lg font-bold text-white flex items-center">
+          <Calendar className="w-5 h-5 mr-2 text-sky-500" />
+          Fixture {tournament === 'APERTURA' ? 'Apertura' : 'Clausura'}
+        </h3>
+        {/* Label dinámico según la fase */}
+        <span className="text-[10px] bg-sky-500/10 text-sky-500 px-2 py-1 rounded-md font-bold transition-all">
+          {currentStageLabel}
+        </span>
+      </div>
+
+      {/* Selector de Jornadas Mejorado */}
+      <div className="flex items-center overflow-x-auto space-x-2 py-2 mb-4 scrollbar-hide border-b border-gray-800/50 custom-scrollbar">
+
+        {/* 1. RENDERIZAR FECHAS REGULARES (Círculos) */}
+        {availableStages.regular.map((mNumber) => (
+          <button
+            key={`reg-${mNumber}`}
+            onClick={() => onSelectMatchday(mNumber)}
+            className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all duration-300
+              ${mNumber === activeMatchday
+                ? 'bg-sky-500 text-white shadow-[0_0_15px_rgba(14,165,233,0.4)] scale-110'
+                : 'bg-gray-900 text-gray-500 hover:bg-gray-800 hover:text-gray-300'
+              }`}
+          >
+            {mNumber}
+          </button>
+        ))}
+
+        {/* Separador visual si hay ambos */}
+        {availableStages.playoffs.length > 0 && (
+          <div className="w-[1px] h-6 bg-gray-800 mx-1" />
+        )}
+
+        {/* 2. RENDERIZAR PLAYOFFS (Pills ovaladas para que entre el texto) */}
+        {availableStages.playoffs.map((pKey) => {
+          const isActive = activeMatchday === pKey;
+          const label = STAGE_LABELS[pKey.toLowerCase()]?.short || pKey;
+
+          return (
+            <button
+              key={`playoff-${pKey}`}
+              onClick={() => onSelectMatchday(pKey)}
+              className={`flex-shrink-0 px-4 h-9 rounded-full flex items-center justify-center text-[10px] font-bold uppercase tracking-wider transition-all duration-300
+                ${isActive
+                  ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)] scale-105'
+                  : 'bg-gray-900 text-gray-500 hover:bg-gray-800 hover:text-gray-300 border border-gray-800'
+                }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Listado de partidos (Misma lógica que tenías) */}
+      <div className="h-[650px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="space-y-1.5">
+          {matches.map((match) => {
+            const liveUpdate = liveResults[match.id];
+            const liveStatuses = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'];
+            const currentStatus = liveUpdate?.status || match.status_short;
+            const isLive = liveStatuses.includes(currentStatus);
+            const isFinished = ['FT', 'AET', 'PEN'].includes(currentStatus);
+
+            let displayStatus = "";
+            if (isLive) {
+              displayStatus = liveUpdate?.elapsed ? `${liveUpdate.elapsed}'` : (match.elapsed ? `${match.elapsed}'` : 'LIVE');
+            } else if (isFinished) {
+              displayStatus = 'FT';
+            } else {
+              displayStatus = formatMatchDate(match.date);
+            }
+
+            const normalizedMatch = {
+              ...match,
+              home_goals: liveUpdate ? liveUpdate.h : match.home_goals,
+              away_goals: liveUpdate ? liveUpdate.a : match.away_goals,
+              status_short: currentStatus,
+              display_status: displayStatus,
+              is_live: isLive
+            };
+
+            return (
+              <Link
+                key={match.id}
+                href={`/match/${match.id}`}
+                className="block group scale-[0.98] hover:scale-[1] transition-transform origin-left"
+              >
+                <FixtureMatch match={normalizedMatch} />
+              </Link>
+            );
+          })}
+          {
+            matches.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-600">
+                <AlertTriangle className="w-8 h-8 mb-2 opacity-20" />
+                <p className="text-sm italic">No hay partidos cargados</p>
+              </div>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+

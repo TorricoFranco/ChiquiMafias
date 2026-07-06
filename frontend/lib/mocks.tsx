@@ -298,16 +298,17 @@ export type PromedioRow = {
 };
 
 export type Match = {
-    homeTeam: string;
-    awayTeam: string;
-    result: string; // e.g., "2 - 1" or "vs"
-    status: 'played' | 'pending';
-    zone: 'A' | 'B';
-};
+  homeTeam: string
+  awayTeam: string
+  result: string
+  status: 'played' | 'pending' | 'live'
+  zone: 'A' | 'B'
+  date: string
+}
 
 export type Matchday = {
     matchday: number;
-    matches: Match[]; // 15 matches total (8 Zona A + 7 Zona B, o viceversa)
+    matches: Match[]; 
 };
 
 

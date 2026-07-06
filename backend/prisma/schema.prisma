@@ -7,212 +7,775 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* -------------------------
-   Enums
-   ------------------------- */
-enum MatchStatus {
-  SCHEDULED
-  LIVE
-  FINISHED
-  POSTPONED
-}
-
-/* -------------------------
-   Models
-   ------------------------- */
-
 model Teams {
-  id               String              @id @default(uuid())
-  name             String
-  logo_url         String?
-  stadium          String?
-  foundation_year  Int?
-  country          String?
-  created_at       DateTime            @default(now())
-  updated_at       DateTime            @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  logo_url        String?
+  foundation_year Int?
+  country         String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  api_team_id     Int      @unique
+  short_code      String?
+  venue_id        String?
 
-  matches_home     Matches[]           @relation("HomeMatches")
-  matches_away     Matches[]           @relation("AwayMatches")
+  legacyStats TeamLegacyStats?
 
-  nicknames        Teams_nicknames[]   @relation("TeamsNicknames")
-  stats            Stats_team_match[]  @relation("TeamStats")
-  goals            Goals[]             @relation("TeamGoals")
+  leagueSeasonGroups LeagueSeasonGroups[]
+  leagueTeams        LeagueTeams[]
+  lineups            MatchLineup[]
+  match_players      MatchPlayer[]
+  matches_away       Matches[]            @relation("AwayMatches")
+  matches_home       Matches[]            @relation("HomeMatches")
+  stats              Stats_team_match[]   @relation("TeamStats")
+
+  events          MatchEvents[]
+  teamSeasonStats TeamSeasonStats[]
+  venue           Venues?           @relation(fields: [venue_id], references: [id])
+  nicknames       Teams_nicknames[]
 
   @@index([name])
-  @@unique([name]) // opcional: evita equipos duplicados por nombre
+}
+
+model TeamLegacyStats {
+  id      String @id @default(uuid())
+  team_id String @unique // Un registro por equipo
+  team    Teams  @relation(fields: [team_id], references: [id])
+
+  points_2024 Int @default(0)
+  played_2024 Int @default(0)
+
+  points_2025 Int @default(0)
+  played_2025 Int @default(0)
+
+  @@index([team_id])
+}
+
+model Venues {
+  id           String    @id @default(uuid())
+  api_venue_id Int?      @unique
+  name         String
+  address      String?
+  city         String?
+  capacity     Int?
+  surface      String?
+  image_url    String?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  matches      Matches[]
+  teams        Teams[]
+}
+
+model LeagueTeams {
+  id         String   @id @default(uuid())
+  league_id  String
+  team_id    String
+  created_at DateTime @default(now())
+  season     Int
+  league     Leagues  @relation(fields: [league_id], references: [id])
+  team       Teams    @relation(fields: [team_id], references: [id])
+
+  @@unique([league_id, team_id, season])
 }
 
 model Teams_nicknames {
-  id               String     @id @default(uuid())
-  nickname         String
-  created_at       DateTime   @default(now())
-  updated_at       DateTime   @updatedAt
-
-  // FK
-  team_id          String
-  team             Teams      @relation("TeamsNicknames", fields: [team_id], references: [id])
+  id         String   @id @default(uuid())
+  nickname   String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  team_id    String
+  team       Teams    @relation(fields: [team_id], references: [id])
 
   @@unique([team_id, nickname])
   @@index([team_id])
 }
 
 model Matches {
-  id              String   @id @default(uuid())
-  season          String?
-  status          MatchStatus?  // enum
-  date            DateTime?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                 String      @id @default(uuid())
+  status             MatchStatus @default(SCHEDULED)
+  date               DateTime
+  created_at         DateTime    @default(now())
+  updated_at         DateTime    @updatedAt
+  home_team_id       String
+  away_team_id       String
+  league_id          String
+  api_fixture_id     Int         @unique
+  away_goals         Int?
+  home_goals         Int?
+  home_penalty_goals Int?
+  away_penalty_goals Int?
+  elapsed            Int?
+  extra_time         Int?
+  referee            String?
+  tournament         String
+  round              String
+  status_long        String
+  status_short       String
+  timestamp          Int
+  timezone           String?
+  venue_id           String?
+  season             Int
 
-  home_team_id    String
-  home_team       Teams   @relation("HomeMatches", fields: [home_team_id], references: [id])
+  tracked           Boolean   @default(false)
+  is_live_finished  Boolean   @default(false)
+  lineup_fetched    Boolean   @default(false)
+  lineup_fetched_at DateTime?
+  events_fetched    Boolean   @default(false)
+  events_fetched_at DateTime?
+  events_finalized  Boolean   @default(false)
+  stats_fetched     Boolean   @default(false)
+  stats_finalized   Boolean   @default(false)
+  market_created    Boolean     @default(false)
 
-  away_team_id    String
-  away_team       Teams   @relation("AwayMatches", fields: [away_team_id], references: [id])
-
-  league_id       String
-  league          League  @relation("LeagueMatches", fields: [league_id], references: [id])
-
-  chat            ChatMatch?
-  stats           Stats_team_match[]  @relation("MatchStats")
-  goals           Goals[]             @relation("MatchGoals")
+  events        MatchEvents[]
+  lineups       MatchLineup[]
+  match_players MatchPlayer[]
+  away_team     Teams              @relation("AwayMatches", fields: [away_team_id], references: [id])
+  home_team     Teams              @relation("HomeMatches", fields: [home_team_id], references: [id])
+  league        Leagues            @relation(fields: [league_id], references: [id])
+  venue         Venues?            @relation(fields: [venue_id], references: [id])
+  stats         Stats_team_match[]
 
   @@index([date])
-  @@index([home_team_id])
-  @@index([away_team_id])
+  @@index([league_id, season])
+  @@index([status_short])
+  @@index([tracked, timestamp])
+  @@index([tracked, lineup_fetched, date])
+  @@index([tracked, is_live_finished])
+  @@index([market_created, date])
+}
+
+model Leagues {
+  id                 String               @id @default(uuid())
+  api_league_id      Int                  @unique
+  name               String
+  type               String?
+  country            String?
+  logo_url           String?
+  created_at         DateTime             @default(now())
+  updated_at         DateTime             @updatedAt
+  leagueSeasonGroups LeagueSeasonGroups[]
+  leagueTeams        LeagueTeams[]
+  matches            Matches[]
+  teamSeasonStats    TeamSeasonStats[]
+}
+
+model Players {
+  id          String    @id @default(uuid())
+  api_id      Int       @unique
+  name        String
+  firstname   String?
+  lastname    String?
+  age         Int?
+  birth_date  DateTime?
+  nationality String?
+  height      String?
+  weight      String?
+  position    String?
+  photo       String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  lineups MatchPlayer[]
+  events  MatchEvents[] @relation("PlayerEvent")
+  assists MatchEvents[] @relation("AssistEvent")
+}
+
+model MatchEvents {
+  id           String  @id @default(uuid())
+  match_id     String
+  team_id      String?
+  player_id    String?
+  assist_id    String?
+  minute       Int
+  extra_minute Int?
+  type         String
+  detail       String
+  api_event_id String
+
+  match  Matches  @relation(fields: [match_id], references: [id])
+  player Players? @relation("PlayerEvent", fields: [player_id], references: [id])
+  assist Players? @relation("AssistEvent", fields: [assist_id], references: [id])
+  team   Teams?   @relation(fields: [team_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([match_id, api_event_id])
+  @@index([match_id])
 }
 
 model Stats_team_match {
-  id              String      @id @default(uuid())
-  shots_total     Int?
-  fouls_total     Int?
-  corners_total   Int?
-  possession_pct  Float?      
-  created_at      DateTime    @default(now())
-  updated_at      DateTime    @updatedAt
+  id       String @id @default(uuid())
+  match_id String
+  team_id  String
+  data     Json
 
-  match_id        String
-  match           Matches     @relation("MatchStats", fields: [match_id], references: [id])
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  team_id         String 
-  team            Teams       @relation("TeamStats", fields: [team_id], references: [id])
+  match Matches @relation(fields: [match_id], references: [id])
+  team  Teams   @relation("TeamStats", fields: [team_id], references: [id])
 
   @@unique([match_id, team_id])
   @@index([match_id])
-  @@index([team_id])
 }
 
-model Goals {
-  id              String      @id @default(uuid())
-  player_name     String
-  minute          Int?
-  type            String?
-  assistance      String?
-  created_at      DateTime    @default(now())
-  updated_at      DateTime    @updatedAt
+model LeagueSeasonGroups {
+  id         String   @id @default(uuid())
+  league_id  String
+  season     Int
+  tournament String
+  group_name String
+  team_id    String
+  created_at DateTime @default(now())
 
-  match_id        String
-  match           Matches     @relation("MatchGoals", fields: [match_id], references: [id])
+  league Leagues @relation(fields: [league_id], references: [id])
+  team   Teams   @relation(fields: [team_id], references: [id])
 
-  team_id         String    
-  team            Teams       @relation("TeamGoals", fields: [team_id], references: [id])
-
-  @@index([match_id])
-  @@index([team_id])
+  @@unique([league_id, season, tournament, team_id])
+  @@index([league_id, season, tournament, group_name])
 }
 
-model League {
-  id              String      @id @default(uuid())
-  name            String
+model TeamSeasonStats {
+  id             String    @id @default(uuid())
+  league_id      String
+  season         Int
+  team_id        String
+  group_name     String?
+  form           String?
+  status         String?
+  description    String?
+  last_update    DateTime?
+  matches_played Int       @default(0)
+  wins           Int       @default(0)
+  draws          Int       @default(0)
+  losses         Int       @default(0)
+  goals_for      Int       @default(0)
+  goals_against  Int       @default(0)
+  goal_diff      Int       @default(0)
+  points         Int       @default(0)
+  position       Int?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  stage          String
+  league         Leagues   @relation(fields: [league_id], references: [id])
+  team           Teams     @relation(fields: [team_id], references: [id])
 
-  matches         Matches[]   @relation("LeagueMatches")
+  @@unique([league_id, season, stage, team_id])
+  @@index([league_id, season, stage])
 }
 
-model Users {
-  id              String   @id @default(uuid())
-  email           String   @unique
-  googleId        String   @unique
-  name            String
-  username        String?  @unique // Para el chat
-  team            String?
+model Rounds {
+  id        String @id @default(uuid())
+  league_id String
+  season    Int
 
-  isFirstLogin    Boolean  @default(true) 
+  name  String
+  phase String?
+  type  String // "REGULAR" | "PLAYOFF"
+  order Int?
 
-  messages_global    Messages_global[]
-  messages_match     Messages_match[]     // un usuario puede tener muchos mensajes en chats de match
+  @@unique([league_id, season, name])
+}
+model MatchLineup {
+  id         String  @id @default(uuid())
+  match_id   String
+  team_id    String
+  formation  String?
+  team_logo  String?
+  kit_colors Json?
+  coach      String?
 
-  votes Vote[] 
+  created_at DateTime      @default(now())
+  match      Matches       @relation(fields: [match_id], references: [id])
+  team       Teams         @relation(fields: [team_id], references: [id])
+  players    MatchPlayer[]
+
+  @@unique([match_id, team_id])
 }
 
-// SISTEMA DE VOTACIÓN
+model MatchPlayer {
+  id          String       @id @default(uuid())
+  match_id    String
+  lineup_id   String?
+  player_id   String
+  team_id     String
+  is_starting Boolean
+  position    String?
+  grid        String?
+  number      String?
+  lineup      MatchLineup? @relation(fields: [lineup_id], references: [id])
+  match       Matches      @relation(fields: [match_id], references: [id])
+  player      Players      @relation(fields: [player_id], references: [id])
+  team        Teams        @relation(fields: [team_id], references: [id])
+
+  @@unique([match_id, player_id])
+  @@index([match_id, team_id])
+  @@index([match_id, is_starting])
+}
+
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  SUSPENDED
+  CANCELLED
+  ABANDONED
+  NOT_PLAYED
+}
+
+enum GoalType {
+  NORMAL
+  PENALTY
+  OWN_GOAL
+}
+
+enum EventStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+// ------------------------
+
+enum SystemRole {
+  USER          // Hincha común
+  MODERATOR   // Jefe de Barra (Moderador)
+  ADMIN       // Administrador
+  PRESIDENT  
+}
+
+enum SubscriptionTier {
+  TIER_1    
+  TIER_2    
+  TIER_3    
+}
+
+model SubscriptionPlan {
+  id           String           @id @default(uuid())
+  tier         SubscriptionTier @unique
+  name         String           
+  basePriceARS Float
+  benefits     String[]
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("subscription_plans")
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE                
+  GRACE_PERIOD          
+  CANCELLATION_PENDING  
+  EXPIRED              
+}
+
+model UserSubscription {
+  id              String             @id @default(uuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  tier            SubscriptionTier   
+  status          SubscriptionStatus @default(PENDING)
+  
+  startsAt        DateTime           @default(now())
+  endsAt          DateTime
+  autoRenew       Boolean            @default(true)
+  
+  mpPreapprovalId String?            @unique
+  mpExternalRef   String             @unique 
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([userId])
+  @@map("user_subscriptions")
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED     
+}
+
+model User {
+  id                 String  @id @default(uuid())
+  name               String
+  email              String  @unique
+  googleId           String  @unique
+  username           String? @unique
+  isFirstLogin       Boolean @default(true)
+
+  status                 UserStatus         @default(ACTIVE)
+  mutedUntil     DateTime?
+  
+  role               SystemRole    @default(USER)
+  activeSubscriptionTier SubscriptionTier? 
+  subscriptions      UserSubscription[]
+
+
+  tickets        Ticket[]
+  ticketMessages TicketMessage[]
+  reportsMade       Report[]        @relation("ReporterRelation")
+  reportsAgainst    Report[]        @relation("ReportedRelation")
+  reportsResolved   Report[]        @relation("ReportResolver")
+  
+  wallet             Wallet?
+  votes              Vote[]
+  bets               Bet[]
+  notifications      Notification[]
+
+  hashedRefreshToken String?
+  activeNameColorId String?
+  activeBannerId    String?
+
+  currentStreak       Int       @default(0)
+  lastCheckIn         DateTime?
+  streakRewardClaimed Boolean   @default(true)
+
+  createdAt          DateTime @default(now())
+
+  teamId String?       @map("team_id")
+  team   FootballTeam? @relation(fields: [teamId], references: [id])
+  inventory    UserInventory[]
+  polls        Poll[]
+
+  @@map("users")
+}
+
+model FootballTeam {
+  id       String @id @default(uuid())
+  name     String @unique
+  slug     String @unique
+  badgeUrl String
+  users    User[]
+  tier      Int      @default(3)
+
+  @@map("football_teams")
+}
+
+
 model Poll {
   id          String   @id @default(uuid())
   title       String
   description String?
-  options     Json     // Ejemplo: [{id: 1, name: "Messi"}, {id: 2, name: "Dibu"}]
-  status      String   @default("PENDING") // PENDING, ACTIVE, CLOSED
+  options     Json    
+  status      String   @default("PENDING")
   createdAt   DateTime @default(now())
+  startsAt    DateTime?
+  endsAt      DateTime? 
   icon        String   @default("USER")
-  startsAt    DateTime
-  endsAt      DateTime
   votes       Vote[]
+
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
 model Vote {
-  id        String   @id @default(uuid())
-  pollId    String
-  userId    String
-  optionId  Int
-
-  poll Poll @relation(fields: [pollId], references: [id])
-  user Users @relation(fields: [userId], references: [id])
+  id       String @id @default(uuid())
+  pollId   String
+  userId   String
+  optionId Int
+  poll     Poll   @relation(fields: [pollId], references: [id])
+  user     User   @relation(fields: [userId], references: [id])
 
   @@unique([pollId, userId])
 }
 
-model Messages_global {
-  id                String    @id @default(uuid())
-  message           String
-  timestamp         DateTime  @default(now())
 
-  user_id           String
-  user              Users     @relation(fields: [user_id], references: [id])
+// Wallet y Transacciones
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Int      @default(1000) // Monedas iniciales de regalo
+  updatedAt DateTime @updatedAt
 
-  chat_id           String
-  chat              ChatGlobal @relation(fields: [chat_id], references: [id])
-
-  @@index([user_id])
-  @@index([chat_id])
+  transactions CoinTransaction[]
 }
 
-model ChatGlobal {
-  id                String            @id @default(uuid())
-  created_at        DateTime          @default(now())
+model CoinTransaction {
+  id          String          @id @default(uuid())
+  walletId    String
+  wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount      Int             
+  type        TransactionType
+  description String          
+  referenceId String?         
+  createdAt   DateTime        @default(now())
 
-  messages          Messages_global[]
+  @@index([walletId])
 }
 
-model Messages_match {
-  id                String    @id @default(uuid())
-  message           String
-  timestamp         DateTime  @default(now())
-
-  user_id           String
-  user              Users     @relation(fields: [user_id], references: [id])
-
-  chat_id           String
-  chat              ChatMatch @relation(fields: [chat_id], references: [id])
-
-  @@index([user_id])
-  @@index([chat_id])
+enum TransactionType {
+  DAILY_LOGIN
+  POLL_VOTE
+  BET_STAKE
+  BET_PAYOUT
+  BET_REFUND
+  STORE_PURCHASE
+  POLL_REFUND
+  BADGE_REWARD
+  STREAK_REWARD
+  MERCADO_PAGO_BUY
+  ADMIN_GIFT
 }
 
-model ChatMatch {
-  id                String           @id @default(uuid())
-  created_at        DateTime         @default(now())
+// Mercado de apuestas
 
-  match_id          String           @unique           
-  match             Matches          @relation(fields: [match_id], references: [id])
+model Market {
+  id          String       @id @default(uuid())
+  title       String       
+  fixtureId   Int?         
+  isManual    Boolean      @default(false)
+  status      MarketStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  closesAt    DateTime    
+  settledAt   DateTime?
 
-  messages          Messages_match[]
+  options     MarketOption[]
+}
+
+enum MarketStatus {
+  OPEN       // Recibiendo apuestas
+  LOCKED     // Ventana cerrada, evento en progreso
+  SETTLED    // Finalizado y pagado de forma normal
+  REFUNDED   // Cancelado/Suspendido o sin ganadores, puntos devueltos
+}
+
+model MarketOption {
+  id          String   @id @default(uuid())
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  name        String  
+  initialProb Float    
+  totalStaked Int      @default(0) 
+
+  bets        Bet[]
+}
+
+model Bet {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  optionId   String
+  option     MarketOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  stake      Int          
+  status     BetStatus    @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  @@index([userId])
+  @@index([optionId])
+}
+
+enum BetStatus {
+  PENDING
+  WON
+  LOST
+  REFUNDED
+}
+
+// NOTIFICATIONS
+
+enum NotifyType {
+  BET_WON
+  BET_LOST
+  BET_REFUND
+  POLL_REJECTED
+  POLL_APPROVED
+  POLL_REWARD
+  DAILY_RACHA
+  MATCH_STARTING
+  STORE_NEW_CONTENT
+  SYSTEM_ALERT
+  SUPPORT_MODERATION_WARN    
+  SUPPORT_MODERATION_MUTE    
+  SUPPORT_MODERATION_UNBAN    
+}
+
+model Notification {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String    
+  message     String    
+  type        NotifyType
+  referenceId String?    
+  metadata    Json?      
+  readAt      DateTime? 
+  createdAt   DateTime   @default(now())
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+}
+
+model GlobalAnnouncement {
+  id          String                  @id @default(uuid())
+  title       String   
+  message     String   
+  type        NotifyType              
+  referenceId String?                 
+  metadata    Json?                   
+  createdAt   DateTime                @default(now())
+  readBy      GlobalAnnouncementRead[]
+
+  @@index([createdAt(sort: Desc)])
+}
+
+model GlobalAnnouncementRead {
+  id             String             @id @default(uuid())
+  userId         String
+  announcementId String
+  announcement   GlobalAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  readAt         DateTime           @default(now())
+
+  @@unique([userId, announcementId])
+}
+
+// STORE
+
+enum ItemType {
+  STICKER_PACK    // Permanente
+  NAME_COLOR      // Permanente
+  BANNER          // Permanente
+  MEGAPHONE       // Consumible
+  CUSTOM_POLL     // Consumible
+}
+
+enum DiscountScope {
+  ALL           
+  BY_TYPE         
+  SPECIFIC_ITEM   
+}
+
+model StoreItem {
+  id          String        @id @default(uuid())
+  name        String        
+  description String
+  price       Int            
+  type        ItemType
+  assetId     String        
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+
+  inventories UserInventory[]
+  discounts   StoreDiscount[] 
+}
+
+model StoreDiscount {
+  id           String        @id @default(uuid())
+  name         String        
+  percentage   Int         
+  scope        DiscountScope
+  
+  targetType   ItemType?     
+
+  targetItemId String?
+  item         StoreItem?    @relation(fields: [targetItemId], references: [id], onDelete: Cascade)
+
+  startDate    DateTime      
+  endDate      DateTime     
+  isActive     Boolean       @default(true) 
+  createdAt    DateTime      @default(now())
+
+  @@index([startDate, endDate]) 
+}
+
+model UserInventory {
+  id          String    @id @default(uuid())
+  userId      String
+  itemId      String
+  quantity    Int       @default(1) 
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item        StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId]) 
+}
+
+/// -------------------------
+/// Enums
+/// -------------------------
+
+
+// SUPORT REPORT AND TICKETS
+
+enum TicketStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum TicketCategory {
+  SUPPORT
+  APPEAL
+  OTHER
+}
+
+enum ReportReason {
+  TOXIC_CHAT
+  FRAUD
+  BAD_BEHAVIOR
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+model Ticket {
+  id               String          @id @default(uuid())
+  userId           String       
+  user             User            @relation(fields: [userId], references: [id])
+  category         TicketCategory  
+  subject          String       
+  status           TicketStatus    @default(OPEN)
+  discordThreadId  String?         
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  
+  messages         TicketMessage[]
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id            String   @id @default(uuid())
+  ticketId      String
+  ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId      String   
+  sender        User     @relation(fields: [senderId], references: [id])
+  message       String   @db.Text
+  screenshotUrl String?  
+  fromDiscord   Boolean  @default(false) 
+  createdAt     DateTime @default(now())
+
+  @@map("ticket_messages")
+}
+
+model Report {
+  id              String       @id @default(uuid())
+  reporterId      String       
+  reporter        User         @relation("ReporterRelation", fields: [reporterId], references: [id])
+  reportedId      String       
+  reported        User         @relation("ReportedRelation", fields: [reportedId], references: [id])
+  reason          ReportReason
+  details         String       @db.Text
+  status          ReportStatus @default(PENDING) 
+  discordMessageId String?    
+  createdAt       DateTime     @default(now())
+
+  resolvedById String?
+  resolvedBy   User?    @relation("ReportResolver", fields: [resolvedById], references: [id])
+  
+  @@index([resolvedById])
+  @@index([reportedId])  
+  @@map("reports")
 }

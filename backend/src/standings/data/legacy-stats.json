@@ -1,0 +1,242 @@
+[
+    {
+        "team_id": "90d8c362-7544-4f3b-b1ef-15c571cd6276",
+        "team_name": "Gimnasia L.P.",
+        "points_2024": 48,
+        "played_2024": 41,
+        "points_2025": 38,
+        "played_2025": 32
+    },
+    {
+        "team_id": "40f8d2eb-cd3e-4a3f-bade-e99d22932291",
+        "team_name": "Racing Club",
+        "points_2024": 70,
+        "played_2024": 41,
+        "points_2025": 53,
+        "played_2025": 32
+    },
+    {
+        "team_id": "e214f31e-4a29-4505-bd56-4fa1f9692ae8",
+        "team_name": "Newells Old Boys",
+        "points_2024": 49,
+        "played_2024": 41,
+        "points_2025": 33,
+        "played_2025": 32
+    },
+    {
+        "team_id": "b700c553-54ff-4762-9f9d-2876d55a6738",
+        "team_name": "Huracan",
+        "points_2024": 62,
+        "played_2024": 41,
+        "points_2025": 47,
+        "played_2025": 32
+    },
+    {
+        "team_id": "839a2bb8-51fd-46d2-9e70-6e4a6937cc63",
+        "team_name": "River Plate",
+        "points_2024": 70,
+        "played_2024": 41,
+        "points_2025": 53,
+        "played_2025": 32
+    },
+    {
+        "team_id": "d29c53cf-7387-4a7b-9bf5-ed3887fc5bed",
+        "team_name": "Belgrano Cordoba",
+        "points_2024": 49,
+        "played_2024": 41,
+        "points_2025": 37,
+        "played_2025": 32
+    },
+    {
+        "team_id": "c03f2e1f-b714-4b6f-a326-435f7ab79462",
+        "team_name": "Lanus",
+        "points_2024": 59,
+        "played_2024": 41,
+        "points_2025": 50,
+        "played_2025": 32
+    },
+    {
+        "team_id": "e6a56f18-abc4-4e23-9532-89c089833f2c",
+        "team_name": "Atletico Tucuman",
+        "points_2024": 50,
+        "played_2024": 41,
+        "points_2025": 34,
+        "played_2025": 32
+    },
+    {
+        "team_id": "8b49935c-f613-4000-a450-c0e47dffffaa",
+        "team_name": "Velez Sarsfield",
+        "points_2024": 76,
+        "played_2024": 41,
+        "points_2025": 40,
+        "played_2025": 32
+    },
+    {
+        "team_id": "46e5cfad-a0f9-4190-8ea8-044b32859f39",
+        "team_name": "San Lorenzo",
+        "points_2024": 45,
+        "played_2024": 41,
+        "points_2025": 51,
+        "played_2025": 32
+    },
+    {
+        "team_id": "8fa66b77-a46e-42f7-90b8-cc7d8ee7b1f0",
+        "team_name": "Independiente",
+        "points_2024": 63,
+        "played_2024": 41,
+        "points_2025": 47,
+        "played_2025": 32
+    },
+    {
+        "team_id": "0e137450-3cad-4d69-b024-91fd556d6daa",
+        "team_name": "Estudiantes L.P.",
+        "points_2024": 63,
+        "played_2024": 41,
+        "points_2025": 42,
+        "played_2025": 32
+    },
+    {
+        "team_id": "24c64dea-7308-4bb9-98f9-f412781ce057",
+        "team_name": "Boca Juniors",
+        "points_2024": 67,
+        "played_2024": 41,
+        "points_2025": 62,
+        "played_2025": 32
+    },
+    {
+        "team_id": "7942b011-3a22-437d-9a53-4c3fb38ed63c",
+        "team_name": "Union Santa Fe",
+        "points_2024": 60,
+        "played_2024": 41,
+        "points_2025": 39,
+        "played_2025": 32
+    },
+    {
+        "team_id": "3e64e29b-c4eb-4735-a5f7-ccced23e2989",
+        "team_name": "Talleres Cordoba",
+        "points_2024": 72,
+        "played_2024": 41,
+        "points_2025": 34,
+        "played_2025": 32
+    },
+    {
+        "team_id": "e9974250-b945-414a-b909-910184c14734",
+        "team_name": "Defensa Y Justicia",
+        "points_2024": 58,
+        "played_2024": 41,
+        "points_2025": 38,
+        "played_2025": 32
+    },
+    {
+        "team_id": "151a4f61-9399-44bd-8e06-c7037eddf6fe",
+        "team_name": "Rosario Central",
+        "points_2024": 47,
+        "played_2024": 41,
+        "points_2025": 66,
+        "played_2025": 32
+    },
+    {
+        "team_id": "c273325c-a719-45e2-98bf-e5f5c02777ee",
+        "team_name": "Tigre",
+        "points_2024": 39,
+        "played_2024": 41,
+        "points_2025": 49,
+        "played_2025": 32
+    },
+    {
+        "team_id": "401577c3-d06f-44c2-ba70-00e4c60cb488",
+        "team_name": "Argentinos JRS",
+        "points_2024": 56,
+        "played_2024": 41,
+        "points_2025": 57,
+        "played_2025": 32
+    },
+    {
+        "team_id": "3a0a4b5d-952c-49b9-8aae-a5d7bb1217de",
+        "team_name": "Banfield",
+        "points_2024": 41,
+        "played_2024": 41,
+        "points_2025": 35,
+        "played_2025": 32
+    },
+    {
+        "team_id": "bc8f25b4-652f-48fd-bbb9-489c372ef661",
+        "team_name": "Estudiantes de Rio Cuarto",
+        "points_2024": 0,
+        "played_2024": 0,
+        "points_2025": 0,
+        "played_2025": 0
+    },
+    {
+        "team_id": "05330ff2-bf46-4d00-aa2c-8969fce6a999",
+        "team_name": "Instituto Cordoba",
+        "points_2024": 53,
+        "played_2024": 41,
+        "points_2025": 34,
+        "played_2025": 32
+    },
+    {
+        "team_id": "31036f90-c226-487e-ae02-45f3970b2141",
+        "team_name": "Platense",
+        "points_2024": 57,
+        "played_2024": 41,
+        "points_2025": 35,
+        "played_2025": 32
+    },
+    {
+        "team_id": "6b58b445-99b3-4bce-88a9-c51708d05e53",
+        "team_name": "Deportivo Riestra",
+        "points_2024": 48,
+        "played_2024": 41,
+        "points_2025": 52,
+        "played_2025": 32
+    },
+    {
+        "team_id": "c3e6ce8b-68fb-467a-a1db-00a7e2c14145",
+        "team_name": "Central Cordoba de Santiago",
+        "points_2024": 42,
+        "played_2024": 41,
+        "points_2025": 42,
+        "played_2025": 32
+    },
+    {
+        "team_id": "6da663b8-630e-433b-91d1-72c397446153",
+        "team_name": "Gimnasia M.",
+        "points_2024": 0,
+        "played_2024": 0,
+        "points_2025": 0,
+        "played_2025": 0
+    },
+    {
+        "team_id": "352538bb-e22d-4753-9f52-551bfba98de6",
+        "team_name": "Aldosivi",
+        "points_2024": 0,
+        "played_2024": 0,
+        "points_2025": 33,
+        "played_2025": 32
+    },
+    {
+        "team_id": "727dc8ae-ec98-4ebc-8de0-92a4b1f7b8d9",
+        "team_name": "Independ. Rivadavia",
+        "points_2024": 46,
+        "played_2024": 41,
+        "points_2025": 43,
+        "played_2025": 32
+    },
+    {
+        "team_id": "7f051747-2259-47cd-8b11-3978a741c527",
+        "team_name": "Sarmiento Junin",
+        "points_2024": 35,
+        "played_2024": 41,
+        "points_2025": 35,
+        "played_2025": 32
+    },
+    {
+        "team_id": "27d2ce2a-0459-47bf-ace5-c36e87b739d5",
+        "team_name": "Barracas Central",
+        "points_2024": 49,
+        "played_2024": 41,
+        "points_2025": 49,
+        "played_2025": 32
+    }
+]

@@ -1,15 +1,93 @@
-import { Body, Controller } from '@nestjs/common'
-import { Post } from '@nestjs/common'
+import {
+  Body,
+  Post,
+  Controller,
+  Res,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { AuthService } from './auth.service'
+import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { GoogleLoginDto } from './dto/input/google-login.dto'
+import * as express from 'express'
+import { Public } from './decorators/auth.decorator'
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+}
+
+@ApiTags('Auth (Autenticación)')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
+  @Public()
   @Post('google')
-  async google(@Body('credential') credential: string) {
-    return {
-      token: await this.authService.googleLogin(credential),
+  @ApiOperation({ summary: 'Iniciar sesión o Registrarse con Google' })
+  async google(
+    @Body() googleLoginDto: GoogleLoginDto,
+    @Res({ passthrough: true }) res: express.Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.authService.googleLogin(googleLoginDto.credential)
+
+    res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS)
+
+    return { access_token: accessToken, user }
+  }
+
+  @Post('refresh')
+  @Public()
+  @ApiOperation({ summary: 'Refrescar Access Token usando Cookie HttpOnly' })
+  async refresh(
+    @Req() req: express.Request,
+    @Res({ passthrough: true }) res: express.Response,
+  ) {
+    const incomingRefreshToken = req.cookies['refresh_token']
+
+    if (!incomingRefreshToken) {
+      throw new UnauthorizedException('No hay token de refresco')
     }
+
+    const { accessToken, refreshToken, user } =
+      await this.authService.refreshTokens(incomingRefreshToken)
+
+    res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS)
+
+    return { access_token: accessToken, user }
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Cerrar sesión limpiando cookies y base de datos' })
+  async logout(
+    @Req() req: express.Request,
+    @Res({ passthrough: true }) res: express.Response,
+  ) {
+    const incomingRefreshToken = req.cookies['refresh_token']
+
+    if (incomingRefreshToken) {
+      await this.authService.logout(incomingRefreshToken)
+    }
+
+    // Borramos la cookie del navegador
+    res.clearCookie('refresh_token', { ...COOKIE_OPTIONS, maxAge: 0 })
+
+    return { status: 'ok', message: 'Sesión cerrada limpiamente, sese' }
+  }
+
+  @Post('dev-login')
+  @Public()
+  @ApiOperation({ summary: '[DEV] Login solo con email' })
+  async devLogin(
+    @Body('email') email: string,
+    @Res({ passthrough: true }) res: express.Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.authService.devLoginByEmail(email)
+    res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS)
+    return { access_token: accessToken, user }
   }
 }

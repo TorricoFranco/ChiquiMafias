@@ -1,63 +1,127 @@
+// src/components/header/Header.tsx
 "use client";
-import { useEffect, useState } from "react"; // 1. Agrega estos hooks
-import Link from "next/link";
-import { Zap, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useUserStore } from "@/store/useUserStore";
 
+// Subcomponentes modulares
+import StreakWidget from "../header/StreakWidget";
+import UserMenuDropdown from "../header/UserMenuDropdown";
+import HeaderNavigation from "../header/HeaderNavigation";
+
+// Modales Compartidos
+import LoginModal from "../auth/LoginModal";
+import ProfileModal from "../profile/ProfileModal";
+import NotificationBell from "../notifications/NotificationBell";
+import UserBalance from "../wallet/UserBalance";
+import StoreModal from "../store/StoreModal";
+import CustomizerModal from "../profile/CustomizerModal";
+import StreakModal from "../streak/StrakeModal";
+
 export default function Header() {
-  // 2. Agregamos el estado de hidratación
   const [isClient, setIsClient] = useState(false);
-  
-  // 3. Obtenemos los datos del store
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Triggers de Modales
+  const [showLogin, setShowLogin] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showStore, setShowStore] = useState(false);
+  const [showCustomizer, setShowCustomizer] = useState(false);
+  const [showStreak, setShowStreak] = useState(false);
+
+  // Zustand Store Selectors
   const username = useUserStore((state) => state.username);
   const team = useUserStore((state) => state.team);
+  const tier = useUserStore((state) => state.tier);
+  const logout = useUserStore((state) => state.logout);
 
-  // 4. Este useEffect se dispara SOLO en el cliente tras el primer render
+  const currentStreak = useUserStore((state) => state.currentStreak);
+  const streakRewardClaimed = useUserStore((state) => state.streakRewardClaimed);
+  const openStreakModalOnMount = useUserStore((state) => state.openStreakModalOnMount);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // 5. Mientras sea el servidor, mostramos un "estado de carga" o nada
-  // Esto evita el error de hidratación y el flash de datos nulos
-  if (!isClient) {
-    return (
-      <header className="flex justify-between items-center p-4 bg-[#181818]/90 border-b border-[#2b2b2b] fixed w-full z-10 top-0 h-16">
-        <div className="flex items-center space-x-2">
-          <Zap className="w-6 h-6 text-lime-400" />
-          <span className="text-xl font-bold text-white tracking-wider">Chiqui Mafias</span>
-        </div>
-        {/* Un placeholder vacío o skeleton para la parte derecha */}
-        <div className="w-20 h-8 bg-[#2b2b2b] animate-pulse rounded-full"></div>
-      </header>
-    );
-  }
+  useEffect(() => {
+    if (isClient && openStreakModalOnMount) {
+      const timer = setTimeout(() => {
+        setShowStreak(true);
+        useUserStore.setState({ openStreakModalOnMount: false });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [openStreakModalOnMount, isClient]);
 
-  // 6. Si ya es el cliente, mostramos el Header real con los datos de Zustand
+  if (!isClient) return null;
+
   return (
-    <header className="flex justify-between items-center p-4 bg-[#181818]/90 backdrop-blur-md border-b border-[#2b2b2b] fixed w-full z-10 top-0 h-16">
-      <div className="flex items-center space-x-2">
-        <Zap className="w-6 h-6 text-lime-400" />
-        <Link href="/" className="text-xl font-bold text-white tracking-wider hover:underline cursor-pointer">
-          Chiqui Mafias
-        </Link>
-      </div>
+    <>
+      <header className="flex justify-between items-center p-4 bg-[#181818]/90 backdrop-blur-md border-b border-[#2b2b2b] fixed w-full z-40 top-0 h-16">
+        {/* LOGO */}
+        <a href="/" className="flex items-center space-x-3 group">
+          <div className="w-16 h-16 rounded-lg overflow-hidden bg-[#1a1a1a] leading-[0]">
+            <img
+              src="/logo.png"
+              alt="Logo Chiqui Mafias"
+              className="w-full h-full object-cover shadow-2xl"
+            />
+          </div>
+          <span className="text-xl font-bold text-white tracking-wider group-hover:text-sky-400 transition-colors">
+            Chiqui Mafias
+          </span>
+        </a>
 
-      <nav className="hidden sm:flex space-x-6">
-        <Link href="/league/liga-profesional-argentina-2025" className="text-sm font-medium text-lime-400 hover:text-white transition p-2 rounded-lg hover:bg-[#2b2b2b] cursor-pointer">Calendario</Link>
-        <Link href="/league/liga-profesional-argentina-2025" className="text-sm font-medium text-gray-400 hover:text-white transition p-2 rounded-lg hover:bg-[#2b2b2b] cursor-pointer">Clasificación</Link>
-        <Link href="/" className="text-sm font-medium text-gray-400 hover:text-white transition p-2 rounded-lg hover:bg-[#2b2b2b] cursor-pointer">Votaciones</Link>
-      </nav>
+        {/* NAVEGACIÓN COMPONETIZADA */}
+        <HeaderNavigation
+          onOpenStore={() => setShowStore(true)}
+          isUserLoggedIn={!!username}
+        />
 
-      <div className="flex items-center space-x-3 cursor-pointer p-1 rounded-full hover:bg-[#2b2b2b] transition duration-150">
-        <div className="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-sm font-semibold text-white">
-          {/* Si team es null, mostramos la inicial del username o "?" */}
-          {team ? team.substring(0, 1).toUpperCase() : "Barracas Central"}
+        {/* SECCIÓN CONTROL USUARIO */}
+        <div className="relative flex items-center space-x-3">
+          {username && (
+            <>
+              {/* STREAK WIDGET COMPONETIZADO */}
+              <StreakWidget
+                currentStreak={currentStreak}
+                streakRewardClaimed={streakRewardClaimed}
+                onClick={() => setShowStreak(true)}
+              />
+              <UserBalance />
+              <NotificationBell />
+            </>
+          )}
+
+          {!username ? (
+            <button
+              onClick={() => setShowLogin(true)}
+              className="bg-white text-black px-4 py-1.5 rounded-full font-semibold text-sm hover:bg-gray-200 transition"
+            >
+              Iniciar Sesión
+            </button>
+          ) : (
+            /* DROPDOWN DINÁMICO COMPONETIZADO */
+            <UserMenuDropdown
+              username={username}
+              team={team}
+              tier={tier}
+              isOpen={isDropdownOpen}
+              setIsOpen={setIsDropdownOpen}
+              onLogout={logout}
+              onOpenProfile={() => setShowProfile(true)}
+              onOpenStore={() => setShowStore(true)}
+              onOpenCustomizer={() => setShowCustomizer(true)}
+            />
+          )}
         </div>
-        <span className="text-sm text-white font-medium hidden md:block">
-          {username || "Chiqui Tapia"}
-        </span>
-        <ChevronRight className="w-4 h-4 text-gray-400" />
-      </div>
-    </header>
+      </header>
+
+      {/* MODALES GLOBALES */}
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />}
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      {showStore && <StoreModal onClose={() => setShowStore(false)} />}
+      {showCustomizer && <CustomizerModal onClose={() => setShowCustomizer(false)} />}
+      {showStreak && <StreakModal onClose={() => setShowStreak(false)} />}
+    </>
   );
 }

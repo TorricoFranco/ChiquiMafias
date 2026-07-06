@@ -1,40 +1,78 @@
 import { Module } from '@nestjs/common'
+import { APP_GUARD } from '@nestjs/core'
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
+import { UserStatusGuard } from './auth/guards/user-status.guard'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { ConfigModule } from '@nestjs/config'
 import { AppConfiguration } from './config/app.config'
 import { ChatModule } from './chat/chat.module'
-import { UsersModule } from './users/users.module'
-import { TeamsModule } from './teams/teams.module'
 import { MatchesModule } from './matches/matches.module'
-import { StatsModule } from './stats/stats.module'
-import { TableModule } from './table/table.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ApiFootballModule } from './api-football/api-football.module'
 import { AuthModule } from './auth/auth.module'
 import { PollsModule } from './polls/polls.module'
 import { RedisModule } from './redis/redis.module'
 import { ScheduleModule } from '@nestjs/schedule'
+import { StandingsModule } from './standings/standings.module'
+import { FixtureModule } from './fixture/fixture.module'
+import { UsersModule } from './users/users.module'
+import { TeamsModule } from './teams/teams.module'
+import { WalletModule } from './wallet/wallet.module'
+import { BetsModule } from './bets/bets.module'
+import { StoreModule } from './store/store.module'
+import { InventoryModule } from './inventory/inventory.module'
+import { NotificationsModule } from './notifications/notifications.module'
+import { EventEmitterModule } from '@nestjs/event-emitter'
+import { SubscriptionsModule } from './subscriptions/subscriptions.module'
+import { StreaksModule } from './streaks/streaks.module'
+import { SupportModule } from './support/support.module'
+import { DiscordModule } from './discord/discord.module'
+import { CloudinaryModule } from './cloudinary/cloudinary.module'
+import { EmailModule } from './email/email.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({
+      isGlobal: true,
       load: [AppConfiguration],
     }),
+    EventEmitterModule.forRoot(),
     ChatModule,
     UsersModule,
-    TeamsModule,
     MatchesModule,
-    StatsModule,
-    TableModule,
     ApiFootballModule,
     AuthModule,
     PrismaModule,
     PollsModule,
     RedisModule,
     ScheduleModule.forRoot(),
+    StandingsModule,
+    FixtureModule,
+    TeamsModule,
+    WalletModule,
+    BetsModule,
+    StoreModule,
+    InventoryModule,
+    NotificationsModule,
+    SubscriptionsModule,
+    StreaksModule,
+    SupportModule,
+    DiscordModule,
+    CloudinaryModule,
+    EmailModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: UserStatusGuard,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule { }

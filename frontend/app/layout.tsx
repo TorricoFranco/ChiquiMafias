@@ -4,6 +4,10 @@ import Script from "next/script";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 
+import { SocketProvider } from "@/context/SocketContext";
+import QueryProvider from "@/context/QueryProvider";
+import AuthProvider from "@/context/AuthProvider"; 
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -26,18 +30,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {/* Google Identity Services */}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Script
           src="https://accounts.google.com/gsi/client"
           strategy="afterInteractive"
         />
 
-        <Header />
-        <div className="pt-16" />
-        {children}
+        <QueryProvider>
+          <AuthProvider> 
+            <SocketProvider>
+              <Header />
+              <div className="pt-16" />
+              {children}
+            </SocketProvider>
+          </AuthProvider>
+        </QueryProvider>
+
       </body>
     </html>
   );

@@ -9,7 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.96.1",
+    "@tanstack/react-query-devtools": "^5.96.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.561.0",
     "next": "16.0.10",
     "react": "19.2.1",
@@ -17,6 +20,7 @@
     "react-resizable-panels": "^3.0.6",
     "socket.io-client": "^4.8.1",
     "sonner": "^2.0.7",
+    "swr": "^2.4.0",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
@@ -26,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
+    "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

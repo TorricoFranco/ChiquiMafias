@@ -1,5 +1,4 @@
 import { Socket } from 'socket.io'
-import { Users } from '@prisma/client'
 
 export interface JwtPayload {
   sub: string
@@ -9,6 +8,16 @@ export interface JwtPayload {
 
 export interface SocketWithUser extends Socket {
   data: {
-    user: Users
+    user: {
+      id: string
+      name: string
+      username: string
+      role: string
+      tier: string
+      team?: {
+        name: string
+        badgeUrl: string | null
+      } | null
+    }
   }
 }

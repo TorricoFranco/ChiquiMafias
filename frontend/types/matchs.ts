@@ -14,6 +14,7 @@ export interface Match {
 }
 
 export interface PageProps {
+  
   params: Promise<{ id: string }>;
 }
 

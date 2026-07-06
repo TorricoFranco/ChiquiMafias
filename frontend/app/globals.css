@@ -42,3 +42,37 @@ body {
   scrollbar-color: #2b2b2b transparent; /* Firefox */
 }
 
+/* ... tu código anterior ... */
+
+/* 1. Elimina el borde/contorno celeste por defecto */
+[data-panel-resize-handle-enabled],
+[data-panel-resize-handle-enabled]:focus,
+[data-panel-resize-handle-enabled]:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+[data-panel-resize-handle-id],
+[data-panel-resize-handle-id]:focus,
+[data-panel-resize-handle-id]:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 2. Forzar mano abierta al pasar el mouse */
+[data-panel-resize-handle-enabled],
+[data-panel-resize-handle-enabled] *,
+[data-panel-resize-handle-id],
+[data-panel-resize-handle-id] * {
+  cursor: grab !important;
+}
+
+/* 3. Forzar puño cerrado al hacer click (arrastrar) */
+[data-panel-resize-handle-active],
+[data-panel-resize-handle-active] *,
+[data-panel-resize-handle-id]:active,
+[data-panel-resize-handle-id]:active *,
+[data-resizable-panels-dragging],
+[data-resizable-panels-dragging] * {
+  cursor: grabbing !important;
+}

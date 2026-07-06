@@ -3,23 +3,19 @@
 import { useEffect, useRef } from "react";
 import { useUserStore } from "@/store/useUserStore";
 
-
 declare global {
   interface Window {
     google: any;
   }
 }
 
-// Definimos la interfaz para recibir los datos del usuario
 interface GoogleLoginButtonProps {
-  onSuccess: (user: any) => void;
+  onSuccess: (user: { id: string; name: string; isFirstLogin: boolean }) => void;
 }
 
 export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
-
   const { setUserInfo } = useUserStore();
-  
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -35,26 +31,32 @@ export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps)
                 {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
+                  credentials: "include",
                   body: JSON.stringify({
                     credential: response.credential,
                   }),
                 }
               );
 
-              if (!res.ok) throw new Error("Error en la autenticación");
+              const data = await res.json();
+
+              if (!res.ok) {
+                throw new Error(data.message || "Error en la autenticación");
+              }
 
 
-              const { token } = await res.json();
-              localStorage.setItem("token", token.access_token);
               setUserInfo({
-                id: token.user.id,
-                username: token.user.username ?? token.user.name,
-                isFirstLogin: token.user.isFirstLogin
+                id: data.user.id,
+                name: data.user.name,
+                username: data.user.username,
+                role: data.user.role,
+                isFirstLogin: data.user.isFirstLogin,
+                accessToken: data.access_token,
+                team: data.user.team,
               });
 
-                // Ejecutamos la función pasando el objeto user completo { id, name, isFirstLogin }
-                onSuccess(token.user);
-              
+              onSuccess(data.user);
+
             } catch (error) {
               console.error("Error al loguear con Google:", error);
             }
@@ -70,7 +72,7 @@ export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps)
     }, 100);
 
     return () => clearInterval(interval);
-  }, [onSuccess]);
+  }, [onSuccess, setUserInfo]);
 
   return <div ref={buttonRef} className="flex justify-center w-full" />;
 }

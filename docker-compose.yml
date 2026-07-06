@@ -35,6 +35,7 @@ services:
       - postgres
     environment:
       DATABASE_URL: postgres://admin:admin123@postgres:5432/football_db
+      DISCORD_INTERNAL_SECRET: "AguanteMessiLaPutaMadre123"
 
   frontend:
     container_name: football_frontend
@@ -47,6 +48,35 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3007
       - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    command:
+      - "http"
+      - "backend:3007"
+    environment:
+      NGROK_AUTHTOKEN: 3FgBb82Rh2kjuiHNFt5Vj5M8V1M_6JyhDggci3Q1nM7wgqWGu
+    ports:
+      - "4040:4040"
+    depends_on:
+      - backend
+
+  discord_bot:
+    container_name: football_discord_bot
+    build: ./discord-bot
+    restart: unless-stopped
+    volumes:
+      - ./discord-bot:/app
+      - /app/node_modules 
+    ports:
+      - "3001:3001"
+    environment:
+      DISCORD_BOT_TOKEN: MTUyMjIyNDk1NzEzMDUzOTE0OA.Gzl-p9.wpomb3JUwZTiMZkzQC14xjm09w1r9U7fsLZ210
+      DISCORD_INTERNAL_SECRET: "AguanteMessiLaPutaMadre123"
+      BACKEND_URL: "http://backend:3007" 
     depends_on:
       - backend
 

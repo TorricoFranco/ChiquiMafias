@@ -6,19 +6,19 @@ import { Injectable } from '@nestjs/common'
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
-      // 1. Extrae el token del header: Authorization: Bearer <token>
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET, // La misma que usaste en el AuthService
+      secretOrKey: process.env.JWT_ACCESS_SECRET,
     })
   }
 
-  // 2. Lo que retorna este método es lo que aparecerá en 'req.user'
   async validate(payload: any) {
     return {
       id: payload.sub,
       email: payload.email,
       isFirstLogin: payload.isFirstLogin,
+      role: payload.role,
+      tier: payload.tier,
     }
   }
 }
