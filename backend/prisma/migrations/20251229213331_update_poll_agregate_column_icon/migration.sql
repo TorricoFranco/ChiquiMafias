@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "Poll" ADD COLUMN     "icon" TEXT NOT NULL DEFAULT 'USER';
