@@ -25,6 +25,8 @@ export class UsersController {
   ) { }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.ADMIN)
   async findAll() {
     return this.usersService.findAll()
   }
