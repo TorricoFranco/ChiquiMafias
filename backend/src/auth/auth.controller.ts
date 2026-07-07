@@ -77,17 +77,4 @@ export class AuthController {
 
     return { status: 'ok', message: 'Sesión cerrada limpiamente, sese' }
   }
-
-  @Post('dev-login')
-  @Public()
-  @ApiOperation({ summary: '[DEV] Login solo con email' })
-  async devLogin(
-    @Body('email') email: string,
-    @Res({ passthrough: true }) res: express.Response,
-  ) {
-    const { accessToken, refreshToken, user } =
-      await this.authService.devLoginByEmail(email)
-    res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS)
-    return { access_token: accessToken, user }
-  }
 }
