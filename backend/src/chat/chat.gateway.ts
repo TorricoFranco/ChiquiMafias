@@ -5,7 +5,13 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets'
-import { UseGuards, UsePipes, ValidationPipe, UseFilters } from '@nestjs/common'
+import {
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  UseFilters,
+  Logger,
+} from '@nestjs/common'
 
 import { Server, Socket } from 'socket.io'
 import { ChatService } from './chat.service'
@@ -33,6 +39,7 @@ import {
 @WebSocketGateway()
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() public server: Server
+  private readonly logger = new Logger(ChatGateway.name)
 
   constructor(
     private readonly chatService: ChatService,
@@ -44,7 +51,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const token = socket.handshake.auth?.token
       if (!token) {
-        console.log(`[Chat] Conexión anónima o sin token: ${socket.id}`)
+        this.logger.log(`[Chat] Conexión anónima o sin token: ${socket.id}`)
         return
       }
 
@@ -57,7 +64,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       socket.data.user = wsUser
 
       await socket.join(`user:${wsUser.id}`)
-      console.log(
+      this.logger.log(
         `[Chat] ${wsUser.username} entró a la tribuna global. Tier: ${wsUser.tier}`,
       )
 
@@ -115,7 +122,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!rate.allowed) {
       throw new WsException({
         code: 'RATE_LIMIT',
-        message: 'Demasiados mensajes, bajá un cambio 😅',
+        message: 'Demasiados mensajes, bajá un cambio ',
         data: rate,
       })
     }
@@ -195,7 +202,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   sendWalletUpdate(userId: string, balance: number) {
     this.server.to(`user:${userId}`).emit('wallet:balance_updated', { balance })
-    console.log(
+    this.logger.debug(
       `[Sockets] Saldo actualizado enviado a user:${userId} -> $${balance}`,
     )
   }

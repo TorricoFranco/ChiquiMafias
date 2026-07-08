@@ -52,7 +52,6 @@ export class MatchesGateway
       const wsUser = await this.authService.authenticateSocket(token)
       if (wsUser) {
         socket.data.user = wsUser
-        console.log(`[Matches] ${wsUser.username} escuchando partidos en vivo.`)
       }
     } catch (error) {
       this.logger.error('Error en conexión MatchesGateway', error)
