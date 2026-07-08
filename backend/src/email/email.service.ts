@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import { Resend } from 'resend'
 
 @Injectable()
@@ -6,8 +8,10 @@ export class EmailService {
   private readonly resend: Resend
   private readonly logger = new Logger(EmailService.name)
 
-  constructor() {
-    this.resend = new Resend(process.env.RESEND_API_KEY)
+  constructor(
+    private readonly configService: ConfigService<EnvironmentVariables>
+  ) {
+    this.resend = new Resend(this.configService.get('RESEND_API_KEY'))
   }
 
   async sendBanNotification(

@@ -1,9 +1,9 @@
 import {
-  WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  WebSocketGateway,
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { VoteService } from './vote.service'
@@ -12,14 +12,11 @@ import { WsJwtGuard } from 'src/auth/guards/ws-jwt.guard'
 import type { SocketWithUser } from 'src/auth/interfaces/jwt-payload.interface'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 
-@WebSocketGateway({
-  cors: { origin: process.env.CLIENT_URL },
-  credentials: true,
-})
+@WebSocketGateway()
 export class PollsGateway {
   @WebSocketServer()
   server: Server
-  constructor(private readonly voteService: VoteService) {}
+  constructor(private readonly voteService: VoteService) { }
 
   @SubscribeMessage('joinPoll')
   handleJoinRoom(

@@ -8,7 +8,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
 
   postgres:
     image: postgres:15
@@ -29,13 +29,41 @@ services:
     restart: unless-stopped
     volumes: 
       - ./backend:/app
+      - /app/node_modules 
     ports:
       - "3007:3007"
+    env_file:             
+      - .env         
     depends_on:
       - postgres
+    command: sh -c "npx prisma generate && npm run start:dev"
     environment:
-      DATABASE_URL: postgres://admin:admin123@postgres:5432/football_db
-      DISCORD_INTERNAL_SECRET: "AguanteMessiLaPutaMadre123"
+      PORT: ${PORT}
+      HOST: ${HOST}
+      DATABASE_URL: ${DATABASE_URL}
+      ID_LEAGUE_ARG: ${ID_LEAGUE_ARG}
+      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+      MERCADO_PAGO_API_URL: ${MERCADO_PAGO_API_URL}
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN}
+      MERCADO_PAGO_WEBHOOK_URL: ${MERCADO_PAGO_WEBHOOK_URL}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      DISCORD_INTERNAL_SECRET: ${DISCORD_INTERNAL_SECRET}
+      DISCORD_BOT_URL: ${DISCORD_BOT_URL}
+      FRONTEND_SUCCESS_URL: ${FRONTEND_SUCCESS_URL}
+      FRONTEND_FAILURE_URL: ${FRONTEND_FAILURE_URL}
+      FRONTEND_PENDING_URL: ${FRONTEND_PENDING_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
 
   frontend:
     container_name: football_frontend

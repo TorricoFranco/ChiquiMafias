@@ -11,18 +11,26 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { GoogleLoginDto } from './dto/input/google-login.dto'
 import * as express from 'express'
 import { Public } from './decorators/auth.decorator'
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-}
+import { ConfigService } from '@nestjs/config'
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 
 @ApiTags('Auth (Autenticación)')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService<EnvironmentVariables>,
+  ) { }
+
+  private get cookieOptions() {
+    return {
+      httpOnly: true,
+      secure:
+        this.configService.get('NODE_ENV', { infer: true }) === 'production',
+      sameSite: 'lax' as const,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    }
+  }
 
   @Public()
   @Post('google')
@@ -34,7 +42,7 @@ export class AuthController {
     const { accessToken, refreshToken, user } =
       await this.authService.googleLogin(googleLoginDto.credential)
 
-    res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS)
+    res.cookie('refresh_token', refreshToken, this.cookieOptions)
 
     return { access_token: accessToken, user }
   }
@@ -55,7 +63,7 @@ export class AuthController {
     const { accessToken, refreshToken, user } =
       await this.authService.refreshTokens(incomingRefreshToken)
 
-    res.cookie('refresh_token', refreshToken, COOKIE_OPTIONS)
+    res.cookie('refresh_token', refreshToken, this.cookieOptions)
 
     return { access_token: accessToken, user }
   }
@@ -72,8 +80,7 @@ export class AuthController {
       await this.authService.logout(incomingRefreshToken)
     }
 
-    // Borramos la cookie del navegador
-    res.clearCookie('refresh_token', { ...COOKIE_OPTIONS, maxAge: 0 })
+    res.clearCookie('refresh_token', { ...this.cookieOptions, maxAge: 0 })
 
     return { status: 'ok', message: 'Sesión cerrada limpiamente, sese' }
   }

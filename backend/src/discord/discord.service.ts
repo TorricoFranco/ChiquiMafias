@@ -2,14 +2,28 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { ConfigService } from '@nestjs/config'
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import type { Report, Ticket } from '@prisma/client'
 
 @Injectable()
 export class DiscordService {
   private readonly logger = new Logger(DiscordService.name)
-  private readonly botBaseUrl = 'http://discord_bot:3001/api'
+  private readonly botBaseUrl: string
+  private readonly discordSecret: string
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService<EnvironmentVariables>,
+  ) {
+    this.botBaseUrl =
+      this.configService.get<string>('DISCORD_BOT_URL', { infer: true }) || ''
+
+    this.discordSecret =
+      this.configService.get<string>('DISCORD_INTERNAL_SECRET', {
+        infer: true,
+      }) || ''
+  }
 
   @OnEvent('report.created', { async: true })
   async handleReportCreatedEvent(report: Report) {
@@ -19,7 +33,7 @@ export class DiscordService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-discord-bot-token': process.env.DISCORD_INTERNAL_SECRET || '',
+          'x-discord-bot-token': this.discordSecret,
         },
         body: JSON.stringify({
           reportId: report.id,
@@ -47,7 +61,7 @@ export class DiscordService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-discord-bot-token': process.env.DISCORD_INTERNAL_SECRET || '',
+          'x-discord-bot-token': this.discordSecret,
         },
         body: JSON.stringify({
           ticketId: ticket.id,
@@ -91,7 +105,7 @@ export class DiscordService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-discord-bot-token': process.env.DISCORD_INTERNAL_SECRET || '',
+          'x-discord-bot-token': this.discordSecret,
         },
         body: JSON.stringify({
           threadId: payload.discordThreadId,

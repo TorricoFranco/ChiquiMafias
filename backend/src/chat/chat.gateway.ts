@@ -2,7 +2,6 @@ import {
   ConnectedSocket,
   MessageBody,
   SubscribeMessage,
-  WebSocketGateway,
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets'
@@ -25,11 +24,13 @@ import { SystemRole } from 'src/auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { INotificationResponse } from 'src/notifications/interfaces/notification-response.interface'
 
-import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets'
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  WebSocketGateway,
+} from '@nestjs/websockets'
 
-@WebSocketGateway({
-  cors: { origin: process.env.CLIENT_URL, credentials: true },
-})
+@WebSocketGateway()
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() public server: Server
 

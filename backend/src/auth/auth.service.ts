@@ -6,16 +6,24 @@ import {
 import { OAuth2Client } from 'google-auth-library'
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { ConfigService } from '@nestjs/config'
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import * as bcrypt from 'bcrypt'
 
 @Injectable()
 export class AuthService {
-  private client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+  private client: OAuth2Client
 
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
-  ) { }
+    private readonly configService: ConfigService<EnvironmentVariables>,
+  ) {
+    const googleClientId = this.configService.get('GOOGLE_CLIENT_ID', {
+      infer: true,
+    })
+    this.client = new OAuth2Client(googleClientId)
+  }
 
   private async generateTokens(user: any) {
     const jwtPayload = {
@@ -28,14 +36,18 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(jwtPayload, {
-        secret: process.env.JWT_ACCESS_SECRET,
-        expiresIn: '15m',
+        secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
+        expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN', {
+          infer: true,
+        }),
       }),
       this.jwtService.signAsync(
         { sub: user.id },
         {
-          secret: process.env.JWT_REFRESH_SECRET,
-          expiresIn: '7d',
+          secret: this.configService.get('JWT_REFRESH_SECRET', { infer: true }),
+          expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', {
+            infer: true,
+          }),
         },
       ),
     ])
@@ -67,7 +79,7 @@ export class AuthService {
   async verifyToken(token: string) {
     try {
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_ACCESS_SECRET,
+        secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
       })
 
       const user = await this.prisma.user.findUnique({
@@ -84,7 +96,7 @@ export class AuthService {
   async googleLogin(credential: string) {
     const ticket = await this.client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: this.configService.get('GOOGLE_CLIENT_ID', { infer: true }),
     })
 
     const payload = ticket.getPayload()
@@ -137,7 +149,7 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: this.configService.get('JWT_REFRESH_SECRET', { infer: true }),
       })
 
       const user = await this.prisma.user.findUnique({
@@ -192,7 +204,7 @@ export class AuthService {
   async logout(refreshToken: string) {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: this.configService.get('JWT_REFRESH_SECRET', { infer: true }),
       })
 
       await this.updateRefreshTokenHash(payload.sub, null)
@@ -202,7 +214,7 @@ export class AuthService {
   async authenticateSocket(token: string) {
     try {
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_ACCESS_SECRET,
+        secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
       })
 
       const user = await this.prisma.user.findUnique({

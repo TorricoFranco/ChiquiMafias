@@ -10,10 +10,6 @@ import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 
 @WebSocketGateway({
   namespace: 'bets',
-  cors: {
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-  },
 })
 @UseFilters(AllWsExceptionFilter)
 export class BetsGateway implements OnModuleInit {

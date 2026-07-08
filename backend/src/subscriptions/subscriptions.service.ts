@@ -20,9 +20,12 @@ import {
   WEEKEND_DISCOUNT_PERCENTAGE,
   SUBSCRIPTION_CYCLE_DAYS,
   GRACE_PERIOD_HOURS,
-  MERCADO_PAGO_CONFIG,
   COINS_PER_DAY_UPGRADE,
+  MERCADO_PAGO_CONSTANTS,
 } from './constants/subscription.constants'
+
+import { ConfigService } from '@nestjs/config'
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 
 import {
   MercadoPagoPreapprovalPayload,
@@ -46,7 +49,29 @@ export class SubscriptionsService {
     private readonly http: HttpService,
     private readonly wallet: WalletService,
     private readonly redis: RedisService,
-  ) {}
+    private readonly configService: ConfigService<EnvironmentVariables>,
+  ) { }
+
+  private getMercadoPagoConfig() {
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL', {
+      infer: true,
+    })
+
+    return {
+      API_BASE_URL: this.configService.get<string>('MERCADO_PAGO_API_URL', {
+        infer: true,
+      }),
+      ACCESS_TOKEN: this.configService.get<string>(
+        'MERCADO_PAGO_ACCESS_TOKEN',
+        { infer: true },
+      ),
+      WEBHOOK_URL: this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL', {
+        infer: true,
+      }),
+      FRONTEND_SUCCESS_URL: `${frontendUrl}/${this.configService.get<string>('FRONTEND_SUCCESS_URL', { infer: true })}`,
+      ...MERCADO_PAGO_CONSTANTS,
+    }
+  }
 
   /**
    * ============================================================================
@@ -80,7 +105,7 @@ export class SubscriptionsService {
       discountedPriceARS: finalPrice,
       discountPercentage,
       isWeekend,
-      currency: MERCADO_PAGO_CONFIG.CURRENCY,
+      currency: MERCADO_PAGO_CONSTANTS.CURRENCY,
       appliedAt: now,
     }
   }
@@ -176,6 +201,8 @@ export class SubscriptionsService {
       // 4. Generar referencias internas
       const mpExternalRef = randomUUID()
 
+      const mpConfig = this.getMercadoPagoConfig()
+
       // 5. Preparar payload para Mercado Pago
       const now = new Date()
       const futureStartDate = new Date(now.getTime() + 5 * 60 * 1000)
@@ -185,7 +212,7 @@ export class SubscriptionsService {
         now.getTime() + SUBSCRIPTION_CYCLE_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString()
 
-      const backUrl = MERCADO_PAGO_CONFIG.FRONTEND_SUCCESS_URL
+      const backUrl = mpConfig.FRONTEND_SUCCESS_URL
 
       const mpPayload: MercadoPagoPreapprovalPayload = {
         reason: `Suscripción ${tier} - ERS Chiquimafías`,
@@ -196,7 +223,7 @@ export class SubscriptionsService {
           frequency: 1,
           frequency_type: 'months',
           transaction_amount: pricing.discountedPriceARS,
-          currency_id: MERCADO_PAGO_CONFIG.CURRENCY,
+          currency_id: mpConfig.CURRENCY,
           start_date: startDate,
         },
       }
@@ -208,11 +235,11 @@ export class SubscriptionsService {
 
       const response = await firstValueFrom(
         this.http.post<MercadoPagoPreapprovalResponse>(
-          `${MERCADO_PAGO_CONFIG.API_BASE_URL}${MERCADO_PAGO_CONFIG.PREAPPROVAL_ENDPOINT}`,
+          `${mpConfig.API_BASE_URL}${mpConfig.PREAPPROVAL_ENDPOINT}`,
           mpPayload,
           {
             headers: {
-              Authorization: `Bearer ${MERCADO_PAGO_CONFIG.ACCESS_TOKEN}`,
+              Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
               'Content-Type': 'application/json',
             },
           },
@@ -564,6 +591,7 @@ export class SubscriptionsService {
     try {
       // Por defecto asumimos que es un pago normal
       let endpoint = `/v1/payments/${id}`
+      const mpConfig = this.getMercadoPagoConfig()
 
       // Si el evento es de la suscripción global, el endpoint cambia
       if (webhookType === 'subscription_preapproval') {
@@ -573,9 +601,9 @@ export class SubscriptionsService {
       }
 
       const response = await firstValueFrom(
-        this.http.get(`${MERCADO_PAGO_CONFIG.API_BASE_URL}${endpoint}`, {
+        this.http.get(`${mpConfig.API_BASE_URL}${endpoint}`, {
           headers: {
-            Authorization: `Bearer ${MERCADO_PAGO_CONFIG.ACCESS_TOKEN}`,
+            Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
           },
         }),
       )
@@ -673,13 +701,15 @@ export class SubscriptionsService {
    */
   private async cancelPreapprovalInMercadoPago(preapprovalId: string) {
     try {
+      const mpConfig = this.getMercadoPagoConfig()
+
       const response = await firstValueFrom(
         this.http.put(
-          `${MERCADO_PAGO_CONFIG.API_BASE_URL}/preapproval/${preapprovalId}`,
+          `${mpConfig.API_BASE_URL}/preapproval/${preapprovalId}`,
           { status: 'cancelled' },
           {
             headers: {
-              Authorization: `Bearer ${MERCADO_PAGO_CONFIG.ACCESS_TOKEN}`,
+              Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
               'Content-Type': 'application/json',
             },
           },
@@ -696,7 +726,7 @@ export class SubscriptionsService {
       throw error
     }
   }
-
+  // -----------------------------------------------------------------
   /**
    * ============================================================================
    * UPGRADE DE PLAN (RF-03) - CORREGIDO CON ESTIMACIÓN PARA EL DTO
