@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core'
 import { WsException } from '@nestjs/websockets'
 import { TIERS_KEY } from '../decorators/tiers.decorator'
 import { SubscriptionTier, TIER_HIERARCHY } from '../enums/tiers.enum'
+import { ActiveUser } from '../interfaces/active-user.interface'
 
 @Injectable()
 export class TiersGuard implements CanActivate {
@@ -21,7 +22,7 @@ export class TiersGuard implements CanActivate {
 
     if (!requiredMinTier) return true
 
-    let user: any
+    let user: ActiveUser
     const isWs = context.getType() === 'ws'
 
     if (isWs) {

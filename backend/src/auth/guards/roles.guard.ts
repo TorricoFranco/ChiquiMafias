@@ -9,6 +9,8 @@ import { WsException } from '@nestjs/websockets'
 import { ROLES_KEY } from '../decorators/roles.decorator'
 import { SystemRole } from '../enums/roles.enum'
 import { ROLE_HIERARCHY } from '../enums/roles.enum'
+import { ActiveUser } from '../interfaces/active-user.interface'
+
 
 function hasRole(userRole: SystemRole, requiredRoles: SystemRole[]): boolean {
   const userIdx = ROLE_HIERARCHY.indexOf(userRole)
@@ -26,7 +28,7 @@ export class RolesGuard implements CanActivate {
     )
     if (!requiredRoles || requiredRoles.length === 0) return true
 
-    let user: any
+    let user: ActiveUser
     const isWs = context.getType() === 'ws'
 
     if (isWs) {

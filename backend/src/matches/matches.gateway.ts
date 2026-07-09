@@ -22,9 +22,8 @@ import { SystemRole } from '../auth/enums/roles.enum'
 
 import { SendMatchMessageDto } from './dto/response/send-match-message.dto'
 
-import type { SocketWithUser } from 'src/auth/interfaces/jwt-payload.interface'
 import { SanitizeMessagePipe } from 'src/pipes/sanitize-message.pipe'
-
+import type { SocketWithUser } from 'src/auth/interfaces/active-user.interface'
 import { OnApplicationBootstrap, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 

@@ -1,10 +1,10 @@
-import { SubscriptionTier as PrismaSubscriptionTier } from '@prisma/client'
+import { SubscriptionTier } from '@prisma/client'
 
-export type SubscriptionTier = PrismaSubscriptionTier | null
+export { SubscriptionTier }
 
-export const TIER_HIERARCHY: SubscriptionTier[] = [
-  null, // Hincha común / Free
-  PrismaSubscriptionTier.TIER_1,
-  PrismaSubscriptionTier.TIER_2,
-  PrismaSubscriptionTier.TIER_3,
+export const TIER_HIERARCHY: (SubscriptionTier | null)[] = [
+  null,
+  SubscriptionTier.TIER_1,
+  SubscriptionTier.TIER_2,
+  SubscriptionTier.TIER_3,
 ]

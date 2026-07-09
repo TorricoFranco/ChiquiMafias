@@ -9,7 +9,7 @@ import { Server, Socket } from 'socket.io'
 import { VoteService } from './vote.service'
 import { UseGuards, UseFilters, Logger } from '@nestjs/common'
 import { WsJwtGuard } from 'src/auth/guards/ws-jwt.guard'
-import type { SocketWithUser } from 'src/auth/interfaces/jwt-payload.interface'
+import type { SocketWithUser } from 'src/auth/interfaces/active-user.interface'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 
 @WebSocketGateway()

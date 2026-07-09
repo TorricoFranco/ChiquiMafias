@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common'
 import { OAuth2Client } from 'google-auth-library'
 import { JwtService } from '@nestjs/jwt'
@@ -9,10 +10,17 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import * as bcrypt from 'bcrypt'
+import { User } from '@prisma/client'
+import {
+  JwtPayload,
+  RefreshTokenPayload,
+} from './interfaces/active-user.interface'
 
 @Injectable()
 export class AuthService {
   private client: OAuth2Client
+
+  private readonly logger = new Logger(AuthService.name)
 
   constructor(
     private jwtService: JwtService,
@@ -25,13 +33,13 @@ export class AuthService {
     this.client = new OAuth2Client(googleClientId)
   }
 
-  private async generateTokens(user: any) {
-    const jwtPayload = {
+  private async generateTokens(user: User & { team?: any }) {
+    const jwtPayload: JwtPayload = {
       sub: user.id,
       email: user.email,
       isFirstLogin: user.isFirstLogin,
       role: user.role,
-      tier: user.activeSubscriptionTier || 'NONE',
+      tier: user.activeSubscriptionTier,
     }
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -78,7 +86,7 @@ export class AuthService {
 
   async verifyToken(token: string) {
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
         secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
       })
 
@@ -138,7 +146,7 @@ export class AuthService {
         name: user.name,
         username: user.username,
         isFirstLogin: user.isFirstLogin,
-        tier: user.activeSubscriptionTier || 'NONE',
+        tier: user.activeSubscriptionTier,
         role: user.role,
         team: user.team,
         status: user.status,
@@ -148,9 +156,12 @@ export class AuthService {
 
   async refreshTokens(refreshToken: string) {
     try {
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get('JWT_REFRESH_SECRET', { infer: true }),
-      })
+      const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshToken,
+        {
+          secret: this.configService.get('JWT_REFRESH_SECRET', { infer: true }),
+        },
+      )
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
@@ -188,7 +199,7 @@ export class AuthService {
           name: user.name,
           username: user.username,
           isFirstLogin: user.isFirstLogin,
-          tier: user.activeSubscriptionTier || 'NONE',
+          tier: user.activeSubscriptionTier,
           role: user.role,
           team: user.team,
           status: user.status,
@@ -196,24 +207,29 @@ export class AuthService {
       }
     } catch (error) {
       if (error instanceof ForbiddenException) throw error
-
       throw new UnauthorizedException('Sesión expirada, volvé a loguearte, rey')
     }
   }
 
   async logout(refreshToken: string) {
     try {
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get('JWT_REFRESH_SECRET', { infer: true }),
-      })
+      const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshToken,
+        {
+          secret: this.configService.get('JWT_REFRESH_SECRET', { infer: true }),
+        },
+      )
 
       await this.updateRefreshTokenHash(payload.sub, null)
-    } catch (error) { }
+      this.logger.log(`Usuario ${payload.sub} cerró sesión correctamente.`)
+    } catch (error) {
+      this.logger.warn(`Intento fallido de logout: ${error.message}`)
+    }
   }
 
   async authenticateSocket(token: string) {
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
         secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
       })
 
