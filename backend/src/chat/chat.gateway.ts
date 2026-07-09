@@ -2,20 +2,24 @@ import {
   ConnectedSocket,
   MessageBody,
   SubscribeMessage,
-  WebSocketGateway,
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets'
-import { UseGuards, UsePipes, ValidationPipe, UseFilters } from '@nestjs/common'
+import {
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  UseFilters,
+  Logger,
+} from '@nestjs/common'
 
 import { Server, Socket } from 'socket.io'
 import { ChatService } from './chat.service'
 import { AuthService } from 'src/auth/auth.service'
 import { SendMessageDto } from './dto/send-message.dto'
-import type { SocketWithUser } from 'src/auth/interfaces/jwt-payload.interface'
+import type { SocketWithUser } from 'src/auth/interfaces/active-user.interface'
 import { WsJwtGuard } from 'src/auth/guards/ws-jwt.guard'
 import { WsTimeoutGuard } from 'src/auth/guards/ws-timeout.guard'
-
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 import { SanitizeMessagePipe } from 'src/pipes/sanitize-message.pipe'
 import { randomUUID } from 'crypto'
@@ -25,13 +29,16 @@ import { SystemRole } from 'src/auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { INotificationResponse } from 'src/notifications/interfaces/notification-response.interface'
 
-import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets'
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  WebSocketGateway,
+} from '@nestjs/websockets'
 
-@WebSocketGateway({
-  cors: { origin: process.env.CLIENT_URL, credentials: true },
-})
+@WebSocketGateway()
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() public server: Server
+  private readonly logger = new Logger(ChatGateway.name)
 
   constructor(
     private readonly chatService: ChatService,
@@ -43,7 +50,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const token = socket.handshake.auth?.token
       if (!token) {
-        console.log(`[Chat] Conexión anónima o sin token: ${socket.id}`)
+        this.logger.log(`[Chat] Conexión anónima o sin token: ${socket.id}`)
         return
       }
 
@@ -56,7 +63,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       socket.data.user = wsUser
 
       await socket.join(`user:${wsUser.id}`)
-      console.log(
+      this.logger.log(
         `[Chat] ${wsUser.username} entró a la tribuna global. Tier: ${wsUser.tier}`,
       )
 
@@ -114,7 +121,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!rate.allowed) {
       throw new WsException({
         code: 'RATE_LIMIT',
-        message: 'Demasiados mensajes, bajá un cambio 😅',
+        message: 'Demasiados mensajes, bajá un cambio ',
         data: rate,
       })
     }
@@ -194,7 +201,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   sendWalletUpdate(userId: string, balance: number) {
     this.server.to(`user:${userId}`).emit('wallet:balance_updated', { balance })
-    console.log(
+    this.logger.debug(
       `[Sockets] Saldo actualizado enviado a user:${userId} -> $${balance}`,
     )
   }

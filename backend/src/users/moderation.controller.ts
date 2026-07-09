@@ -5,9 +5,7 @@ import { TimeoutDto } from './dto/timeout.dto'
 import { ChatGateway } from 'src/chat/chat.gateway'
 import { SystemRole } from '../auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
-import { Public } from 'src/auth/decorators/auth.decorator'
 import { PrismaService } from 'src/prisma/prisma.service'
 
 @Controller('moderation')
@@ -18,7 +16,7 @@ export class ModerationController {
     private readonly prisma: PrismaService,
   ) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
   @Get('muted-users')
   async getMutedUsers() {
@@ -45,14 +43,13 @@ export class ModerationController {
         username: user.username,
         email: user.email,
         mutedUntil: user.mutedUntil,
-        remainingMinutes: Math.ceil(remainingMs / 1000 / 60), 
+        remainingMinutes: Math.ceil(remainingMs / 1000 / 60),
       }
     })
   }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(SystemRole.ADMIN)
   @Post('timeout')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.ADMIN)
   async applyTimeout(@Body() dto: TimeoutDto) {
     const { userId, durationMinutes } = dto
     const seconds = durationMinutes * 60
@@ -80,7 +77,7 @@ export class ModerationController {
   }
 
   @Post('unmute')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
   async removeTimeout(@Body() dto: { userId: string }) {
     await this.redisService.redis.del(`timeout:${dto.userId}`)
@@ -95,7 +92,8 @@ export class ModerationController {
   }
 
   @Get('status/:userId')
-  @Public()
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.ADMIN)
   async checkTimeout(@Param('userId') userId: string) {
     const isMuted = await this.redisService.redis.get(`timeout:${userId}`)
     if (!isMuted) return { isMuted: false }

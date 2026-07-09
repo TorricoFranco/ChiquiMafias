@@ -1,11 +1,8 @@
-// src/matches/matches.gateway.ts
-
 import { RedisService } from '../redis/redis.service'
 import { ChatService } from '../chat/chat.service'
 import { AuthService } from 'src/auth/auth.service'
 
 import {
-  WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
   MessageBody,
@@ -13,13 +10,7 @@ import {
   WsException,
 } from '@nestjs/websockets'
 
-import {
-  UseFilters,
-  UseGuards,
-  UsePipes,
-  ValidationPipe,
-  OnModuleInit,
-} from '@nestjs/common'
+import { UseFilters, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common'
 import { Server, Socket } from 'socket.io'
 
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
@@ -31,19 +22,17 @@ import { SystemRole } from '../auth/enums/roles.enum'
 
 import { SendMatchMessageDto } from './dto/response/send-match-message.dto'
 
-import type { SocketWithUser } from 'src/auth/interfaces/jwt-payload.interface'
 import { SanitizeMessagePipe } from 'src/pipes/sanitize-message.pipe'
-
-import { Logger } from '@nestjs/common'
+import type { SocketWithUser } from 'src/auth/interfaces/active-user.interface'
+import { OnApplicationBootstrap, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 
-import { OnGatewayConnection } from '@nestjs/websockets'
+import { OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets'
 
-@WebSocketGateway({
-  cors: { origin: process.env.CLIENT_URL, credentials: true },
-})
 @UseFilters(AllWsExceptionFilter)
-export class MatchesGateway implements OnGatewayConnection {
+@WebSocketGateway()
+export class MatchesGateway
+  implements OnGatewayConnection, OnApplicationBootstrap {
   @WebSocketServer() server: Server
 
   private readonly logger = new Logger(MatchesGateway.name)
@@ -62,14 +51,13 @@ export class MatchesGateway implements OnGatewayConnection {
       const wsUser = await this.authService.authenticateSocket(token)
       if (wsUser) {
         socket.data.user = wsUser
-        console.log(`[Matches] ${wsUser.username} escuchando partidos en vivo.`)
       }
     } catch (error) {
       this.logger.error('Error en conexión MatchesGateway', error)
     }
   }
 
-  async onModuleInit() {
+  async onApplicationBootstrap() {
     try {
       await this.redisService.subscribe('match_updates', (message) => {
         const update = JSON.parse(message)

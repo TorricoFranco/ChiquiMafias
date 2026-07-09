@@ -1,8 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
 import { WsException } from '@nestjs/websockets'
 import { RedisService } from 'src/redis/redis.service'
-import type { SocketWithUser } from 'src/auth/interfaces/jwt-payload.interface'
-
+import type { SocketWithUser } from '../interfaces/active-user.interface'
 @Injectable()
 export class WsTimeoutGuard implements CanActivate {
   constructor(private readonly redisService: RedisService) {}

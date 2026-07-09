@@ -1,4 +1,3 @@
-// wallet/dto/admin-add-coins.dto.ts
 import { IsNotEmpty, IsNumber, IsString, IsUUID, Min } from 'class-validator'
 
 export class AdminAddCoinsDto {

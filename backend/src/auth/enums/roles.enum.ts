@@ -1,9 +1,6 @@
-export enum SystemRole {
-  USER = 'USER',
-  MODERATOR = 'MODERATOR',
-  ADMIN = 'ADMIN',
-  PRESIDENT = 'PRESIDENT',
-}
+import { SystemRole } from '@prisma/client'
+
+export { SystemRole }
 
 export const ROLE_HIERARCHY = [
   SystemRole.USER,

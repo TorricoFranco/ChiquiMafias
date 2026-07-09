@@ -9,16 +9,21 @@ import {
   Get,
   Query,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { SupportService } from '../support/support.service'
 import { Public } from 'src/auth/decorators/auth.decorator'
 import { TicketStatus } from '@prisma/client'
 import { SystemRole } from 'src/auth/enums/roles.enum'
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 
 @Controller('api/discord/webhook')
 export class DiscordController {
   private readonly logger = new Logger(DiscordController.name)
 
-  constructor(private readonly supportService: SupportService) { }
+  constructor(
+    private readonly supportService: SupportService,
+    private readonly configService: ConfigService<EnvironmentVariables>,
+  ) {}
 
   @Post('action')
   @Public()
@@ -38,7 +43,12 @@ export class DiscordController {
       JSON.stringify(payload),
     )
 
-    if (token !== process.env.DISCORD_INTERNAL_SECRET) {
+    const internalSecret = this.configService.get<string>(
+      'DISCORD_INTERNAL_SECRET',
+      { infer: true },
+    )
+
+    if (token !== internalSecret) {
       this.logger.error('❌ Token inválido o no enviado')
       throw new UnauthorizedException('Intento de acceso no autorizado')
     }
@@ -98,7 +108,11 @@ export class DiscordController {
   }
 
   private validateToken(token: string) {
-    if (token !== process.env.DISCORD_INTERNAL_SECRET) {
+    const internalSecret = this.configService.get<string>(
+      'DISCORD_INTERNAL_SECRET',
+      { infer: true },
+    )
+    if (token !== internalSecret) {
       throw new UnauthorizedException('Token inválido')
     }
   }

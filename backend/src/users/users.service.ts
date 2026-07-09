@@ -38,35 +38,6 @@ export class UsersService {
   }
 
   async findAll() {
-    // try {
-    //   this.logger.log(
-    //     '🧹 Limpiando historial de suscripciones y reseteando usuarios...',
-    //   )
-
-    //   await this.prisma.$transaction([
-    //     // 1. Borramos absolutamente todo el historial de la tabla de suscripciones
-    //     this.prisma.userSubscription.deleteMany({}),
-
-    //     // 2. Reseteamos a todos los usuarios para que vuelvan a ser "Hinchas Comunes" (null)
-    //     this.prisma.user.updateMany({
-    //       data: {
-    //         activeSubscriptionTier: null,
-    //         activeNameColorId: null, // Les sacamos los cosméticos VIP temporales
-    //         activeBannerId: null,
-    //       },
-    //     }),
-    //   ])
-
-    //   this.logger.log('✅ Base de datos limpia y sincronizada.')
-    //   return {
-    //     message:
-    //       'Historial borrado con éxito, todos los usuarios volvieron a ser Free.',
-    //   }
-    // } catch (error) {
-    //   this.logger.error('❌ Error limpiando el historial:', error)
-    //   throw error
-    // }
-
     return this.prisma.user.findMany({
       select: {
         id: true,

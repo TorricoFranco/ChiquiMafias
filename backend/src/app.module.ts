@@ -5,7 +5,6 @@ import { UserStatusGuard } from './auth/guards/user-status.guard'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { ConfigModule } from '@nestjs/config'
-import { AppConfiguration } from './config/app.config'
 import { ChatModule } from './chat/chat.module'
 import { MatchesModule } from './matches/matches.module'
 import { PrismaModule } from './prisma/prisma.module'
@@ -30,12 +29,13 @@ import { SupportModule } from './support/support.module'
 import { DiscordModule } from './discord/discord.module'
 import { CloudinaryModule } from './cloudinary/cloudinary.module'
 import { EmailModule } from './email/email.module'
+import { envValidationSchema } from './config/env.validation'
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [AppConfiguration],
+      validationSchema: envValidationSchema,
     }),
     EventEmitterModule.forRoot(),
     ChatModule,
@@ -75,4 +75,4 @@ import { EmailModule } from './email/email.module'
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

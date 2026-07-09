@@ -13,7 +13,6 @@ export class AllWsExceptionFilter implements WsExceptionFilter {
     const client = host.switchToWs().getClient<Socket>()
     const args = host.getArgs()
 
-    // Buscamos el callback (ACK) en los argumentos enviados por el cliente
     const ack = args.find((arg) => typeof arg === 'function')
 
     let message = 'Error interno del servidor'
@@ -39,12 +38,10 @@ export class AllWsExceptionFilter implements WsExceptionFilter {
 
     const errorResponse = { status: 'error', code, message, data }
 
-    // Si el cliente pasó un callback (como en castVote), lo ejecutamos
     if (ack) {
       ack(errorResponse)
     }
 
-    // emitimos un evento global por si el front escucha 'ws-error' de forma genérica
     client.emit('ws-error', errorResponse)
   }
 }

@@ -1,26 +1,39 @@
-import { OnModuleInit } from '@nestjs/common/interfaces/hooks/on-init.interface'
 import {
-  WebSocketGateway,
   WebSocketServer,
   MessageBody,
   ConnectedSocket,
   SubscribeMessage,
+  WebSocketGateway,
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 
 import { RedisService } from 'src/redis/redis.service'
-import { Logger } from '@nestjs/common'
+import { OnApplicationBootstrap, Logger } from '@nestjs/common'
 
 import { isPlayoffRound } from './utils/match-format'
 
-@WebSocketGateway({ cors: true })
-export class FixtureLeagueGateway implements OnModuleInit {
+@WebSocketGateway()
+export class FixtureLeagueGateway implements OnApplicationBootstrap {
   @WebSocketServer() server: Server
   private readonly logger = new Logger(FixtureLeagueGateway.name)
 
   constructor(private readonly redisService: RedisService) { }
 
-  async onModuleInit() {
+  async onApplicationBootstrap() {
+    let retries = 0
+    while (!this.redisService && retries < 5) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      retries++
+    }
+
+    if (!this.redisService) {
+      this.logger.error(
+        'RedisService sigue siendo undefined después de los reintentos',
+      )
+      return
+    }
+
+    // Ahora ya debería funcionar
     await this.redisService.subscribe('league_live_updates', (data) => {
       try {
         if (!data) return

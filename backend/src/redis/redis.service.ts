@@ -1,4 +1,6 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import Redis from 'ioredis'
 
 @Injectable()
@@ -7,22 +9,29 @@ export class RedisService implements OnModuleDestroy {
   private readonly subscriber: Redis
   private readonly logger = new Logger(RedisService.name)
 
-  constructor() {
+  constructor(
+    private readonly configService: ConfigService<EnvironmentVariables>,
+  ) {
+    const host = this.configService.get<string>('REDIS_HOST', { infer: true })
+    const port = this.configService.get<number>('REDIS_PORT', { infer: true })
+    const password = this.configService.get<string>('REDIS_PASSWORD', {
+      infer: true,
+    })
+
     const redisConfig = {
-      host: 'redis',
-      port: 6379,
+      host,
+      port,
+      password,
     }
 
     this.client = new Redis(redisConfig)
     this.subscriber = new Redis(redisConfig)
 
-    this.logger.log('Redis: Conexiones Command y Subscriber listas.')
+    this.logger.log(
+      'Redis: Conexiones Command y Subscriber listas con autenticación.',
+    )
   }
 
-  /**
-   * Getter para mantener compatibilidad con tu código actual.
-   * Uso: this.redisService.redis.hgetall(...)
-   */
   get redis() {
     return this.client
   }

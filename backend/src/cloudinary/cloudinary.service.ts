@@ -1,31 +1,33 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { v2 as cloudinary } from 'cloudinary'
 import { randomUUID } from 'crypto'
-
+import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 
 @Injectable()
 export class CloudinaryService {
-  constructor() {
+  constructor(
+    private readonly configService: ConfigService<EnvironmentVariables>,
+  ) {
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
+      cloud_name: this.configService.get('CLOUDINARY_CLOUD_NAME', {
+        infer: true,
+      }),
+      api_key: this.configService.get('CLOUDINARY_API_KEY', { infer: true }),
+      api_secret: this.configService.get('CLOUDINARY_API_SECRET', {
+        infer: true,
+      }),
     })
   }
 
   generateSignature(folderName: string = 'support_tickets') {
-    const apiSecret = process.env.CLOUDINARY_API_SECRET
-
-    if (!apiSecret) {
-      throw new InternalServerErrorException(
-        'Error de configuración en el servidor',
-      )
-    }
+    const apiSecret = this.configService.get('CLOUDINARY_API_SECRET', {
+      infer: true,
+    })!
 
     const timestamp = Math.round(new Date().getTime() / 1000)
     const publicId = `ticket_${randomUUID()}`
     const uploadPreset = 'support_tickets_preset'
-
     const allowedFormats = 'png,jpg,jpeg,webp'
 
     const paramsToSign = {
@@ -41,8 +43,10 @@ export class CloudinaryService {
     return {
       timestamp,
       signature,
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-      apiKey: process.env.CLOUDINARY_API_KEY,
+      cloudName: this.configService.get('CLOUDINARY_CLOUD_NAME', {
+        infer: true,
+      }),
+      apiKey: this.configService.get('CLOUDINARY_API_KEY', { infer: true }),
       folder: folderName,
       publicId,
       uploadPreset,

@@ -8,16 +8,16 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
 
   postgres:
     image: postgres:15
     container_name: football_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin123
-      POSTGRES_DB: football_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -29,13 +29,40 @@ services:
     restart: unless-stopped
     volumes: 
       - ./backend:/app
+      - /app/node_modules 
     ports:
       - "3007:3007"
+    env_file:         
+      - .env         
     depends_on:
       - postgres
+    command: sh -c "npx prisma generate && npm run start:dev"
     environment:
-      DATABASE_URL: postgres://admin:admin123@postgres:5432/football_db
-      DISCORD_INTERNAL_SECRET: "AguanteMessiLaPutaMadre123"
+      PORT: ${PORT}
+      HOST: ${HOST}
+      DATABASE_URL: ${DATABASE_URL}
+      ID_LEAGUE_ARG: ${ID_LEAGUE_ARG}
+      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+      MERCADO_PAGO_API_URL: ${MERCADO_PAGO_API_URL}
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN}
+      MERCADO_PAGO_WEBHOOK_URL: ${MERCADO_PAGO_WEBHOOK_URL}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      DISCORD_INTERNAL_SECRET: ${DISCORD_INTERNAL_SECRET}
+      DISCORD_BOT_URL: ${DISCORD_BOT_URL}
+      FRONTEND_SUCCESS_URL: ${FRONTEND_SUCCESS_URL}
+      FRONTEND_FAILURE_URL: ${FRONTEND_FAILURE_URL}
+      FRONTEND_PENDING_URL: ${FRONTEND_PENDING_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
   frontend:
     container_name: football_frontend
@@ -46,7 +73,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3007
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - CHOKIDAR_USEPOLLING=true
     depends_on:
       - backend
@@ -58,7 +85,7 @@ services:
       - "http"
       - "backend:3007"
     environment:
-      NGROK_AUTHTOKEN: 3FgBb82Rh2kjuiHNFt5Vj5M8V1M_6JyhDggci3Q1nM7wgqWGu
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     ports:
       - "4040:4040"
     depends_on:
@@ -74,8 +101,8 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DISCORD_BOT_TOKEN: MTUyMjIyNDk1NzEzMDUzOTE0OA.Gzl-p9.wpomb3JUwZTiMZkzQC14xjm09w1r9U7fsLZ210
-      DISCORD_INTERNAL_SECRET: "AguanteMessiLaPutaMadre123"
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_INTERNAL_SECRET: ${DISCORD_INTERNAL_SECRET}
       BACKEND_URL: "http://backend:3007" 
     depends_on:
       - backend
@@ -83,4 +110,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-
