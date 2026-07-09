@@ -36,6 +36,5 @@ export async function calculateStageTable({
     ),
   )
 
-  console.log('Stage standings:', stats)
   return stats
 }

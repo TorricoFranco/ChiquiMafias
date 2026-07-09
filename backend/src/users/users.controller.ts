@@ -4,7 +4,6 @@ import {
   Patch,
   Param,
   Body,
-  Req,
   Put,
   UseGuards,
 } from '@nestjs/common'
@@ -16,6 +15,8 @@ import { SystemRole } from 'src/auth/enums/roles.enum'
 import { OptionalAuth, Public } from 'src/auth/decorators/auth.decorator'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
+import { GetUser } from 'src/auth/decorators/get-user.decorator'
+import { UpdateRoleDto } from './dto/update-role.dto'
 
 @Controller('users')
 export class UsersController {
@@ -34,22 +35,23 @@ export class UsersController {
   @Patch(':id/role')
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
-  async updateRole(@Param('id') id: string, @Body('role') role: SystemRole) {
-    return this.usersService.updateRole(id, role)
+  async updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
+    return this.usersService.updateRole(id, dto.role)
   }
 
   @Put('complete-profile')
-  async completeProfile(@Req() req: any, @Body() dto: CompleteProfileDto) {
-    const userId = req.user.id
+  async completeProfile(
+    @GetUser('id') userId: string,
+    @Body() dto: CompleteProfileDto,
+  ) {
     return this.usersService.completeProfile(userId, dto)
   }
 
   @Patch('update-profile')
   async updateProfile(
-    @Req() req: any,
+    @GetUser('id') userId: string,
     @Body() dto: Partial<CompleteProfileDto>,
   ) {
-    const userId = req.user.id
     return this.usersService.updateProfile(userId, dto)
   }
 

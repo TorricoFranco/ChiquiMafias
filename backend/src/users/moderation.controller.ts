@@ -14,7 +14,7 @@ export class ModerationController {
     private readonly redisService: RedisService,
     private readonly chatGateway: ChatGateway,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
