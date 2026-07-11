@@ -30,6 +30,8 @@ import { DiscordModule } from './discord/discord.module'
 import { CloudinaryModule } from './cloudinary/cloudinary.module'
 import { EmailModule } from './email/email.module'
 import { envValidationSchema } from './config/env.validation'
+import { MercadoPagoModule } from './mercado-pago/mercado-pago.module';
+import { WebhookModule } from './webhook/webhook.module';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { envValidationSchema } from './config/env.validation'
     DiscordModule,
     CloudinaryModule,
     EmailModule,
+    MercadoPagoModule,
+    WebhookModule,
   ],
   controllers: [AppController],
   providers: [

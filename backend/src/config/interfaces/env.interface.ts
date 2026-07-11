@@ -24,6 +24,7 @@ export interface EnvironmentVariables {
   MERCADO_PAGO_ACCESS_TOKEN: string
   MERCADO_PAGO_RECEIVER_ID?: string
   MERCADO_PAGO_WEBHOOK_URL: string
+  MERCADO_PAGO_WEBHOOK_SECRET: string
 
   CLOUDINARY_CLOUD_NAME: string
   CLOUDINARY_API_KEY: string

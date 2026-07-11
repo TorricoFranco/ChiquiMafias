@@ -254,4 +254,40 @@ export class AuthService {
       return null
     }
   }
+
+  // TEMPORAL: Login de desarrollo
+  async devLoginByEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { team: true },
+    })
+    if (!user) throw new UnauthorizedException('Usuario no encontrado')
+
+    if (user.status === 'BANNED') {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        message: 'Tu cuenta se encuentra suspendida por irregularidades.',
+        code: 'USER_BANNED',
+      })
+    }
+
+    const tokens = await this.generateTokens(user)
+    await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        isFirstLogin: user.isFirstLogin,
+        tier: user.activeSubscriptionTier || 'NONE',
+        role: user.role,
+        team: user.team,
+        status: user.status,
+      },
+    }
+  }
 }

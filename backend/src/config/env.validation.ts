@@ -27,6 +27,7 @@ export const envValidationSchema = Joi.object({
   MERCADO_PAGO_ACCESS_TOKEN: Joi.string().required(),
   MERCADO_PAGO_RECEIVER_ID: Joi.string().allow('').optional(),
   MERCADO_PAGO_WEBHOOK_URL: Joi.string().uri().required(),
+  MERCADO_PAGO_WEBHOOK_SECRET: Joi.string().required(),
 
   CLOUDINARY_CLOUD_NAME: Joi.string().required(),
   CLOUDINARY_API_KEY: Joi.string().required(),

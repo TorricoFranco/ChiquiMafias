@@ -13,7 +13,6 @@ export class SubscriptionsCronService {
     private readonly chatGateway: ChatGateway,
   ) { }
 
-  // ⏰ Cambiado a cada hora para cortar los beneficios apenas venza el plan en MP
   @Cron(CronExpression.EVERY_HOUR)
   async handleSubscriptionLifecycle() {
     this.logger.log(

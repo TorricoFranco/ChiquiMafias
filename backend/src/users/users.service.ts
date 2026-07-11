@@ -48,6 +48,7 @@ export class UsersService {
         team: true,
         role: true,
         status: true,
+        activeSubscriptionTier: true,
       },
       orderBy: { name: 'asc' },
     })
