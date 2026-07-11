@@ -15,7 +15,7 @@ export class MatchesController {
   @ApiOperation({ summary: 'Detalles completos de un partido' })
   @ApiResponse({
     status: 200,
-    type: MatchDetailsResponseDto, // <--- ESTO genera el esquema en Swagger
+    type: MatchDetailsResponseDto,
   })
   async getMatchDetails(
     @Param('leagueId') leagueId: string,
@@ -32,7 +32,7 @@ export class MatchesController {
     description:
       'Lista ordenada cronológicamente de los eventos del partido (Goles, Tarjetas, Cambios).',
     type: MatchEventResponseDto,
-    isArray: true, // <-- Esto le dice a Swagger que es una lista [ ]
+    isArray: true, 
   })
   @ApiResponse({
     status: 404,
@@ -71,4 +71,3 @@ export class MatchesController {
     return await this.matchesService.getAggregatedData(matchId)
   }
 }
-// http://localhost:3007/matches/leagues/6a2a03c5-1054-49e4-96c3-afd2bca9ebd7/seasons/2026/matches/c822f72a-22b4-4ea6-b0c3-038a48717271

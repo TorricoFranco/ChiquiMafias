@@ -5,6 +5,9 @@ import { ApiFootballHttp } from 'src/api-football/http/api-football.http'
 import { ApiFootballResponse } from 'src/api-football/interfaces/types'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ApiFixture } from 'src/api-football/interfaces/fixture'
+import { SystemRole } from 'src/auth/enums/roles.enum'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { RolesGuard } from 'src/auth/guards/roles.guard'
 
 @Controller('test-events')
 export class TestEventsController {
@@ -16,6 +19,8 @@ export class TestEventsController {
 
   // Testear Alineaciones: /test-events/lineups?matchId=ID_DE_TU_PARTIDO
   @Get('lineups')
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async testLineups(@Query('matchId') matchId: string) {
     const payload = {
       matchId: matchId,
@@ -31,6 +36,8 @@ export class TestEventsController {
 
   // Testear Marcador: /test-events/score?matchId=ID_DE_TU_PARTIDO&home=2&away=1
   @Get('score')
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async testScore(
     @Query('matchId') matchId: string,
     @Query('home') home: string,
@@ -53,6 +60,8 @@ export class TestEventsController {
 
   // Testear Fin de Partido: /test-events/end?matchId=ID_DE_TU_PARTIDO
   @Get('end')
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async testEnd(@Query('matchId') matchId: string) {
     const payload = {
       matchId: matchId,
@@ -68,6 +77,8 @@ export class TestEventsController {
 
   // Testaear eventos de score
   @Get('test-full-event')
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async testFullEvent(
     @Query('matchId') matchId: string,
     @Query('status') status: string = '2H',
@@ -173,6 +184,8 @@ export class TestEventsController {
   // Testear Score updated de League Fixture
   // CONTROLLER
   @Post()
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async testLeague(@Body() body: { matches: any[] }) {
     return await this.simulateLeagueUpdate(body.matches)
   }
@@ -229,6 +242,8 @@ export class TestEventsController {
   // TRAER DATA BD DE MATCHES
 
   @Get(':id')
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async findOne(@Param('id') id: string) {
     return await this.getMatchById(id)
   }
@@ -252,6 +267,8 @@ export class TestEventsController {
   }
 
   @Post('toggle-tracking/:id')
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async toggleTracking(
     @Param('id') id: string,
     @Query('tracked') tracked: string,
@@ -280,6 +297,8 @@ export class TestEventsController {
   // 2. Solo resetea 'is_live_finished' a false para que el cron lo vuelva a tomar
   // Testear: /test-events/reset-live/:id
   @Post('reset-live/:id')
+  @Post('admin/add-coins')
+  @Roles(SystemRole.ADMIN)
   async resetLiveStatus(@Param('id') id: string) {
     const updatedMatch = await this.prisma.matches.update({
       where: { id },
