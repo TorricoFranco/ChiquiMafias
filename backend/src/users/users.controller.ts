@@ -80,7 +80,6 @@ export class UsersController {
   @Get('test/all-balances')
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
-  @Public()
   async getAllBalances(): Promise<UserBalanceResponse[]> {
     return this.usersService.getAllUsersBalances()
   }
