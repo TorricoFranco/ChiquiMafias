@@ -25,7 +25,7 @@ export function usePollSocket(pollId: string) {
 
     const handleConnect = () => {
       setConnected(true);
-      socket.emit("joinPoll", pollId);
+      socket.emit("joinPoll", {pollId: pollId});
     };
 
     const handleDisconnect = () => setConnected(false);
