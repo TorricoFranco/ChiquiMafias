@@ -20,7 +20,6 @@ export class SubscriptionsService {
     private readonly prisma: PrismaService,
   ) { }
 
-
   /**
    * ============================================================================
    * ACTUALIZAR PRECIO BASE DE UN PLAN (ADMIN ONLY)
@@ -138,4 +137,3 @@ export class SubscriptionsService {
     ])
   }
 }
-

@@ -15,6 +15,7 @@ import {
   JwtPayload,
   RefreshTokenPayload,
 } from './interfaces/active-user.interface'
+import { UserEntity } from 'src/users/entities/user.entity'
 
 @Injectable()
 export class AuthService {
@@ -95,7 +96,7 @@ export class AuthService {
       })
 
       if (!user) return null
-      return user
+      return new UserEntity(user)
     } catch (error) {
       return null
     }
@@ -141,16 +142,7 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        isFirstLogin: user.isFirstLogin,
-        tier: user.activeSubscriptionTier,
-        role: user.role,
-        team: user.team,
-        status: user.status,
-      },
+      user: new UserEntity(user),
     }
   }
 
@@ -194,16 +186,7 @@ export class AuthService {
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          isFirstLogin: user.isFirstLogin,
-          tier: user.activeSubscriptionTier,
-          role: user.role,
-          team: user.team,
-          status: user.status,
-        },
+        user: new UserEntity(user),
       }
     } catch (error) {
       if (error instanceof ForbiddenException) throw error
@@ -278,16 +261,7 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        isFirstLogin: user.isFirstLogin,
-        tier: user.activeSubscriptionTier || 'NONE',
-        role: user.role,
-        team: user.team,
-        status: user.status,
-      },
+      user: new UserEntity(user),
     }
   }
 }
