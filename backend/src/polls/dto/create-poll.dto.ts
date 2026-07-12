@@ -1,4 +1,3 @@
-// src/polls/dto/create-poll.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   IsArray,
