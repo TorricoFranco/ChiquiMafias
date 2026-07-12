@@ -6,6 +6,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import cookieParser from 'cookie-parser'
 import { ConfigService } from '@nestjs/config'
 import { SocketIoAdapter } from './adapters/socket-io.adapter'
+import helmet from 'helmet'
+import { json } from 'express'
 
 if (!globalThis.crypto) {
   globalThis.crypto = webcrypto as any
@@ -13,6 +15,10 @@ if (!globalThis.crypto) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+
+  app.use(helmet())
+
+  app.use(json({ limit: '1mb' }))
 
   const configService = app.get(ConfigService)
 
@@ -36,7 +42,7 @@ async function bootstrap() {
   )
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)))
-  
+
   app.useWebSocketAdapter(new SocketIoAdapter(app))
 
   const config = new DocumentBuilder()

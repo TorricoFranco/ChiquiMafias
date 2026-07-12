@@ -13,6 +13,7 @@ import * as express from 'express'
 import { Public } from './decorators/auth.decorator'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Auth (Autenticación)')
 @Controller('auth')
@@ -32,6 +33,7 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Public()
   @Post('google')
   @ApiOperation({ summary: 'Iniciar sesión o Registrarse con Google' })

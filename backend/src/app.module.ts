@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common'
+import { envValidationSchema } from './config/env.validation'
+import { MercadoPagoModule } from './mercado-pago/mercado-pago.module'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
 import { UserStatusGuard } from './auth/guards/user-status.guard'
+import { ConfigModule } from '@nestjs/config'
+
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
-import { ConfigModule } from '@nestjs/config'
 import { ChatModule } from './chat/chat.module'
 import { MatchesModule } from './matches/matches.module'
 import { PrismaModule } from './prisma/prisma.module'
@@ -29,9 +33,7 @@ import { SupportModule } from './support/support.module'
 import { DiscordModule } from './discord/discord.module'
 import { CloudinaryModule } from './cloudinary/cloudinary.module'
 import { EmailModule } from './email/email.module'
-import { envValidationSchema } from './config/env.validation'
-import { MercadoPagoModule } from './mercado-pago/mercado-pago.module';
-import { WebhookModule } from './webhook/webhook.module';
+import { WebhookModule } from './webhook/webhook.module'
 
 @Module({
   imports: [
@@ -39,6 +41,14 @@ import { WebhookModule } from './webhook/webhook.module';
       isGlobal: true,
       validationSchema: envValidationSchema,
     }),
+
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: 150,
+      },
+    ]),
     EventEmitterModule.forRoot(),
     ChatModule,
     UsersModule,
@@ -69,6 +79,10 @@ import { WebhookModule } from './webhook/webhook.module';
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
