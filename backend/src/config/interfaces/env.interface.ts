@@ -14,6 +14,7 @@ export interface EnvironmentVariables {
   JWT_REFRESH_SECRET: string
   JWT_ACCESS_EXPIRES_IN: string
   JWT_REFRESH_EXPIRES_IN: string
+  BCRYPT_SALT_ROUNDS: number
 
   FRONTEND_SUCCESS_URL: string
   FRONTEND_FAILURE_URL: string

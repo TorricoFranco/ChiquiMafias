@@ -76,8 +76,11 @@ export class AuthService {
       return
     }
 
-    const salt = await bcrypt.genSalt(10)
-    const hashed = await bcrypt.hash(refreshToken, salt)
+    const saltRounds = Number(
+      this.configService.get('BCRYPT_SALT_ROUNDS', { infer: true }) || 12,
+    )
+
+    const hashed = await bcrypt.hash(refreshToken, saltRounds)
 
     await this.prisma.user.update({
       where: { id: userId },
