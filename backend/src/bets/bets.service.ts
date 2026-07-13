@@ -27,7 +27,7 @@ export class BetsService {
     private readonly betsGateway: BetsGateway,
     private readonly eventEmitter: EventEmitter2,
     private readonly chatGateway: ChatGateway,
-  ) {}
+  ) { }
 
   /**
    * Resuelve el GET del Frontend trayendo mercados abiertos o pausados en vivo
@@ -77,7 +77,6 @@ export class BetsService {
 
           const betId = randomUUID()
 
-
           const updatedWallet = await this.walletService.subtractCoins(
             {
               userId,
@@ -111,7 +110,7 @@ export class BetsService {
           return {
             newBet: createdBet,
             targetMarketId: market.id,
-            updatedBalance: updatedWallet.balance, 
+            updatedBalance: updatedWallet.balance,
           }
         })
 
@@ -239,6 +238,25 @@ export class BetsService {
         if (winningOption.totalStaked === 0) triggerRefund = true
       }
 
+      const finalStatusToSet = triggerRefund ? 'REFUNDED' : 'SETTLED'
+
+      const lock = await tx.market.updateMany({
+        where: {
+          id: marketId,
+          status: market.status,
+        },
+        data: {
+          status: finalStatusToSet,
+          settledAt: new Date(),
+        },
+      })
+
+      if (lock.count === 0) {
+        throw new BadRequestException(
+          'El mercado ya está siendo liquidado por otra solicitud.',
+        )
+      }
+
       // REEMBOLSOS
       if (triggerRefund) {
         for (const option of market.options) {
@@ -261,7 +279,6 @@ export class BetsService {
               data: { status: 'REFUNDED' },
             })
 
-            // evento de reembolso
             pendingEvents.push({
               userId: bet.userId,
               status: 'REFUND',
@@ -270,10 +287,9 @@ export class BetsService {
             })
           }
         }
-        return tx.market.update({
-          where: { id: marketId },
-          data: { status: 'REFUNDED', settledAt: new Date() },
-        })
+
+        //  mercado actualizado
+        return tx.market.findUnique({ where: { id: marketId } })
       }
 
       // LIQUIDACIÓN NORMAL
@@ -302,7 +318,6 @@ export class BetsService {
               data: { status: 'WON' },
             })
 
-            //  evento de ganador
             pendingEvents.push({
               userId: bet.userId,
               status: 'WON',
@@ -315,7 +330,6 @@ export class BetsService {
               data: { status: 'LOST' },
             })
 
-            // evento de perdedor
             pendingEvents.push({
               userId: bet.userId,
               status: 'LOST',
@@ -326,15 +340,14 @@ export class BetsService {
         }
       }
 
-      return tx.market.update({
-        where: { id: marketId },
-        data: { status: 'SETTLED', settledAt: new Date() },
-      })
+      // mercado actualizado
+      return tx.market.findUnique({ where: { id: marketId } })
     })
 
+    // EMISIÓN DE EVENTOS
     this.betsGateway.emitMarketStatusChange(
       marketId,
-      finalMarket.status as 'LOCKED' | 'SETTLED' | 'REFUNDED',
+      finalMarket!.status as 'LOCKED' | 'SETTLED' | 'REFUNDED',
     )
 
     pendingEvents.forEach((event) => {
