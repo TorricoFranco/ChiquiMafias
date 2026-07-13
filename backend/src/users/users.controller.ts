@@ -72,7 +72,6 @@ export class UsersController {
   @Get('online')
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
-  @OptionalAuth()
   getOnlineClients(): ChatClient[] {
     return this.chatService.getConnectedClients()
   }
