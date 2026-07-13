@@ -64,9 +64,19 @@ export class WebhookService {
       throw new UnauthorizedException('Firma de webhook inválida')
     }
 
-    this.logger.log(
-      `Webhook validado correctamente. Delegando al SubscriptionService...`,
-    )
-    return this.subscriptionCheckoutService.processWebhook(payload)
+    try {
+      this.logger.log(`Webhook validado. Delegando al SubscriptionService...`)
+      return await this.subscriptionCheckoutService.processWebhook(payload)
+    } catch (error) {
+      this.logger.error(
+        `[Webhook Error] Fallo al procesar webhook ${xRequestId}: ${error.message}`,
+        error.stack,
+      )
+
+      //  NestJS va a devolver 500 a Mercado Pago
+      throw new InternalServerErrorException(
+        'Error al procesar el webhook, reintentando...',
+      )
+    }
   }
 }
