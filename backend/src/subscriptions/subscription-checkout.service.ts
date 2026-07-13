@@ -347,9 +347,16 @@ export class SubscriptionCheckoutService {
       // TRANSACCIÓN ATÓMICA
       const result = await this.prisma.$transaction(async (tx) => {
         // Registrar el ID del pago en la base de datos para asegurar idempotencia
-        await tx.processedPayment.create({
-          data: { paymentId: paymentId },
-        })
+        try {
+          await tx.processedPayment.create({
+            data: { paymentId: paymentId },
+          })
+        } catch (e) {
+          if (e.code === 'P2002') {
+            throw new Error('DUPLICATE_WEBHOOK')
+          }
+          throw e
+        }
 
         const updatedSubscription = await tx.userSubscription.update({
           where: { id: subscription.id },
@@ -395,7 +402,7 @@ export class SubscriptionCheckoutService {
           },
         })
 
-        // 💡 LÓGICA EXCLUSIVA DE UPGRADE (DENTRO DE LA TRANSACCIÓN)
+        //  LÓGICA EXCLUSIVA DE UPGRADE (DENTRO DE LA TRANSACCIÓN)
         if (upgradeOldSubId) {
           const oldSub = await tx.userSubscription.findUnique({
             where: { id: upgradeOldSubId },
@@ -443,7 +450,7 @@ export class SubscriptionCheckoutService {
         return { subscription: updatedSubscription, user: updatedUser }
       })
 
-      // 8. 💡 FUERA DE LA TRANSACCIÓN: Dar de baja el debito automático viejo en Mercado Pago
+      // Dar de baja el debito automático viejo en Mercado Pago
       if (oldPreapprovalIdToCancel) {
         try {
           await this.mercadoPagoService.cancelPreapprovalInMercadoPago(
@@ -470,7 +477,14 @@ export class SubscriptionCheckoutService {
         message: 'Pago procesado y beneficios aplicados correctamente.',
         subscription: result.subscription,
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'DUPLICATE_WEBHOOK') {
+        this.logger.warn(
+          `[Webhook] Intento de procesamiento duplicado para ${payload.data?.id}, ignorando.`,
+        )
+        return { status: 'idempotent', message: 'Pago ya fue procesado' }
+      }
+
       this.logger.error(`[Webhook Error] ${error.message}`, error.stack)
       throw error
     }
