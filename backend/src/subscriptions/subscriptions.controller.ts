@@ -3,20 +3,19 @@ import {
   Post,
   Get,
   Body,
-  Request,
   HttpCode,
   HttpStatus,
   Logger,
   BadRequestException,
   Patch,
-  UsePipes,
-  ValidationPipe,
+  Param,
+  Delete,
+  UseGuards,
 } from '@nestjs/common'
 import { SubscriptionsService } from './subscriptions.service'
 import { CheckoutSubscriptionDto } from './dto/checkout-subscription.dto'
 import { CancelSubscriptionDto } from './dto/cancel-subscription.dto'
 import { UpgradeSubscriptionDto } from './dto/upgrade-subscription.dto'
-import { MercadoPagoWebhookDto } from './dto/mercado-pago-webhook.dto'
 import {
   CheckoutSubscriptionResponseDto,
   SubscriptionDetailResponseDto,
@@ -25,8 +24,12 @@ import {
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
 import { SubscriptionTier } from '@prisma/client'
 import { UpdatePlanPriceDto } from './dto/update-plan-price.dto'
-import { OptionalAuth, Public } from 'src/auth/decorators/auth.decorator'
-
+import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
+import { SubscriptionCheckoutService } from './subscription-checkout.service'
+import { SubscriptionPricingService } from './domain/subscription-pricing.service'
+import { RolesGuard } from 'src/auth/guards/roles.guard'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { SystemRole } from '@prisma/client'
 /**
  * SubscriptionsController
  * Maneja todos los endpoints relacionados con suscripciones recurrentes
@@ -36,7 +39,11 @@ import { OptionalAuth, Public } from 'src/auth/decorators/auth.decorator'
 export class SubscriptionsController {
   private readonly logger = new Logger(SubscriptionsController.name)
 
-  constructor(private readonly subscriptionsService: SubscriptionsService) { }
+  constructor(
+    private readonly subscriptionsService: SubscriptionsService,
+    private readonly subscriptionCheckoutService: SubscriptionCheckoutService,
+    private readonly subscriptionPricingService: SubscriptionPricingService,
+  ) { }
 
   /**
    * Grilla informativa de planes con precios dinámicos actuales
@@ -47,7 +54,7 @@ export class SubscriptionsController {
   async getPlans(
     @GetUser('activeSubscriptionTier') userTier: SubscriptionTier | null,
   ) {
-    return await this.subscriptionsService.getPlans(userTier)
+    return await this.subscriptionPricingService.getPlans(userTier)
   }
 
   /**
@@ -56,10 +63,8 @@ export class SubscriptionsController {
   @Get('me')
   @HttpCode(HttpStatus.OK)
   async getCurrentSubscription(
-    @Request() req,
+    @GetUser('id') userId: string,
   ): Promise<SubscriptionDetailResponseDto | null> {
-    const userId = req.user?.sub || req.user?.id
-
     if (!userId) {
       throw new BadRequestException('Usuario no autenticado correctamente')
     }
@@ -69,17 +74,15 @@ export class SubscriptionsController {
 
   /**
 
-   * Inicia el proceso de compra de una suscripción
-   * El usuario selecciona el tier deseado y recibe un link de Mercado Pago
-   */
+ * Inicia el proceso de compra de una suscripción
+ * El usuario selecciona el tier deseado y recibe un link de Mercado Pago
+ */
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
   async checkout(
     @Body() dto: CheckoutSubscriptionDto,
-    @Request() req,
+    @GetUser('id') userId: string,
   ): Promise<CheckoutSubscriptionResponseDto> {
-    const userId = req.user?.sub || req.user?.id
-
     if (!userId) {
       throw new BadRequestException('Usuario no autenticado correctamente')
     }
@@ -88,44 +91,30 @@ export class SubscriptionsController {
       `[POST /checkout] Iniciando checkout para user ${userId}, tier ${dto.tier}`,
     )
 
-    return await this.subscriptionsService.startCheckout(userId, dto.tier)
+    return await this.subscriptionCheckoutService.startCheckout(
+      userId,
+      dto.tier,
+    )
   }
 
   /**
-   * Endpoint público que recibe notificaciones de Mercado Pago
-   * Procesa pagos exitosos y actualiza el estado de suscripcione
-   */
-  // TODO FIJARSE QUE ESTE BIEN FILTRADO Y NO CUALQUIERA PUEDA PEGARLE Y SIMULAR UN PAYLOAD
-  @Post('webhook')
-  @Public()
-  // Alivianamos el cañón de class-validator para que no rebote campos extras de MP
-  @UsePipes(
-    new ValidationPipe({
-      whitelist: false,
-      forbidNonWhitelisted: false,
-    }),
-  )
-  async handleWebhook(@Body() payload: any) {
-    // Podés dejarle el tipo o usar el DTO actualizado
-    return this.subscriptionsService.processWebhook(payload)
-  }
-  /**
 
-   * Cancela la suscripción ACTIVE del usuario (Estilo Spotify)
-   * Los beneficios se mantienen activos hasta el fin del ciclo
-   */
+ * Cancela la suscripción ACTIVE del usuario (Estilo Spotify)
+ * Los beneficios se mantienen activos hasta el fin del ciclo
+ */
   @Post('cancel')
   @HttpCode(HttpStatus.OK)
-  async cancel(@Body() dto: CancelSubscriptionDto, @Request() req) {
-    const userId = req.user?.sub || req.user?.id
-
+  async cancel(
+    @Body() dto: CancelSubscriptionDto,
+    @GetUser('id') userId: string,
+  ) {
     if (!userId) {
       throw new BadRequestException('Usuario no autenticado correctamente')
     }
 
     this.logger.log(`[POST /cancel] Cancelando suscripción de user ${userId}`)
 
-    return await this.subscriptionsService.cancelSubscription(
+    return await this.subscriptionCheckoutService.cancelSubscription(
       userId,
       dto.reason,
     )
@@ -136,13 +125,13 @@ export class SubscriptionsController {
    * Genera bonus coins por los días restantes del plan viejo
    */
   @Post('upgrade')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async upgrade(
     @Body() dto: UpgradeSubscriptionDto,
-    @Request() req,
+    @GetUser('id') userId: string,
   ): Promise<UpgradeSubscriptionResponseDto> {
-    const userId = req.user?.sub || req.user?.id
-
     if (!userId) {
       throw new BadRequestException('Usuario no autenticado correctamente')
     }
@@ -151,7 +140,7 @@ export class SubscriptionsController {
       `[POST /upgrade] Upgrade para user ${userId} a tier ${dto.newTier}`,
     )
 
-    return await this.subscriptionsService.upgradeSubscription(
+    return await this.subscriptionCheckoutService.upgradeSubscription(
       userId,
       dto.newTier,
     )
@@ -168,5 +157,12 @@ export class SubscriptionsController {
       dto.tier,
       dto.basePriceARS,
     )
+  }
+
+  @Delete('admin/reset/:userId')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.ADMIN)
+  async deleteUserSubscriptions(@Param('userId') userId: string) {
+    return await this.subscriptionsService.deleteUserSubscriptions(userId)
   }
 }

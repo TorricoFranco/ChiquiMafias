@@ -1,14 +1,4 @@
-// bets/bets.controller.ts
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-  BadRequestException,
-} from '@nestjs/common'
+import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common'
 import { BetsService } from './bets.service'
 import { CreateBetDto } from './dto/create-bet.dto'
 import { CreateMarketDto } from './dto/create-market.dto'
@@ -17,7 +7,7 @@ import { SettleMarketDto } from './dto/settle-market.dto'
 import { SystemRole } from 'src/auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
-import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
+import { GetUser } from 'src/auth/decorators/get-user.decorator'
 
 @Controller('bets')
 export class BetsController {
@@ -34,10 +24,8 @@ export class BetsController {
   /**
    * RUTA DE USUARIO: Meter una apuesta
    */
-  @OptionalAuth()
   @Post('place')
-  async createBet(@Req() req: any, @Body() dto: CreateBetDto) {
-    const userId = req.user.id
+  async createBet(@GetUser('id') userId: string, @Body() dto: CreateBetDto) {
     return this.betsService.placeBet(userId, dto)
   }
 
@@ -46,8 +34,7 @@ export class BetsController {
    */
 
   @Get('my-history')
-  async getMyHistory(@Req() req: any) {
-    const userId = req.user.id
+  async getMyHistory(@GetUser('id') userId: string) {
     return this.betsService.getUserBets(userId)
   }
 
@@ -57,12 +44,7 @@ export class BetsController {
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
   @Post('admin/markets')
-  async createMarket(@Req() req: any, @Body() dto: CreateMarketDto) {
-    if (req.user.role !== 'ADMIN') {
-      throw new BadRequestException(
-        'No tenés permisos de administrador para realizar esta acción',
-      )
-    }
+  async createMarket(@Body() dto: CreateMarketDto) {
     return this.betsService.createManualMarket(dto)
   }
 
@@ -73,15 +55,9 @@ export class BetsController {
   @Roles(SystemRole.ADMIN)
   @Post('admin/markets/:id/settle')
   async settleMarket(
-    @Req() req: any,
     @Param('id') marketId: string,
     @Body() dto: SettleMarketDto,
   ) {
-    if (req.user.role !== 'ADMIN') {
-      throw new BadRequestException(
-        'No tenés permisos de administrador para realizar esta acción',
-      )
-    }
     return this.betsService.settleMarket(marketId, dto)
   }
 }

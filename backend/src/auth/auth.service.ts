@@ -15,6 +15,7 @@ import {
   JwtPayload,
   RefreshTokenPayload,
 } from './interfaces/active-user.interface'
+import { UserEntity } from 'src/users/entities/user.entity'
 
 @Injectable()
 export class AuthService {
@@ -38,6 +39,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       isFirstLogin: user.isFirstLogin,
+      isBanned: user.status === 'BANNED',
       role: user.role,
       tier: user.activeSubscriptionTier,
     }
@@ -75,8 +77,11 @@ export class AuthService {
       return
     }
 
-    const salt = await bcrypt.genSalt(10)
-    const hashed = await bcrypt.hash(refreshToken, salt)
+    const saltRounds = Number(
+      this.configService.get('BCRYPT_SALT_ROUNDS', { infer: true }) || 12,
+    )
+
+    const hashed = await bcrypt.hash(refreshToken, saltRounds)
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -95,7 +100,7 @@ export class AuthService {
       })
 
       if (!user) return null
-      return user
+      return new UserEntity(user)
     } catch (error) {
       return null
     }
@@ -126,31 +131,13 @@ export class AuthService {
       })
     }
 
-    if (user.status === 'BANNED') {
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'Forbidden',
-        message: 'Tu cuenta se encuentra suspendida por irregularidades.',
-        code: 'USER_BANNED',
-      })
-    }
-
     const tokens = await this.generateTokens(user)
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
 
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        isFirstLogin: user.isFirstLogin,
-        tier: user.activeSubscriptionTier,
-        role: user.role,
-        team: user.team,
-        status: user.status,
-      },
+      user: new UserEntity(user),
     }
   }
 
@@ -179,14 +166,6 @@ export class AuthService {
       if (!isTokenMatched)
         throw new UnauthorizedException('Token manipulado o inválido')
 
-      if (user.status === 'BANNED') {
-        throw new ForbiddenException({
-          statusCode: 403,
-          error: 'Forbidden',
-          message: 'Tu cuenta se encuentra suspendida por irregularidades.',
-          code: 'USER_BANNED',
-        })
-      }
 
       const tokens = await this.generateTokens(user)
       await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
@@ -194,16 +173,7 @@ export class AuthService {
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          isFirstLogin: user.isFirstLogin,
-          tier: user.activeSubscriptionTier,
-          role: user.role,
-          team: user.team,
-          status: user.status,
-        },
+        user: new UserEntity(user),
       }
     } catch (error) {
       if (error instanceof ForbiddenException) throw error
@@ -252,6 +222,23 @@ export class AuthService {
       }
     } catch (error) {
       return null
+    }
+  }
+
+  // TEMPORAL: Login de desarrollo
+  async devLoginByEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { team: true },
+    })
+    if (!user) throw new UnauthorizedException('Usuario no encontrado')
+    const tokens = await this.generateTokens(user)
+    await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: new UserEntity(user),
     }
   }
 }

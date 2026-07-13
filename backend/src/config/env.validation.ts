@@ -17,6 +17,7 @@ export const envValidationSchema = Joi.object({
   JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
   JWT_REFRESH_SECRET: Joi.string().required(),
+  BCRYPT_SALT_ROUNDS: Joi.number().default(12),
 
   FRONTEND_SUCCESS_URL: Joi.string().required(),
   FRONTEND_FAILURE_URL: Joi.string().required(),
@@ -27,6 +28,7 @@ export const envValidationSchema = Joi.object({
   MERCADO_PAGO_ACCESS_TOKEN: Joi.string().required(),
   MERCADO_PAGO_RECEIVER_ID: Joi.string().allow('').optional(),
   MERCADO_PAGO_WEBHOOK_URL: Joi.string().uri().required(),
+  MERCADO_PAGO_WEBHOOK_SECRET: Joi.string().required(),
 
   CLOUDINARY_CLOUD_NAME: Joi.string().required(),
   CLOUDINARY_API_KEY: Joi.string().required(),

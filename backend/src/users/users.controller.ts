@@ -12,7 +12,7 @@ import { CompleteProfileDto } from './dto/complete-profile.dto'
 import { ChatService } from 'src/chat/chat.service'
 import { ChatClient } from 'src/chat/interfaces/ChatClient'
 import { SystemRole } from 'src/auth/enums/roles.enum'
-import { OptionalAuth, Public } from 'src/auth/decorators/auth.decorator'
+import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
@@ -23,7 +23,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly chatService: ChatService,
-  ) { }
+  ) {}
 
   @Get()
   @UseGuards(RolesGuard)
@@ -72,7 +72,6 @@ export class UsersController {
   @Get('online')
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
-  @OptionalAuth()
   getOnlineClients(): ChatClient[] {
     return this.chatService.getConnectedClients()
   }
@@ -80,7 +79,6 @@ export class UsersController {
   @Get('test/all-balances')
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
-  @Public()
   async getAllBalances(): Promise<UserBalanceResponse[]> {
     return this.usersService.getAllUsersBalances()
   }

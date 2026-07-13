@@ -9,10 +9,8 @@ import { SystemRole } from 'src/auth/enums/roles.enum'
 import { CompleteProfileDto } from './dto/complete-profile.dto'
 import { ChatService } from 'src/chat/chat.service'
 import { RedisService } from 'src/redis/redis.service'
-
-import { SubscriptionTier } from '@prisma/client'
 import { OnEvent } from '@nestjs/event-emitter/dist/decorators/on-event.decorator'
-
+import { UserEntity } from './entities/user.entity'
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name)
@@ -37,36 +35,22 @@ export class UsersService {
     }
   }
 
-  async findAll() {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        username: true,
-        isFirstLogin: true,
-        team: true,
-        role: true,
-        status: true,
-      },
+  async findAll(): Promise<UserEntity[]> {
+    const users = await this.prisma.user.findMany({
+      include: { team: true },
       orderBy: { name: 'asc' },
     })
+
+    return users.map((user) => new UserEntity(user))
   }
 
-  async updateRole(userId: string, role: SystemRole) {
-    return this.prisma.user.update({
+  async updateRole(userId: string, role: SystemRole): Promise<UserEntity> {
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: { role },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        username: true,
-        isFirstLogin: true,
-        team: true,
-        role: true,
-      },
+      include: { team: true },
     })
+    return new UserEntity(updatedUser)
   }
 
   async completeProfile(userId: string, dto: CompleteProfileDto) {
@@ -98,9 +82,7 @@ export class UsersService {
         teamId: dto.teamId,
         isFirstLogin: false,
       },
-      include: {
-        team: true,
-      },
+      include: { team: true },
     })
 
     this.chatService.updateActiveUserProfile(updatedUser.id, {
@@ -109,7 +91,7 @@ export class UsersService {
       badgeUrl: updatedUser.team?.badgeUrl || null,
     })
 
-    return updatedUser
+    return new UserEntity(updatedUser)
   }
 
   async updateProfile(userId: string, dto: Partial<CompleteProfileDto>) {

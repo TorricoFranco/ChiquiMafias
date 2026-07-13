@@ -14,6 +14,7 @@ export interface EnvironmentVariables {
   JWT_REFRESH_SECRET: string
   JWT_ACCESS_EXPIRES_IN: string
   JWT_REFRESH_EXPIRES_IN: string
+  BCRYPT_SALT_ROUNDS: number
 
   FRONTEND_SUCCESS_URL: string
   FRONTEND_FAILURE_URL: string
@@ -24,6 +25,7 @@ export interface EnvironmentVariables {
   MERCADO_PAGO_ACCESS_TOKEN: string
   MERCADO_PAGO_RECEIVER_ID?: string
   MERCADO_PAGO_WEBHOOK_URL: string
+  MERCADO_PAGO_WEBHOOK_SECRET: string
 
   CLOUDINARY_CLOUD_NAME: string
   CLOUDINARY_API_KEY: string

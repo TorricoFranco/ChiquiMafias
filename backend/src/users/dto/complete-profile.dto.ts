@@ -16,5 +16,5 @@ export class CompleteProfileDto {
   username: string
 
   @IsUUID('4', { message: 'El ID del club seleccionado no es válido' })
-  teamId: string
+  teamId?: string
 }
