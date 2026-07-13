@@ -5,10 +5,10 @@ export interface JwtPayload {
   sub: string
   email: string
   isFirstLogin: boolean
+  isBanned: boolean
   role: SystemRole
   tier: SubscriptionTier | null
 }
-
 export interface RefreshTokenPayload {
   sub: string
 }
@@ -17,6 +17,7 @@ export interface ActiveUser {
   id: string
   email: string
   isFirstLogin: boolean
+  isBanned: boolean
   role: SystemRole
   tier: SubscriptionTier | null
 }

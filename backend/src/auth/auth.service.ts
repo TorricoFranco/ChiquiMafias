@@ -39,6 +39,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       isFirstLogin: user.isFirstLogin,
+      isBanned: user.status === 'BANNED',
       role: user.role,
       tier: user.activeSubscriptionTier,
     }
@@ -130,15 +131,6 @@ export class AuthService {
       })
     }
 
-    if (user.status === 'BANNED') {
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'Forbidden',
-        message: 'Tu cuenta se encuentra suspendida por irregularidades.',
-        code: 'USER_BANNED',
-      })
-    }
-
     const tokens = await this.generateTokens(user)
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
 
@@ -174,14 +166,6 @@ export class AuthService {
       if (!isTokenMatched)
         throw new UnauthorizedException('Token manipulado o inválido')
 
-      if (user.status === 'BANNED') {
-        throw new ForbiddenException({
-          statusCode: 403,
-          error: 'Forbidden',
-          message: 'Tu cuenta se encuentra suspendida por irregularidades.',
-          code: 'USER_BANNED',
-        })
-      }
 
       const tokens = await this.generateTokens(user)
       await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
@@ -248,16 +232,6 @@ export class AuthService {
       include: { team: true },
     })
     if (!user) throw new UnauthorizedException('Usuario no encontrado')
-
-    if (user.status === 'BANNED') {
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'Forbidden',
-        message: 'Tu cuenta se encuentra suspendida por irregularidades.',
-        code: 'USER_BANNED',
-      })
-    }
-
     const tokens = await this.generateTokens(user)
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
 
