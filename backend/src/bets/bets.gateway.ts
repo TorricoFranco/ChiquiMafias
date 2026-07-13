@@ -3,16 +3,20 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  OnGatewayConnection,
 } from '@nestjs/websockets'
-import { OnModuleInit, UseFilters, Logger } from '@nestjs/common'
+import { UseFilters, Logger, UseGuards } from '@nestjs/common'
 import { Server, Socket } from 'socket.io'
+import { WsJwtGuard } from 'src/auth/guards/ws-jwt.guard'
+import { AuthService } from 'src/auth/auth.service'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 
 @WebSocketGateway({
   namespace: 'bets',
 })
 @UseFilters(AllWsExceptionFilter)
-export class BetsGateway implements OnModuleInit {
+@UseGuards(WsJwtGuard)
+export class BetsGateway implements OnGatewayConnection {
   private readonly logger = new Logger(BetsGateway.name)
 
   @WebSocketServer()
@@ -20,20 +24,45 @@ export class BetsGateway implements OnModuleInit {
 
   private readonly DASHBOARD_ROOM = 'bets_dashboard'
 
-  onModuleInit() {
-    this.server.on('connection', (socket: Socket) => {
-      this.logger.log(`Cliente conectado a apuestas: ${socket.id}`)
+  constructor(private readonly authService: AuthService) { }
 
-      socket.on('disconnect', () => {
-        this.logger.log(`Cliente desconectado de apuestas: ${socket.id}`)
-      })
-    })
+  async handleConnection(client: Socket) {
+    try {
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers['authorization']
+
+      if (!token) {
+        this.logger.warn(
+          `Intento de conexión a apuestas sin token: ${client.id}`,
+        )
+        client.disconnect()
+        return
+      }
+
+      const user = await this.authService.verifyToken(token)
+      if (!user) {
+        this.logger.warn(
+          `Usuario no válido intentando conectar a apuestas: ${client.id}`,
+        )
+        client.disconnect()
+        return
+      }
+
+      client.data.user = user
+      this.logger.log(`Cliente autenticado en apuestas: ${user.id}`)
+    } catch (error) {
+      this.logger.error(
+        `Error de autenticación en BetsGateway: ${error.message}`,
+      )
+      client.disconnect()
+    }
   }
 
   @SubscribeMessage('join_dashboard')
   handleJoinDashboard(@ConnectedSocket() client: Socket) {
     client.join(this.DASHBOARD_ROOM)
-    this.logger.log(`Socket ${client.id} entró al Dashboard Global de apuestas`)
+    this.logger.log(`Socket ${client.id} entró al Dashboard`)
     return { status: 'subscribed_to_dashboard' }
   }
 
