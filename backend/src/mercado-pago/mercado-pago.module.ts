@@ -3,7 +3,12 @@ import { MercadoPagoService } from './mercado-pago.service'
 import { HttpModule } from '@nestjs/axios'
 
 @Module({
-  imports: [HttpModule],
+  imports: [
+    HttpModule.register({
+      timeout: 5000,
+      maxRedirects: 0,
+    }),
+  ],
   providers: [MercadoPagoService],
   exports: [MercadoPagoService],
 })
