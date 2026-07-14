@@ -45,18 +45,23 @@ export class MatchesGateway
 
   async handleConnection(socket: Socket) {
     try {
-      const token = socket.handshake.auth?.token
+      const token =
+        socket.handshake.auth?.token ||
+        socket.handshake.headers['authorization']
+
       if (!token) return
 
+      // Si hay token, tratamos de autenticarlo
       const wsUser = await this.authService.authenticateSocket(token)
       if (wsUser) {
         socket.data.user = wsUser
       }
     } catch (error) {
-      this.logger.error('Error en conexión MatchesGateway', error)
+      this.logger.warn(
+        `Intento de conexión con token inválido en MatchesGateway: ${error.message}`,
+      )
     }
   }
-
   async onApplicationBootstrap() {
     try {
       await this.redisService.subscribe('match_updates', (message) => {
