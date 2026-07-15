@@ -12,10 +12,13 @@ import { BetsGateway } from './bets.gateway'
 import { CreateBetDto } from './dto/create-bet.dto'
 import { CreateMarketDto } from './dto/create-market.dto'
 import { SettleMarketDto } from './dto/settle-market.dto'
-import { Bet } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { ChatGateway } from 'src/chat/chat.gateway'
+import { RedisService } from 'src/redis/redis.service'
+import { PLACE_BET_LUA_SCRIPT } from './bets.scripts'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Queue } from 'bullmq'
 
 @Injectable()
 export class BetsService {
@@ -27,6 +30,8 @@ export class BetsService {
     private readonly betsGateway: BetsGateway,
     private readonly eventEmitter: EventEmitter2,
     private readonly chatGateway: ChatGateway,
+    private readonly redisService: RedisService,
+    @InjectQueue('bets-queue') private betsQueue: Queue,
   ) { }
 
   /**
@@ -47,107 +52,52 @@ export class BetsService {
   /**
    * Procesa de forma atómica la creación de una apuesta y distribuye por WS
    */
-  async placeBet(userId: string, dto: CreateBetDto): Promise<Bet> {
-    const { optionId, stake } = dto
+  async placeBet(userId: string, dto: CreateBetDto) {
+    const { optionId, stake, marketId } = dto
+    const redis = this.redisService.redis
 
-    try {
-      const { newBet, targetMarketId, updatedBalance } =
-        await this.prisma.$transaction(async (tx) => {
-          const option = await tx.marketOption.findUnique({
-            where: { id: optionId },
-            include: { market: true },
-          })
+    const walletKey = `wallet:${userId}:balance`
+    const marketKey = `market:${marketId}`
+    const now = Date.now()
 
-          if (!option) {
-            throw new NotFoundException(
-              'La opción de apuesta seleccionada no existe',
-            )
-          }
+    const luaResult = await redis.eval(
+      PLACE_BET_LUA_SCRIPT,
+      3,
+      walletKey,
+      marketKey,
+      optionId,
+      stake,
+      now,
+    )
 
-          const market = option.market
+    const result = JSON.parse(luaResult as string)
 
-          if (market.status !== 'OPEN') {
-            throw new BadRequestException('Este mercado ya no acepta apuestas')
-          }
+    if (result.error) {
+      throw new BadRequestException(result.error)
+    }
 
-          const now = new Date()
-          if (now >= market.closesAt) {
-            throw new BadRequestException('Apuesta rechazada: El mercado cerró')
-          }
+    const betId = randomUUID()
 
-          const betId = randomUUID()
+    this.chatGateway.sendWalletUpdate(userId, result.new_balance)
 
-          const updatedWallet = await this.walletService.subtractCoins(
-            {
-              userId,
-              amount: stake,
-              type: 'BET_STAKE',
-              description: `Apuesta: ${market.title} (${option.name})`,
-              referenceId: betId,
-            },
-            tx,
-          )
+    this.betsGateway.emitPoolUpdate(marketId, {
+      optionId: optionId,
+      newTotalStaked: result.new_pool,
+    })
 
-          const createdBet = await tx.bet.create({
-            data: {
-              id: betId,
-              userId,
-              optionId,
-              stake,
-              status: 'PENDING',
-            },
-          })
+    await this.betsQueue.add('persist-bet', {
+      betId,
+      userId,
+      optionId,
+      marketId,
+      stake,
+      timestamp: now,
+    })
 
-          await tx.marketOption.update({
-            where: { id: optionId },
-            data: { totalStaked: { increment: stake } },
-          })
-
-          this.logger.log(
-            `[BET OK] Usuario ${userId} apostó ${stake} a [${option.name}]`,
-          )
-
-          return {
-            newBet: createdBet,
-            targetMarketId: market.id,
-            updatedBalance: updatedWallet.balance,
-          }
-        })
-
-      this.chatGateway.sendWalletUpdate(userId, updatedBalance)
-
-      const updatedMarket = await this.prisma.market.findUnique({
-        where: { id: targetMarketId },
-        include: { options: true },
-      })
-
-      if (updatedMarket) {
-        const totalPool = updatedMarket.options.reduce(
-          (sum, opt) => sum + opt.totalStaked,
-          0,
-        )
-        this.betsGateway.emitPoolUpdate(targetMarketId, {
-          totalPool,
-          options: updatedMarket.options.map((opt) => ({
-            id: opt.id,
-            totalStaked: opt.totalStaked,
-          })),
-        })
-      }
-
-      return newBet
-    } catch (error) {
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error
-      }
-      this.logger.error(
-        `Fallo crítico al procesar apuesta del usuario ${userId}`,
-        error.stack,
-      )
-      throw new InternalServerErrorException('No se pudo procesar la apuesta')
+    return {
+      id: betId,
+      status: 'ACCEPTED_PENDING_SAVE',
+      message: 'Apuesta tomada con éxito',
     }
   }
 
@@ -168,6 +118,21 @@ export class BetsService {
       },
       include: { options: true },
     })
+
+    const redis = this.redisService.redis
+    const marketKey = `market:${market.id}`
+
+    await redis.hset(
+      marketKey,
+      'status',
+      'OPEN',
+      'closesAt',
+      new Date(dto.closesAt).getTime().toString(),
+    )
+
+    for (const opt of market.options) {
+      await redis.hset(marketKey, opt.id, '0')
+    }
 
     this.betsGateway.emitMarketCreated(market)
 
@@ -193,6 +158,9 @@ export class BetsService {
 
   async settleMarket(marketId: string, dto: SettleMarketDto) {
     const { status, winningOptionId } = dto
+
+    const redis = this.redisService.redis
+    await redis.hset(`market:${marketId}`, 'status', 'SETTLED')
 
     if (status === 'SETTLED' && !winningOptionId) {
       throw new BadRequestException('Debe especificar la opción ganadora')
@@ -265,6 +233,9 @@ export class BetsService {
               where: { userId: bet.userId },
               data: { balance: { increment: bet.stake } },
             })
+
+            await redis.set(`wallet:${bet.userId}:balance`, wallet.balance)
+
             await tx.coinTransaction.create({
               data: {
                 walletId: wallet.id,
@@ -300,10 +271,14 @@ export class BetsService {
         for (const bet of option.bets) {
           if (isWinner) {
             const payout = Math.floor(bet.stake * multiplier)
+
             const wallet = await tx.wallet.update({
               where: { userId: bet.userId },
               data: { balance: { increment: payout } },
             })
+
+            await redis.set(`wallet:${bet.userId}:balance`, wallet.balance)
+
             await tx.coinTransaction.create({
               data: {
                 walletId: wallet.id,

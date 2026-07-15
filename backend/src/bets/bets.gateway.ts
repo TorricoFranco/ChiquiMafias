@@ -84,9 +84,11 @@ export class BetsGateway implements OnGatewayConnection {
 
   emitPoolUpdate(
     marketId: string,
-    poolData: { totalPool: number; options: any[] },
+    poolData: { optionId: string; newTotalStaked: number },
   ) {
-    this.logger.debug(`Actualizando pool para el market: ${marketId}`)
+    this.logger.debug(
+      `Actualizando pool para el market: ${marketId}, opción: ${poolData.optionId}`,
+    )
     this.server.to(this.DASHBOARD_ROOM).emit('market_pool_updated', {
       marketId,
       ...poolData,

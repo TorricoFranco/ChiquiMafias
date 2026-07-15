@@ -1,6 +1,9 @@
-import { IsNotEmpty, IsInt, IsUUID, Min } from 'class-validator'
-
+import { IsNotEmpty, IsUUID, IsInt, Min } from 'class-validator'
 export class CreateBetDto {
+  @IsNotEmpty({ message: 'Debe especificar el ID del mercado' })
+  @IsUUID('4', { message: 'El ID del mercado debe ser un UUID válido' })
+  marketId!: string
+
   @IsNotEmpty({ message: 'Debe especificar el ID de la opción' })
   @IsUUID('4', { message: 'El ID de la opción debe ser un UUID válido' })
   optionId!: string
