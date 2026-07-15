@@ -29,6 +29,12 @@ export class ChatService {
   }
 
   onClientDisconnected(socketId: string) {
+    const client = this.clients.get(socketId)
+
+    if (client && client.userId) {
+      this.rateMap.delete(client.userId)
+    }
+
     this.clients.delete(socketId)
   }
 
@@ -233,9 +239,6 @@ export class ChatService {
   async executeMute(userId: string, durationSeconds: number) {
     const redisKey = `timeout:${userId}`
     await this.redisService.redis.set(redisKey, 'true', 'EX', durationSeconds)
-
-    // Opcional: Si tenés el cliente conectado en this.clients, acá podés
-    // mandarle un socket.emit() silencioso para que el front bloquee el input de chat al instante.
   }
 
   async isUserMuted(
