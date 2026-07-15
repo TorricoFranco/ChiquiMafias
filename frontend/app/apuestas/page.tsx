@@ -6,7 +6,7 @@ import Link from 'next/link';
 import PlaceBetDrawer from '@/components/bets/PlaceBetDrawer';
 import AdminBetsPanel from '@/components/bets/AdminBetsPanel';
 import { useBetsSocket } from '@/hook/socket/useBetSocket';
-import { useUserStore } from "@/store/useUserStore"; 
+import { useUserStore } from "@/store/useUserStore";
 
 export default function ApuestasPage() {
     const [markets, setMarkets] = useState<Market[]>([]);
@@ -214,7 +214,8 @@ export default function ApuestasPage() {
                 onClose={() => setIsDrawerOpen(false)}
                 market={selectedMarket}
                 option={selectedOption}
-                onBetSuccess={loadMarkets}
+                onBetSuccess={() => {
+                }}
             />
         </div>
     );
