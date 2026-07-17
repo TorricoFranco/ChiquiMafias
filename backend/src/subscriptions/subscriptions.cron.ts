@@ -22,99 +22,117 @@ export class SubscriptionsCronService {
 
     try {
       // ---------------------------------------------------------------------------
-      // CASO 1: Procesar CANCELLATION_PENDING o GRACE_PERIOD expirados (RF-04.4)
+      // CASO 1: Procesar CANCELLATION_PENDING o GRACE_PERIOD expirados EN LOTES
       // ---------------------------------------------------------------------------
-      const expiredSubscriptions = await this.prisma.userSubscription.findMany({
-        where: {
-          status: {
-            in: [
-              SubscriptionStatus.CANCELLATION_PENDING,
-              SubscriptionStatus.GRACE_PERIOD,
-            ],
+      let hasMoreExpired = true
+      let expiredCount = 0
+
+      while (hasMoreExpired) {
+        // Pedimos de a 50 registros para no saturar la memoria
+        const batch = await this.prisma.userSubscription.findMany({
+          where: {
+            status: {
+              in: [
+                SubscriptionStatus.CANCELLATION_PENDING,
+                SubscriptionStatus.GRACE_PERIOD,
+              ],
+            },
+            endsAt: { lte: now },
           },
-          endsAt: { lte: now }, // Ya llegó o pasó la fecha de vencimiento
-        },
-        include: { user: true },
-      })
+          take: 50,
+          include: { user: true },
+        })
 
-      if (expiredSubscriptions.length > 0) {
-        this.logger.log(
-          `Se encontraron ${expiredSubscriptions.length} suscripciones expiradas para degradar.`,
-        )
+        if (batch.length === 0) {
+          hasMoreExpired = false
+          break
+        }
 
-        await this.prisma.$transaction(async (tx) => {
-          for (const sub of expiredSubscriptions) {
-            // 1. Degradamos el registro de la suscripción
+        expiredCount += batch.length
+
+        for (const sub of batch) {
+          await this.prisma.$transaction(async (tx) => {
             await tx.userSubscription.update({
               where: { id: sub.id },
               data: { status: SubscriptionStatus.EXPIRED },
             })
 
-            // 2. Limpiamos el caché comercial del usuario (Socio Free = null)
             await tx.user.update({
               where: { id: sub.userId },
               data: {
-                activeSubscriptionTier: null, // 👈 Vuelve a null impecable
+                activeSubscriptionTier: null,
                 activeNameColorId: null,
                 activeBannerId: null,
               },
             })
+          })
 
-            // 3. 🔥 Notificación por Sockets alineada con el Front
-            this.chatGateway.server
-              .to(`user:${sub.userId}`)
-              .emit('subscription:expired', {
-                message:
-                  'Tu membresía de tribuna ha expirado, pa. Volvé a platea cuando quieras! ⚽',
-                tier: null, // 👈 Enviamos null para sincronizar el estado del dropdown
-              })
+          this.chatGateway.server
+            .to(`user:${sub.userId}`)
+            .emit('subscription:expired', {
+              message:
+                'Tu membresía de tribuna ha expirado, pa. Volvé a platea cuando quieras! ⚽',
+              tier: null,
+            })
+        }
+      }
 
-            this.logger.log(
-              `[Cron] Usuario ${sub.user.name} (${sub.userId}) degradado a Free (null) con éxito.`,
-            )
-          }
-        })
+      if (expiredCount > 0) {
+        this.logger.log(
+          `✅ [Cron] Se degradaron ${expiredCount} suscripciones a Free.`,
+        )
       }
 
       // ---------------------------------------------------------------------------
-      // CASO 2: Control de seguridad para ACTIVE que vencen hoy (Safety Net)
+      // CASO 2: Control de seguridad para ACTIVE que vencen hoy EN LOTES
       // ---------------------------------------------------------------------------
-      const activeReachingEnd = await this.prisma.userSubscription.findMany({
-        where: {
-          status: SubscriptionStatus.ACTIVE,
-          endsAt: { lte: now },
-          autoRenew: true, // Si es false, ya es CANCELLATION_PENDING y va por el CASO 1
-        },
-        include: { user: true },
-      })
+      let hasMoreActive = true
+      let activeCount = 0
 
-      if (activeReachingEnd.length > 0) {
-        this.logger.log(
-          `[Cron] Moviendo ${activeReachingEnd.length} planes activos vencidos a periodo de gracia...`,
-        )
-
-        await this.prisma.$transaction(async (tx) => {
-          for (const sub of activeReachingEnd) {
-            const graceEndDate = new Date()
-            graceEndDate.setHours(graceEndDate.getHours() + 48)
-
-            await tx.userSubscription.update({
-              where: { id: sub.id },
-              data: {
-                status: SubscriptionStatus.GRACE_PERIOD,
-                endsAt: graceEndDate,
-              },
-            })
-
-            this.chatGateway.server
-              .to(`user:${sub.userId}`)
-              .emit('subscription:grace_period', {
-                message:
-                  'Tuvimos un problema con el cobro automático. Tenés 48hs de tolerancia, rey! 🚨',
-                endsAt: graceEndDate,
-              })
-          }
+      while (hasMoreActive) {
+        const batch = await this.prisma.userSubscription.findMany({
+          where: {
+            status: SubscriptionStatus.ACTIVE,
+            endsAt: { lte: now },
+            autoRenew: true,
+          },
+          take: 50,
+          include: { user: true },
         })
+
+        if (batch.length === 0) {
+          hasMoreActive = false
+          break
+        }
+
+        activeCount += batch.length
+
+        for (const sub of batch) {
+          const graceEndDate = new Date()
+          graceEndDate.setHours(graceEndDate.getHours() + 48)
+
+          await this.prisma.userSubscription.update({
+            where: { id: sub.id },
+            data: {
+              status: SubscriptionStatus.GRACE_PERIOD,
+              endsAt: graceEndDate,
+            },
+          })
+
+          this.chatGateway.server
+            .to(`user:${sub.userId}`)
+            .emit('subscription:grace_period', {
+              message:
+                'Tuvimos un problema con el cobro automático. Tenés 48hs de tolerancia, rey! 🚨',
+              endsAt: graceEndDate,
+            })
+        }
+      }
+
+      if (activeCount > 0) {
+        this.logger.log(
+          `✅ [Cron] Se movieron ${activeCount} planes a periodo de gracia.`,
+        )
       }
     } catch (error) {
       this.logger.error(

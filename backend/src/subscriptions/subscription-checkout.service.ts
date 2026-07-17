@@ -42,7 +42,7 @@ export class SubscriptionCheckoutService {
     private readonly mercadoPagoService: MercadoPagoService,
     private readonly redis: RedisService,
     private readonly configService: ConfigService<EnvironmentVariables>,
-  ) {}
+  ) { }
 
   private getMercadoPagoConfig() {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL', {
@@ -284,9 +284,11 @@ export class SubscriptionCheckoutService {
         // Si viene en otro estado (ej: "authorized" al crearse), dejamos que siga el flujo normal
       }
 
-      // 2. Protección contra Replay Attacks (Acá sigue tu código de siempre para los PAGOS)
-      const redisKey = `payment:processed:${paymentId}`
-      const isAlreadyProcessed = await this.redis.redis.get(redisKey)
+      // Protección contra Replay Attacks (Acá sigue tu código de siempre para los PAGOS)
+      const isAlreadyProcessed = await this.prisma.processedPayment.findUnique({
+        where: { paymentId: String(paymentId) },
+        // Nota: Asegurate de parsearlo a String o Number según cómo esté definido en tu schema.prisma
+      })
 
       if (isAlreadyProcessed) {
         this.logger.warn(
@@ -295,7 +297,7 @@ export class SubscriptionCheckoutService {
         return { status: 'idempotent', message: 'Pago ya fue procesado' }
       }
 
-      // 3. Obtener detalles del pago
+      // Obtener detalles del pago
       const paymentDetails = await this.mercadoPagoService.getPaymentDetails(
         paymentId,
         payload.type,
@@ -306,7 +308,7 @@ export class SubscriptionCheckoutService {
         )
       }
 
-      // 4. Validar estado aprobado
+      // Validar estado aprobado
       if (
         paymentDetails.status !== 'approved' &&
         paymentDetails.status !== 'authorized' &&
@@ -322,13 +324,11 @@ export class SubscriptionCheckoutService {
         }
       }
 
-      // 5. Buscar la nueva suscripción (la que se acaba de pagar)
+      //  Buscar la nueva suscripción (la que se acaba de pagar)
       const subscription = await this.prisma.userSubscription.findFirst({
         where: { mpExternalRef: paymentDetails.external_reference },
         include: {
           user: true,
-          // Asumiendo que tenés la relación al plan en tu modelo UserSubscription,
-          // o podés buscarlo directamente abajo por el tier.
         },
       })
 
@@ -338,19 +338,26 @@ export class SubscriptionCheckoutService {
         )
       }
 
-      // 6. 💡 VERIFICAR SI ESTE PAGO CORRESPONDE A UN UPGRADE
       const upgradeOldSubId = await this.redis.redis.get(
         `subscription:upgrade:${paymentDetails.external_reference}`,
       )
 
       let oldPreapprovalIdToCancel: string | null = null
 
-      // 7. TRANSACCIÓN ATÓMICA
+      // TRANSACCIÓN ATÓMICA
       const result = await this.prisma.$transaction(async (tx) => {
-        // Bloquear ID de pago en Redis
-        await this.redis.redis.set(redisKey, 'true', 'EX', 7 * 24 * 3600)
+        // Registrar el ID del pago en la base de datos para asegurar idempotencia
+        try {
+          await tx.processedPayment.create({
+            data: { paymentId: paymentId },
+          })
+        } catch (e) {
+          if (e.code === 'P2002') {
+            throw new Error('DUPLICATE_WEBHOOK')
+          }
+          throw e
+        }
 
-        // Activar la nueva suscripción
         const updatedSubscription = await tx.userSubscription.update({
           where: { id: subscription.id },
           data: { status: SubscriptionStatus.ACTIVE },
@@ -395,7 +402,7 @@ export class SubscriptionCheckoutService {
           },
         })
 
-        // 💡 LÓGICA EXCLUSIVA DE UPGRADE (DENTRO DE LA TRANSACCIÓN)
+        //  LÓGICA EXCLUSIVA DE UPGRADE (DENTRO DE LA TRANSACCIÓN)
         if (upgradeOldSubId) {
           const oldSub = await tx.userSubscription.findUnique({
             where: { id: upgradeOldSubId },
@@ -443,7 +450,7 @@ export class SubscriptionCheckoutService {
         return { subscription: updatedSubscription, user: updatedUser }
       })
 
-      // 8. 💡 FUERA DE LA TRANSACCIÓN: Dar de baja el debito automático viejo en Mercado Pago
+      // Dar de baja el debito automático viejo en Mercado Pago
       if (oldPreapprovalIdToCancel) {
         try {
           await this.mercadoPagoService.cancelPreapprovalInMercadoPago(
@@ -470,7 +477,14 @@ export class SubscriptionCheckoutService {
         message: 'Pago procesado y beneficios aplicados correctamente.',
         subscription: result.subscription,
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'DUPLICATE_WEBHOOK') {
+        this.logger.warn(
+          `[Webhook] Intento de procesamiento duplicado para ${payload.data?.id}, ignorando.`,
+        )
+        return { status: 'idempotent', message: 'Pago ya fue procesado' }
+      }
+
       this.logger.error(`[Webhook Error] ${error.message}`, error.stack)
       throw error
     }
@@ -555,12 +569,12 @@ export class SubscriptionCheckoutService {
 
   /**
    * ============================================================================
-   * UPGRADE DE PLAN (RF-03) - CORREGIDO CON ESTIMACIÓN PARA EL DTO
+   * UPGRADE DE PLAN (RF-03)
    * ============================================================================
    */
   async upgradeSubscription(userId: string, newTier: SubscriptionTier) {
     try {
-      // 1. Validar que el usuario tenga una suscripción ACTIVE actual
+      // Validar que el usuario tenga una suscripción ACTIVE actual
       const currentSubscription = await this.prisma.userSubscription.findFirst({
         where: {
           userId,
@@ -588,10 +602,10 @@ export class SubscriptionCheckoutService {
       const { bonusCoins: estimatedBonusCoins } =
         this.pricingService.calculateUpgradeBonus(currentSubscription.endsAt)
 
-      // 3. 🔥 Iniciamos el checkout pasando "true" como tercer parámetro (isUpgrade)
+      // Iniciamos el checkout pasando "true" como tercer parámetro (isUpgrade)
       const checkoutResult = await this.startCheckout(userId, newTier, true)
 
-      // 4. Guardamos el puente en Redis para el Webhook
+      //  Guardamos el puente en Redis para el Webhook
       await this.redis.redis.set(
         `subscription:upgrade:${checkoutResult.external_reference}`,
         currentSubscription.id,

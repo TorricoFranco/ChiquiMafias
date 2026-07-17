@@ -5,7 +5,8 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
 import { UserStatusGuard } from './auth/guards/user-status.guard'
-import { ConfigModule } from '@nestjs/config'
+import { BullModule } from '@nestjs/bullmq'
+import { ConfigModule, ConfigService } from '@nestjs/config'
 
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
@@ -49,6 +50,17 @@ import { WebhookModule } from './webhook/webhook.module'
         limit: 150,
       },
     ]),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get('REDIS_HOST'),
+          port: configService.get('REDIS_PORT'),
+          password: configService.get('REDIS_PASSWORD'),
+        },
+      }),
+    }),
     EventEmitterModule.forRoot(),
     ChatModule,
     UsersModule,
@@ -93,4 +105,4 @@ import { WebhookModule } from './webhook/webhook.module'
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

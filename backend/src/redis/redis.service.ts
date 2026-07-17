@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
+import { EnvironmentVariables } from '../config/interfaces/env.interface'
 import Redis from 'ioredis'
 
 @Injectable()
@@ -8,6 +8,11 @@ export class RedisService implements OnModuleDestroy {
   private readonly client: Redis
   private readonly subscriber: Redis
   private readonly logger = new Logger(RedisService.name)
+
+  private readonly channelCallbacks = new Map<
+    string,
+    Array<(message: string) => void>
+  >()
 
   constructor(
     private readonly configService: ConfigService<EnvironmentVariables>,
@@ -18,11 +23,7 @@ export class RedisService implements OnModuleDestroy {
       infer: true,
     })
 
-    const redisConfig = {
-      host,
-      port,
-      password,
-    }
+    const redisConfig = { host, port, password }
 
     this.client = new Redis(redisConfig)
     this.subscriber = new Redis(redisConfig)
@@ -30,6 +31,14 @@ export class RedisService implements OnModuleDestroy {
     this.logger.log(
       'Redis: Conexiones Command y Subscriber listas con autenticación.',
     )
+
+    this.subscriber.on('message', (channel, message) => {
+      const callbacks = this.channelCallbacks.get(channel)
+      if (callbacks && callbacks.length > 0) {
+        // Ejecutamos todos los callbacks anotados para este canal
+        callbacks.forEach((cb) => cb(message))
+      }
+    })
   }
 
   get redis() {
@@ -37,15 +46,34 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async subscribe(channel: string, callback: (message: string) => void) {
-    await this.subscriber.subscribe(channel)
+    let callbacks = this.channelCallbacks.get(channel)
 
-    this.subscriber.on('message', (chan, message) => {
-      if (chan === channel) {
-        callback(message)
-      }
-    })
+    if (!callbacks) {
+      callbacks = []
+      this.channelCallbacks.set(channel, callbacks)
 
-    this.logger.log(`Suscrito al canal: ${channel}`)
+      await this.subscriber.subscribe(channel)
+      this.logger.log(`Suscrito en Redis al canal: ${channel}`)
+    }
+
+    callbacks.push(callback)
+  }
+
+  async unsubscribe(
+    channel: string,
+    callbackToRemove: (message: string) => void,
+  ) {
+    const callbacks = this.channelCallbacks.get(channel)
+    if (!callbacks) return
+
+    const filteredCallbacks = callbacks.filter((cb) => cb !== callbackToRemove)
+    this.channelCallbacks.set(channel, filteredCallbacks)
+
+    if (filteredCallbacks.length === 0) {
+      await this.subscriber.unsubscribe(channel)
+      this.channelCallbacks.delete(channel)
+      this.logger.log(`Desuscrito en Redis del canal: ${channel}`)
+    }
   }
 
   async publish(channel: string, message: any) {

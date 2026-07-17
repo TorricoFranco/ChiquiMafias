@@ -7,8 +7,8 @@ import { Market } from "@/services/betsApi";
 
 interface PoolUpdatePayload {
     marketId: string;
-    totalPool: number;
-    options: { id: string; totalStaked: number }[];
+    optionId: string;
+    newTotalStaked: number;
 }
 
 interface StatusUpdatePayload {
@@ -71,16 +71,18 @@ export function useBetsSocket(setMarkets: React.Dispatch<React.SetStateAction<Ma
     // Escucha las variaciones de los pozos cuando alguien apuesta (Pari-Mutuel en vivo)
     const handlePoolUpdated = useCallback((payload: PoolUpdatePayload) => {
         console.log("💰 Pozo actualizado por WS:", payload);
+
         setMarkets((prev) =>
             prev.map((market) => {
+                // Si no es el mercado que buscamos, lo dejamos igual
                 if (market.id !== payload.marketId) return market;
 
-                // Mapeamos las opciones viejas inyectando los nuevos montos apostados (totalStaked)
+                // Actualizamos solo la opción que cambió
                 const updatedOptions = market.options.map((opt) => {
-                    const incomingOpt = payload.options.find((o) => o.id === opt.id);
-                    return incomingOpt
-                        ? { ...opt, totalStaked: incomingOpt.totalStaked }
-                        : opt;
+                    if (opt.id === payload.optionId) {
+                        return { ...opt, totalStaked: payload.newTotalStaked };
+                    }
+                    return opt;
                 });
 
                 return { ...market, options: updatedOptions };

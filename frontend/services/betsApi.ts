@@ -50,16 +50,21 @@ export const betsApi = {
     /**
      * Envía una nueva apuesta al backend (POST /bets/place)
      */
-    placeBet: async (optionId: string, stake: number) => {
+    placeBet: async (marketId: string, optionId: string, stake: number) => {
         const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/bets/place`, {
             method: 'POST',
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ optionId, stake }),
+            // Ahora enviamos los 3 campos que requiere el DTO
+            body: JSON.stringify({ marketId, optionId, stake }),
         });
 
         if (!res.ok) {
             const errorData = await res.json();
-            throw new Error(errorData.message || 'Error al procesar la apuesta');
+            // Si el backend envía un array de errores, tomamos el primero
+            const errorMessage = Array.isArray(errorData.message)
+                ? errorData.message[0]
+                : errorData.message;
+            throw new Error(errorMessage || 'Error al procesar la apuesta');
         }
 
         return res.json();

@@ -3,7 +3,9 @@ import { MERCADO_PAGO_CONSTANTS } from 'src/subscriptions/constants/subscription
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import { HttpService } from '@nestjs/axios'
-import { firstValueFrom } from 'rxjs'
+import { firstValueFrom, throwError, timer } from 'rxjs'
+import { retry } from 'rxjs/operators'
+import { AxiosResponse } from 'axios'
 import { MercadoPagoPreapprovalPayload } from 'src/subscriptions'
 import { MercadoPagoPreapprovalResponse } from 'src/subscriptions'
 
@@ -14,7 +16,7 @@ export class MercadoPagoService {
   constructor(
     private readonly http: HttpService,
     private readonly configService: ConfigService<EnvironmentVariables>,
-  ) {}
+  ) { }
 
   getMercadoPagoConfig() {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL', {
@@ -37,25 +39,40 @@ export class MercadoPagoService {
     }
   }
 
-  /**
-   * CANCELAR PREAPPROVAL EN MERCADO PAGO
-   */
+  private get retryStrategy() {
+    return retry({
+      count: 3,
+      delay: (error, retryCount) => {
+        const status = error?.response?.status
+        if (status && status >= 400 && status < 500) {
+          return throwError(() => error)
+        }
+        this.logger.warn(
+          `[MP API] Falla de red, reintentando request (intento ${retryCount})...`,
+        )
+        return timer(Math.pow(2, retryCount - 1) * 1000)
+      },
+    })
+  }
+
   public async cancelPreapprovalInMercadoPago(preapprovalId: string) {
     try {
       const mpConfig = this.getMercadoPagoConfig()
 
-      const response = await firstValueFrom(
-        this.http.put(
-          `${mpConfig.API_BASE_URL}/preapproval/${preapprovalId}`,
-          { status: 'cancelled' },
-          {
-            headers: {
-              Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
-              'Content-Type': 'application/json',
+      const response = (await firstValueFrom(
+        this.http
+          .put(
+            `${mpConfig.API_BASE_URL}/preapproval/${preapprovalId}`,
+            { status: 'cancelled' },
+            {
+              headers: {
+                Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
             },
-          },
-        ),
-      )
+          )
+          .pipe(this.retryStrategy),
+      )) as AxiosResponse<any>
 
       this.logger.log(`[MP Cancel] Preapproval ${preapprovalId} cancelada`)
       return response.data
@@ -68,61 +85,62 @@ export class MercadoPagoService {
     }
   }
 
-  /**
-   * ============================================================================
-   * OBTENER DETALLES DE PAGO DESDE MERCADO PAGO
-   * ============================================================================
-   */
   public async getPaymentDetails(
     id: string | number,
     webhookType: string,
   ): Promise<any> {
     try {
-      // Por defecto asumimos que es un pago normal
       let endpoint = `/v1/payments/${id}`
       const mpConfig = this.getMercadoPagoConfig()
 
-      // Si el evento es de la suscripción global, el endpoint cambia
       if (webhookType === 'subscription_preapproval') {
         endpoint = `/preapproval/${id}`
       } else if (webhookType === 'subscription_authorized_payment') {
         endpoint = `/authorized_payments/${id}`
       }
 
-      const response = await firstValueFrom(
-        this.http.get(`${mpConfig.API_BASE_URL}${endpoint}`, {
-          headers: {
-            Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
-          },
-        }),
-      )
+      const response = (await firstValueFrom(
+        this.http
+          .get(`${mpConfig.API_BASE_URL}${endpoint}`, {
+            headers: { Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}` },
+          })
+          .pipe(this.retryStrategy),
+      )) as AxiosResponse<any>
 
       return response.data
     } catch (error) {
+      const status = error.response?.status
       this.logger.error(
         `[MP API Error] No se pudieron obtener detalles para el ID ${id} (${webhookType})`,
         error.response?.data || error.message,
       )
-      return null
+
+      if (status && status >= 400 && status < 500) {
+        return null
+      }
+
+      throw error
     }
   }
 
   public async createPreapproval(payload: MercadoPagoPreapprovalPayload) {
     const mpConfig = this.getMercadoPagoConfig()
 
-    const response = await firstValueFrom(
-      this.http.post<MercadoPagoPreapprovalResponse>(
-        `${mpConfig.API_BASE_URL}${mpConfig.PREAPPROVAL_ENDPOINT}`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
-            'Content-Type': 'application/json',
+    const response = (await firstValueFrom(
+      this.http
+        .post<MercadoPagoPreapprovalResponse>(
+          `${mpConfig.API_BASE_URL}${mpConfig.PREAPPROVAL_ENDPOINT}`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
           },
-        },
-      ),
-    )
+        )
+        .pipe(this.retryStrategy),
+    )) as AxiosResponse<MercadoPagoPreapprovalResponse>
 
-    return response.data // TypeScript ahora reconocerá el tipo aquí
+    return response.data
   }
 }

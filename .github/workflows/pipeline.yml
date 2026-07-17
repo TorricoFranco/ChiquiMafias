@@ -1,0 +1,95 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    defaults:
+      run:
+        working-directory: ./backend
+        
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with: { node-version: '20' }
+      
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Lint and Format
+        run: npm run lint
+
+      - name: Build and Test
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/testdb
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ""
+          
+          PORT: 3007
+          HOST: localhost
+          ID_LEAGUE_ARG: 128
+          API_FOOTBALL_KEY: "dummy_key"
+          GOOGLE_CLIENT_ID: "dummy_google_id"
+          JWT_ACCESS_SECRET: "dummy_secret_access"
+          JWT_REFRESH_SECRET: "dummy_secret_refresh"
+          JWT_ACCESS_EXPIRES_IN: "15m"
+          JWT_REFRESH_EXPIRES_IN: "7d"
+          MERCADO_PAGO_API_URL: "https://api.mercadopago.com"
+          MERCADO_PAGO_ACCESS_TOKEN: "dummy_mp_token"
+          MERCADO_PAGO_WEBHOOK_URL: "http://localhost/webhook"
+          CLOUDINARY_CLOUD_NAME: "dummy_cloud"
+          CLOUDINARY_API_KEY: "dummy_key"
+          CLOUDINARY_API_SECRET: "dummy_secret"
+          RESEND_API_KEY: "dummy_resend"
+          DISCORD_INTERNAL_SECRET: "dummy_discord"
+          DISCORD_BOT_URL: "http://dummy"
+          FRONTEND_SUCCESS_URL: "http://localhost:3000/success"
+          FRONTEND_FAILURE_URL: "http://localhost:3000/failure"
+          FRONTEND_PENDING_URL: "http://localhost:3000/pending"
+          
+          TESTCONTAINERS_RYUK_DISABLED: 'true'
+
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run build
+          npm run test:unit
+          npm run test:e2e
+          
+#   frontend:
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         working-directory: ./frontend
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-node@v3
+#         with: { node-version: '20' }
+      
+#       - name: Install dependencies
+#         run: npm ci
+      
+#       - name: Build Frontend
+#         run: npm run build

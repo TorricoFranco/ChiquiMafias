@@ -1,26 +1,40 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { RedisService } from 'src/redis/redis.service'
+import { PrismaService } from 'src/prisma/prisma.service'
 import { WsException } from '@nestjs/websockets'
 
 @Injectable()
 export class VoteService {
-  constructor(private readonly redisService: RedisService) {}
+  private readonly logger = new Logger(VoteService.name)
+
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly prisma: PrismaService,
+  ) { }
 
   async castVote(pollId: string, userId: string, optionId: number) {
     const cooldownKey = `limit:vote:${userId}`
 
-    const isSpamming = await this.redisService.redis.get(cooldownKey)
-    if (isSpamming) {
-      console.log('Spam por parte del user:', userId)
-      throw new Error('Demasiados intentos. Esperá unos segundos.')
+    const acquired = await this.redisService.redis.set(
+      cooldownKey,
+      '1',
+      'EX',
+      2,
+      'NX',
+    )
+
+    if (!acquired) {
+      this.logger.warn(`Spam por parte del user: ${userId}`)
+      throw new WsException('Demasiados intentos. Esperá unos segundos.')
     }
+
     const voterKey = `poll:${pollId}:voters`
     const resultsKey = `poll:${pollId}:results`
     const detailKey = `poll:${pollId}:details`
 
-    const hasVoted = await this.redisService.redis.sismember(voterKey, userId)
+    const isNew = await this.redisService.redis.sadd(voterKey, userId)
 
-    if (hasVoted) {
+    if (isNew === 0) {
       throw new WsException({
         status: 'error',
         code: 'ALREADY_VOTED',
@@ -28,15 +42,28 @@ export class VoteService {
       })
     }
 
-    await this.redisService.redis.set(cooldownKey, '1', 'EX', 2)
+    try {
+      await this.prisma.vote.create({
+        data: {
+          pollId,
+          userId,
+          optionId,
+        },
+      })
 
-    await this.redisService.redis
-      .multi()
-      .hincrby(resultsKey, optionId.toString(), 1)
-      .sadd(voterKey, userId)
-      .hset(detailKey, userId, optionId.toString())
-      .exec()
+      await this.redisService.redis
+        .multi()
+        .hincrby(resultsKey, optionId.toString(), 1)
+        .hset(detailKey, userId, optionId.toString())
+        .exec()
 
-    return this.redisService.redis.hgetall(resultsKey)
+      return await this.redisService.redis.hgetall(resultsKey)
+    } catch (error) {
+      await this.redisService.redis.srem(voterKey, userId)
+      this.logger.error(`Error persistiendo voto de ${userId}:`, error.message)
+      throw new WsException(
+        'Ocurrió un error al procesar tu voto, intentá de nuevo.',
+      )
+    }
   }
 }

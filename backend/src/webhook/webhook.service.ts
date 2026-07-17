@@ -53,20 +53,30 @@ export class WebhookService {
     }
 
     const hmac = crypto
-      .createHmac('sha256', secret) // Ahora 'secret' es string garantizado
+      .createHmac('sha256', secret)
       .update(manifest)
       .digest('hex')
 
     if (hmac !== v1) {
       this.logger.error(
-        `[Security] Firma de Webhook inválida. RequestID: ${xRequestId}, - ${secret}`,
+        `[Security] Firma de Webhook inválida. RequestID: ${xRequestId}`,
       )
       throw new UnauthorizedException('Firma de webhook inválida')
     }
 
-    this.logger.log(
-      `Webhook validado correctamente. Delegando al SubscriptionService...`,
-    )
-    return this.subscriptionCheckoutService.processWebhook(payload)
+    try {
+      this.logger.log(`Webhook validado. Delegando al SubscriptionService...`)
+      return await this.subscriptionCheckoutService.processWebhook(payload)
+    } catch (error) {
+      this.logger.error(
+        `[Webhook Error] Fallo al procesar webhook ${xRequestId}: ${error.message}`,
+        error.stack,
+      )
+
+      //  NestJS va a devolver 500 a Mercado Pago
+      throw new InternalServerErrorException(
+        'Error al procesar el webhook, reintentando...',
+      )
+    }
   }
 }

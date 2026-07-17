@@ -48,27 +48,24 @@ export default function PlaceBetDrawer({ isOpen, onClose, market, option, onBetS
   const estimadoPayout = Math.floor(numericStake * cuotaProyectada);
 
   // --- HANDLER DE ENVÍO ---
+  // En tu handleSubmit dentro de PlaceBetDrawer.tsx
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (numericStake <= 0) {
-      setError('El monto de la apuesta debe ser mayor a 0');
-      return;
-    }
+    if (numericStake <= 0) return;
 
     try {
       setLoading(true);
       setError(null);
-      
-      // Llamada atómica a tu endpoint de NestJS
-      await betsApi.placeBet(option.id, numericStake);
-      
+
+      // --- AQUÍ EL CAMBIO ---
+      // Pasamos market.id además de option.id y el stake
+      await betsApi.placeBet(market.id, option.id, numericStake);
+
       setSuccess(true);
-      setTimeout(() => {
-        onBetSuccess(); // Refresca los mercados en la pantalla principal
-        onClose();      // Cierra el drawer
-      }, 1500);
+      // ... resto del código
     } catch (err: any) {
-      setError(err.message || 'Hubo un problema al procesar tu apuesta.');
+      // Ahora el error que llegue será más limpio gracias al cambio en betsApi.ts
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -77,21 +74,21 @@ export default function PlaceBetDrawer({ isOpen, onClose, market, option, onBetS
   return (
     <>
       {/* Backdrop de fondo oscuro */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
         onClick={onClose}
       />
 
       {/* Contenedor del Drawer lateral */}
       <div className="fixed inset-y-0 right-0 w-full max-w-md bg-zinc-900 border-l border-zinc-800 p-6 z-50 shadow-2xl flex flex-col justify-between text-white animate-slide-in">
-        
+
         {/* Cabecera */}
         <div>
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
               🎫 Cupón de Apuesta
             </h2>
-            <button 
+            <button
               onClick={onClose}
               className="text-zinc-400 hover:text-white p-1 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition text-sm"
             >
@@ -105,7 +102,7 @@ export default function PlaceBetDrawer({ isOpen, onClose, market, option, onBetS
               {market.status}
             </span>
             <h3 className="font-bold text-zinc-200 mt-2 text-base">{market.title}</h3>
-            
+
             <div className="mt-4 pt-3 border-t border-zinc-800 flex justify-between items-center">
               <div>
                 <p className="text-xs text-zinc-500">Tu selección:</p>
@@ -114,8 +111,8 @@ export default function PlaceBetDrawer({ isOpen, onClose, market, option, onBetS
               <div className="text-right">
                 <p className="text-xs text-zinc-500">Cuota Actual:</p>
                 <p className="font-mono font-bold text-emerald-400">
-                  x{currentTotalPool > 0 && option.totalStaked > 0 
-                    ? (currentTotalPool / option.totalStaked).toFixed(2) 
+                  x{currentTotalPool > 0 && option.totalStaked > 0
+                    ? (currentTotalPool / option.totalStaked).toFixed(2)
                     : (100 / option.initialProb).toFixed(2)}
                 </p>
               </div>

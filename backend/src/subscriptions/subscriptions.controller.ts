@@ -125,8 +125,6 @@ export class SubscriptionsController {
    * Genera bonus coins por los días restantes del plan viejo
    */
   @Post('upgrade')
-  @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async upgrade(
     @Body() dto: UpgradeSubscriptionDto,
@@ -147,7 +145,8 @@ export class SubscriptionsController {
   }
 
   @Patch('plans/price')
-  @OptionalAuth()
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async updatePlanPrice(@Body() dto: UpdatePlanPriceDto) {
     this.logger.log(
