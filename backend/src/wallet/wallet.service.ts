@@ -5,8 +5,8 @@ import {
   Logger,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { RedisService } from 'src/redis/redis.service'
-import { ChatGateway } from 'src/chat/chat.gateway'
+import { RedisService } from '../redis/redis.service'
+import { ChatGateway } from '../chat/chat.gateway'
 
 import { WalletOperation } from './interfaces/wallet-operation.interface'
 import { Prisma, Wallet } from '@prisma/client'

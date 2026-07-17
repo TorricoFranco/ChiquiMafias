@@ -53,13 +53,13 @@ export class WebhookService {
     }
 
     const hmac = crypto
-      .createHmac('sha256', secret) // Ahora 'secret' es string garantizado
+      .createHmac('sha256', secret)
       .update(manifest)
       .digest('hex')
 
     if (hmac !== v1) {
       this.logger.error(
-        `[Security] Firma de Webhook inválida. RequestID: ${xRequestId}, - ${secret}`,
+        `[Security] Firma de Webhook inválida. RequestID: ${xRequestId}`,
       )
       throw new UnauthorizedException('Firma de webhook inválida')
     }

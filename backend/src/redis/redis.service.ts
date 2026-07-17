@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
+import { EnvironmentVariables } from '../config/interfaces/env.interface'
 import Redis from 'ioredis'
 
 @Injectable()
