@@ -64,10 +64,10 @@ describe('WebhookService', () => {
   });
 
   it('debería lanzar InternalServerErrorException si el secret no está configurado', async () => {
-    const signature = generateSignature(TS, MOCK_PAYLOAD.data.id, X_REQUEST_ID, 'cualquiera');
+    mockConfigService.get.mockReturnValueOnce(undefined);
 
     await expect(
-      service.processWebhook(MOCK_PAYLOAD, signature, X_REQUEST_ID)
+      service.processWebhook(MOCK_PAYLOAD, 'cualquier-firma', X_REQUEST_ID)
     ).rejects.toThrow(InternalServerErrorException);
   });
 });
