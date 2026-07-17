@@ -260,7 +260,7 @@ export class BetsService {
         }
 
         //  mercado actualizado
-        return tx.market.findUnique({ where: { id: marketId } })
+        return { ...market, status: finalStatusToSet, settledAt: new Date() }
       }
 
       // LIQUIDACIÓN NORMAL
@@ -316,13 +316,13 @@ export class BetsService {
       }
 
       // mercado actualizado
-      return tx.market.findUnique({ where: { id: marketId } })
+      return { ...market, status: finalStatusToSet, settledAt: new Date() }
     })
 
     // EMISIÓN DE EVENTOS
     this.betsGateway.emitMarketStatusChange(
       marketId,
-      finalMarket!.status as 'LOCKED' | 'SETTLED' | 'REFUNDED',
+      finalMarket.status as 'LOCKED' | 'SETTLED' | 'REFUNDED',
     )
 
     pendingEvents.forEach((event) => {

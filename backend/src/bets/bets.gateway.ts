@@ -7,8 +7,8 @@ import {
 } from '@nestjs/websockets'
 import { UseFilters, Logger, UseGuards } from '@nestjs/common'
 import { Server, Socket } from 'socket.io'
-import { WsJwtGuard } from 'src/auth/guards/ws-jwt.guard'
-import { AuthService } from 'src/auth/auth.service'
+import { WsJwtGuard } from '../auth/guards/ws-jwt.guard'
+import { AuthService } from '../auth/auth.service'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 
 @WebSocketGateway({
