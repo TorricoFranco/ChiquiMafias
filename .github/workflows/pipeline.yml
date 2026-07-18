@@ -45,7 +45,10 @@ jobs:
           DATABASE_URL: postgresql://user:password@localhost:5432/testdb
           REDIS_HOST: localhost
           REDIS_PORT: 6379
-          REDIS_PASSWORD: ""
+          
+          CLIENT_URL: "http://localhost:3000"
+          FRONTEND_URL: "http://localhost:3000"
+          MERCADO_PAGO_WEBHOOK_SECRET: "dummy_webhook_secret"
           
           PORT: 3007
           HOST: localhost
