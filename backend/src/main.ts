@@ -46,8 +46,8 @@ async function bootstrap() {
   app.useWebSocketAdapter(new SocketIoAdapter(app))
 
   const config = new DocumentBuilder()
-    .setTitle('Ultra League API')
-    .setDescription('API documentation for Ultra League')
+    .setTitle('ChiquiMafias API')
+    .setDescription('API documentation for ChiquiMafias')
     .setVersion('1.0')
     .addBearerAuth(
       {
