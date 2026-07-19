@@ -4,7 +4,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
-    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -26,17 +25,21 @@ services:
 
   backend:
     container_name: football_backend
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
+    volumes: 
+      - ./backend:/app
+      - /app/node_modules 
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "3007:3007"
     env_file:         
       - .env   
     depends_on:
       - postgres
-      - redis
-    # Agregamos migrate deploy para que la BD de prod se actualice sola
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:prod"
+    command: sh -c "npx prisma generate && npm run start:dev"
     environment:
       PORT: ${PORT}
       HOST: ${HOST}
@@ -63,22 +66,47 @@ services:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TESTCONTAINERS_RYUK_DISABLED: 'true'
+      DOCKER_HOST: 'unix:///var/run/docker.sock'
 
   frontend:
     container_name: football_frontend
-    build: ./frontend
-    restart: unless-stopped
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    command:
+      - "http"
+      - "backend:3007"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"
     depends_on:
       - backend
 
   discord_bot:
     container_name: football_discord_bot
-    build: ./discord-bot
+    build:
+      context: ./discord-bot
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
+    volumes:
+      - ./discord-bot:/app
+      - /app/node_modules 
     ports:
       - "3001:3001"
     environment:
