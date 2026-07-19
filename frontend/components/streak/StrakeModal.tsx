@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import { X, Flame, Coins, Gift, CheckCircle2, Lock, Loader2 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { streakApi, StreakTimelineItem, StreakTimelineResponse } from "@/services/streakApi";
+
 
 interface StreakModalProps {
     onClose: () => void;
@@ -75,7 +76,7 @@ export default function StreakModal({ onClose }: { onClose: StreakModalProps["on
     };
 
     // Variantes para animaciones en cascada (Stagger) de los casilleros
-    const containerVariants = {
+    const containerVariants: Variants = {
         hidden: { opacity: 0 },
         show: {
             opacity: 1,
@@ -83,9 +84,14 @@ export default function StreakModal({ onClose }: { onClose: StreakModalProps["on
         },
     };
 
-    const itemVariants = {
+
+    const itemVariants: Variants = {
         hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
+        show: {
+            opacity: 1,
+            y: 0,
+            transition: { type: "spring", stiffness: 300, damping: 24 }
+        },
     };
 
     return (
@@ -189,10 +195,10 @@ export default function StreakModal({ onClose }: { onClose: StreakModalProps["on
                                                 key={day.dayNumber}
                                                 variants={itemVariants}
                                                 className={`relative flex flex-col items-center justify-between p-3 rounded-xl border text-center h-32 transition-all ${isCurrent && !data.streakRewardClaimed
-                                                        ? "bg-gradient-to-b from-amber-500/20 to-[#221c13] border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-2 ring-amber-500/20"
-                                                        : isCompleted || (isCurrent && data.streakRewardClaimed)
-                                                            ? "bg-[#161616] border-[#262626] opacity-60"
-                                                            : "bg-[#222222] border-[#2e2e2e]"
+                                                    ? "bg-gradient-to-b from-amber-500/20 to-[#221c13] border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-2 ring-amber-500/20"
+                                                    : isCompleted || (isCurrent && data.streakRewardClaimed)
+                                                        ? "bg-[#161616] border-[#262626] opacity-60"
+                                                        : "bg-[#222222] border-[#2e2e2e]"
                                                     }`}
                                             >
                                                 {/* Indicador de número de Día */}
@@ -243,8 +249,8 @@ export default function StreakModal({ onClose }: { onClose: StreakModalProps["on
                                     disabled={loading || claiming || !data || data.streakRewardClaimed}
                                     onClick={handleClaim}
                                     className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-sm tracking-wide uppercase transition duration-300 flex items-center justify-center space-x-2 ${data?.streakRewardClaimed
-                                            ? "bg-[#252525] text-gray-500 cursor-not-allowed border border-[#333]"
-                                            : "bg-amber-500 text-black hover:bg-amber-400 active:scale-95 shadow-lg shadow-amber-500/10"
+                                        ? "bg-[#252525] text-gray-500 cursor-not-allowed border border-[#333]"
+                                        : "bg-amber-500 text-black hover:bg-amber-400 active:scale-95 shadow-lg shadow-amber-500/10"
                                         }`}
                                 >
                                     {claiming ? (

@@ -4,13 +4,17 @@
 import { useEffect, useState } from "react";
 import { usePollSocket } from "@/hook/socket/usePollSocket";
 import { useUserStore } from "@/store/useUserStore";
-import { pollsApi, Poll } from "@/services/polls"; 
+import { pollsApi, Poll } from "@/services/polls";
 import { toast } from "sonner";
 import { POLL_ICONS } from "@/constants/poll-icons";
 import { VOTE_ERRORS } from "@/constants/error-messages";
 import LoginModal from "../auth/LoginModal";
 
-export default function VotePage({ pollId }: { pollId: string }) {
+interface VotePageProps {
+  pollId: string;
+}
+
+export default function VotePage({ pollId }: VotePageProps) {
   // Usamos el tipo Poll importado de nuestro servicio
   const [poll, setPoll] = useState<(Poll & { hasVoted?: boolean }) | null>(null);
   const [isPending, setIsPending] = useState(false);

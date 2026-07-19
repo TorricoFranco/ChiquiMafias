@@ -8,12 +8,16 @@ interface FixtureMatchProps {
 }
 
 export const FixtureMatch: React.FC<FixtureMatchProps> = ({ match }) => {
-  const isFinished = match.status_short === 'FT'
-  const isPenalties = match.status_short === 'PEN' || match.status_short === 'AET'
-  // Lista estricta de estados en vivo para evitar falsos positivos
-  const liveStatuses = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE']
-  const isLive = liveStatuses.includes(match.status_short)
-  const isPending = match.status_short === 'NS' || match.status_short === 'TBD'
+  const status = match.status_short as string;
+
+  // 2. Usamos la variable 'status' para todas las validaciones
+  const isFinished = status === 'FT';
+  const isPenalties = status === 'PEN' || status === 'AET';
+
+  const liveStatuses = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'];
+  const isLive = liveStatuses.includes(status);
+
+  const isPending = status === 'NS' || status === 'TBD';
 
   return (
     <div className="group relative p-3 bg-gray-900/40 hover:bg-gray-700/50 border border-gray-700/30 rounded-xl transition-all mb-2 overflow-hidden">
@@ -54,7 +58,7 @@ export const FixtureMatch: React.FC<FixtureMatchProps> = ({ match }) => {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
             </span>
             <span className="text-[10px] font-bold text-red-500 uppercase tracking-tighter">
-              {match.status_short === 'HT' ? 'Entretiempo' : `En Vivo ${match.status_short}`}
+              {status === 'HT' ? 'Entretiempo' : `En Vivo ${status}`}
             </span>
           </div>
         ) : isPenalties ? (
@@ -68,7 +72,7 @@ export const FixtureMatch: React.FC<FixtureMatchProps> = ({ match }) => {
         ) : (
           <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
             {/* CAMBIO AQUÍ: Usamos display_status que es lo que manda el padre */}
-            {match.display_status || 'Próximamente'}
+            {status || 'Próximamente'}
           </span>
         )}
       </div>

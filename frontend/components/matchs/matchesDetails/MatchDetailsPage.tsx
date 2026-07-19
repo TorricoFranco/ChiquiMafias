@@ -15,8 +15,28 @@ import { ChatDisabledMessage } from "./ChatDIsableMessage";
 import { SectionTitle } from "./SectionTitle";
 import { PreMatchDashboard } from "./PreMatchDashboard";
 
-export const MatchDetailsPage = ({ initialMatch }) => {
-  const matchId = initialMatch.metadata.id;
+interface MatchMetadata {
+  id: string | number;
+  status: string;
+}
+
+// Asegúrate de incluir las propiedades que usas (metadata, teams, score, etc.)
+interface Match {
+  metadata: MatchMetadata;
+  teams: any; // Puedes mejorar esto luego
+  score: any;
+  lineups?: any[];
+  events?: any[];
+  stats?: any;
+}
+
+interface MatchDetailsPageProps {
+  initialMatch: Match;
+}
+
+export const MatchDetailsPage = ({ initialMatch }: MatchDetailsPageProps) => {
+
+  const matchId = String(initialMatch.metadata.id);
   const { data: match } = useMatch(matchId, initialMatch);
   const status = match.metadata.status;
   const liveStatuses = ["1H", "HT", "2H", "ET", "BT", "P", "LIVE"];

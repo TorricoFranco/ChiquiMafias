@@ -1,18 +1,30 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, History } from 'lucide-react';
 
-export const HeadToHead = ({ history }) => {
+interface HeadToHeadProps {
+    history: {
+        homeWins: number;
+        awayWins: number;
+        draws: number;
+        total: number;
+        lastMatches: Array<{
+            fixture: { id: string | number; date: string };
+            teams: { home: { name: string }; away: { name: string } };
+            goals: { home: number; away: number };
+        }>;
+    };
+}
+
+export const HeadToHead = ({ history }: HeadToHeadProps) => {
     const { homeWins, awayWins, draws, total, lastMatches } = history;
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const homePct = (homeWins / total) * 100;
-    const awayPct = (awayWins / total) * 100;
-    const drawsPct = (draws / total) * 100;
+    const homePct = total > 0 ? (homeWins / total) * 100 : 0;
+    const awayPct = total > 0 ? (awayWins / total) * 100 : 0;
+    const drawsPct = total > 0 ? (draws / total) * 100 : 0;
 
     return (
-
         <section className="max-w-5xl mx-auto bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden transition-all duration-500 shadow-2xl">
-
             {/* HEADER */}
             <div className="p-6 md:p-8 bg-gradient-to-b from-white/[0.03] to-transparent">
                 <div className="flex flex-col items-center gap-2 mb-8">
@@ -63,7 +75,7 @@ export const HeadToHead = ({ history }) => {
                 </button>
             </div>
 
-            {/* LISTADO DINÁMICO  */}
+            {/* LISTADO DINÁMICO */}
             {isExpanded && (
                 <div className="p-6 md:p-10 bg-black/40 border-t border-white/5 animate-in slide-in-from-top-4 duration-500">
                     <div className="max-w-2xl mx-auto space-y-3">

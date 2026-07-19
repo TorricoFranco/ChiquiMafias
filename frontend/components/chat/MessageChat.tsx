@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldOff, MoreVertical, Trash2, Megaphone, Flag} from "lucide-react";
+import { ShieldOff, MoreVertical, Trash2, Megaphone, Flag } from "lucide-react";
 import { apiFetch } from "@/lib/apiFetch";
 import clsx from "clsx";
 import { getBannerComponent } from "./banners/BannerRegistry";
@@ -11,10 +11,10 @@ import { useCreateReport } from "@/hook/react-query/useSupport";
 interface ChatMessageProps {
   messageId: string;
   userId?: string;
-  avatar?: string;
+  avatar?: string | null;
   user: string;
   time?: string;
-  teamName?: string;
+  teamName?: string | null;
   message: string;
   currentRole?: string | null;
   variant?: "global" | "match";

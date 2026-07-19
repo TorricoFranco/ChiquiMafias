@@ -9,7 +9,7 @@ const EVENT_ICONS = {
     DEFAULT: "https://cdn-icons-png.flaticon.com/512/1165/1165230.png"
 };
 
-const getEventImage = (type, detail) => {
+const getEventImage = (type?: string | null, detail?: string | null): string => {
     const t = type?.toLowerCase() || '';
     const d = detail?.toLowerCase() || '';
     if (t === 'goal') return EVENT_ICONS.GOAL;
@@ -20,7 +20,15 @@ const getEventImage = (type, detail) => {
     return EVENT_ICONS.DEFAULT;
 };
 
-export const EventsMatch = ({ events, teams }) => {
+interface EventsMatchProps {
+    events: any[];
+    teams: {
+        home?: { id: number | string };
+        away?: { id: number | string };
+    };
+}
+
+export const EventsMatch = ({ events, teams }: EventsMatchProps) => {
     if (!events || events.length === 0) {
         return <div className="py-10 text-center text-gray-400 italic font-medium">Esperando sucesos del encuentro...</div>;
     }

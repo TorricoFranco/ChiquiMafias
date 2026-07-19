@@ -1,13 +1,13 @@
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supportApi, TicketStatus, TicketCategory } from '@/services/supportApi';
 
-// 1. LISTA PAGINADA DE TICKETS
+// 2. Actualiza el hook
 export const useAdminTickets = (page: number, limit: number, status?: TicketStatus, category?: TicketCategory) => {
   return useQuery({
     queryKey: ['admin-tickets', page, limit, status, category],
     queryFn: () => supportApi.adminGetTickets(page, limit, status, category),
-    keepPreviousData: true, 
+    placeholderData: keepPreviousData,
   });
 };
 

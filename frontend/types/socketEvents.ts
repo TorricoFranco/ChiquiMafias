@@ -33,23 +33,23 @@ export interface MatchLiveUpdatePayload {
 export interface StatisticData {
     fouls?: number;
     offsides?: number | null;
-  passes_ %?: string;
-red_cards ?: number | null;
-total_shots ?: number;
-corner_kicks ?: number;
-total_passes ?: number;
-yellow_cards ?: number | null;
-blocked_shots ?: number;
-shots_on_goal ?: number;
-expected_goals ?: string;
-shots_off_goal ?: number;
-ball_possession ?: string;
-goals_prevented ?: string;
-passes_accurate ?: number;
-shots_insidebox ?: number;
-goalkeeper_saves ?: number;
-shots_outsidebox ?: number;
-[key: string]: any;
+    "passes_%"?: string;
+    red_cards?: number | null;
+    total_shots?: number;
+    corner_kicks?: number;
+    total_passes?: number;
+    yellow_cards?: number | null;
+    blocked_shots?: number;
+    shots_on_goal?: number;
+    expected_goals?: string;
+    shots_off_goal?: number;
+    ball_possession?: string;
+    goals_prevented?: string;
+    passes_accurate?: number;
+    shots_insidebox?: number;
+    goalkeeper_saves?: number;
+    shots_outsidebox?: number;
+    [key: string]: any;
 }
 
 export interface TeamStats {
