@@ -1,5 +1,5 @@
 import { getBaseUrl } from "./getBaseUrl";
-import { PreMatchResponse } from "@/types/matchDetails";
+import { PreMatchResponse } from "@/types/preMatch";
 
 export async function getPreMatchInfo(
     matchId: string

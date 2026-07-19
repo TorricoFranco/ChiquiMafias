@@ -34,6 +34,7 @@ const ScoreDisplay = ({ match, liveScore }: { match: Match; liveScore?: LiveScor
         a: match.away_goals ?? 0,
         hp: match.home_pen ?? null,
         ap: match.away_pen ?? null,
+        isLive: false, // <--- AGREGA ESTA LÍNEA
     };
 
     const hasPenalties = score.hp !== null && score.ap !== null;

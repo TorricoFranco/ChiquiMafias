@@ -1,40 +1,57 @@
 import { useState, useMemo } from "react";
 
-export const SoccerPitch = ({ players, kitColors }) => {
-  const renderPlayers = useMemo(() => {
-    const rowsMap = {};
+interface Player {
+  id: string | number;
+  name: string;
+  number: number;
+  pos: string;
+  grid: string | null;
+}
 
-    // 1. Filtramos primero para asegurarnos que solo procesamos 
-    // jugadores que TENGAN grid (si no tienen, no los podemos dibujar)
+interface KitColorSet {
+  primary: string;
+  border: string;
+  number: string;
+}
+
+interface KitColors {
+  goalkeeper?: KitColorSet;
+  player?: KitColorSet;
+}
+
+interface SoccerPitchProps {
+  players: Player[];
+  kitColors?: KitColors;
+}
+
+export const SoccerPitch = ({ players, kitColors }: SoccerPitchProps) => {
+  const renderPlayers = useMemo(() => {
+    // 2. Definimos el tipo de rowsMap como un objeto con llaves string y valores number
+    const rowsMap: { [key: string]: number } = {};
+
     const validPlayers = players.filter(p => p.grid !== null && p.grid !== undefined);
 
-    // 2. Agrupamos para el centrado horizontal
     validPlayers.forEach(p => {
-      const row = p.grid.split(":")[0];
-      rowsMap[row] = (rowsMap[row] || 0) + 1;
+      if (p.grid) {
+        const row = p.grid.split(":")[0];
+        rowsMap[row] = (rowsMap[row] || 0) + 1;
+      }
     });
 
     return validPlayers.map((player) => {
-      // 3. Usamos el encadenamiento opcional por seguridad extrema
-      const parts = player.grid?.split(":") || ["5", "1"]; // Default a fila 5 si falla
+      const parts = player.grid?.split(":") || ["5", "1"];
       const [row, col] = parts.map(Number);
 
-      /**
-       * CONTROL VERTICAL MANUAL:
-       */
       let yPos;
       switch (row) {
-        case 1: yPos = 92; break; // Portero
-        case 2: yPos = 72; break; // Defensas
-        case 3: yPos = 50; break; // Mediocampistas
-        case 4: yPos = 28; break; // Volantes ofensivos
-        case 5: yPos = 12; break; // Delanteros
+        case 1: yPos = 92; break;
+        case 2: yPos = 72; break;
+        case 3: yPos = 50; break;
+        case 4: yPos = 28; break;
+        case 5: yPos = 12; break;
         default: yPos = 50;
       }
 
-      /**
-       * CENTRADO HORIZONTAL:
-       */
       const totalInRow = rowsMap[row] || 1;
       const xPos = (col / (totalInRow + 1)) * 100;
 
@@ -42,9 +59,11 @@ export const SoccerPitch = ({ players, kitColors }) => {
     });
   }, [players]);
 
-  const getColors = (pos) => {
+  const getColors = (pos: string) => {
     const type = pos === 'G' ? 'goalkeeper' : 'player';
-    const colors = kitColors?.[type] || { primary: '263142', border: 'ffffff', number: 'ffffff' };
+    // Usamos un fallback seguro por si kitColors es undefined o el tipo no existe
+    const colors = kitColors?.[type as keyof KitColors] || { primary: '263142', border: 'ffffff', number: 'ffffff' };
+
     return {
       bg: `#${colors.primary}`,
       border: `#${colors.border}`,
@@ -85,7 +104,6 @@ export const SoccerPitch = ({ players, kitColors }) => {
             className="absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-700 flex flex-col items-center z-10"
             style={{ left: `${p.xPos}%`, top: `${p.yPos}%` }}
           >
-            {/* Círculo del jugador */}
             <div
               className="w-7 h-7 rounded-full border-2 flex items-center justify-center shadow-lg"
               style={{ backgroundColor: colors.bg, borderColor: colors.border }}
@@ -94,7 +112,6 @@ export const SoccerPitch = ({ players, kitColors }) => {
                 {p.number}
               </span>
             </div>
-            {/* Nombre con fondo para legibilidad */}
             <div className="mt-1 bg-black/80 px-1.5 py-0.5 rounded shadow-sm">
               <p className="text-[7px] font-bold text-white whitespace-nowrap uppercase tracking-tighter">
                 {p.name.split(' ').pop()}
@@ -107,14 +124,48 @@ export const SoccerPitch = ({ players, kitColors }) => {
   );
 };
 
-export const LineupsSection = ({ match }) => {
-  const [activeTab, setActiveTab] = useState("home");
+interface Team {
+  id: string | number;
+  name: string;
+  logo: string;
+}
+
+interface Substitute {
+  id: string | number;
+  number: number;
+  name: string;
+}
+
+interface Lineup {
+  teamId: string | number;
+  team_id: string | number;
+  coach: { name: string } | string;
+  formation: string;
+  startXI: Player[]; // Reutilizando la interface Player que ya definiste arriba
+  substitutes: Substitute[];
+  kit_colors?: KitColors; // Reutilizando la interface KitColors
+}
+
+interface Match {
+  teams: {
+    home: Team;
+    away: Team;
+  };
+  lineups: Lineup[];
+}
+
+interface LineupsSectionProps {
+  match: Match;
+}
+
+// 2. Componente actualizado
+export const LineupsSection = ({ match }: LineupsSectionProps) => {
+  const [activeTab, setActiveTab] = useState<"home" | "away">("home");
 
   const teams = match.teams;
   const currentTeam = teams[activeTab];
 
   const playersData = match.lineups.find(l => l.teamId === currentTeam.id);
-
   const kitData = match.lineups.find(l => l.team_id === currentTeam.id);
 
   const coach = playersData?.coach;
@@ -123,13 +174,15 @@ export const LineupsSection = ({ match }) => {
 
   return (
     <div className="w-full bg-[#121212] rounded-3xl overflow-hidden border border-white/10">
-      {/* Tabs de equipos con Logo */}
+      {/* Tabs de equipos */}
       <div className="flex bg-white/5 p-1 gap-1">
-        {["home", "away"].map((side) => (
+        {(["home", "away"] as const).map((side) => (
           <button
             key={side}
             onClick={() => setActiveTab(side)}
-            className={`flex-1 flex items-center justify-center gap-3 py-3 text-xs font-bold rounded-2xl transition-all ${activeTab === side ? "bg-white/10 text-white shadow-lg" : "text-gray-500 opacity-50 hover:opacity-100"
+            className={`flex-1 flex items-center justify-center gap-3 py-3 text-xs font-bold rounded-2xl transition-all ${activeTab === side
+                ? "bg-white/10 text-white shadow-lg"
+                : "text-gray-500 opacity-50 hover:opacity-100"
               }`}
           >
             <img src={teams[side].logo} alt="logo" className="w-5 h-5 object-contain" />
@@ -147,7 +200,7 @@ export const LineupsSection = ({ match }) => {
           </span>
         </div>
 
-        {/*  Campo de juego */}
+        {/* Campo de juego */}
         <SoccerPitch
           players={playersData.startXI}
           kitColors={kitData?.kit_colors}
@@ -169,12 +222,11 @@ export const LineupsSection = ({ match }) => {
                   </p>
                 </div>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* Suplentes*/}
+        {/* Suplentes */}
         <div className="pt-4 border-t border-white/5">
           <h3 className="text-[10px] font-black text-gray-500 uppercase mb-3 px-1 tracking-widest">Suplentes</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">

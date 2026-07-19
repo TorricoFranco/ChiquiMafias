@@ -2,7 +2,18 @@ import { HeadToHead } from "./HeadToHead";
 import { FormTab } from "./FormTab";
 import { MiniTables } from "./MiniTables";
 
-export const PreMatchDashboard = ({ data, isLoading }) => {
+interface PreMatchData {
+    form: any; // O define una interface para form si quieres ser más estricto
+    history: any;
+    miniTable: any;
+}
+
+interface PreMatchDashboardProps {
+    data: PreMatchData | undefined; // Es undefined porque puede ser null antes de cargar
+    isLoading: boolean;
+}
+
+export const PreMatchDashboard = ({ data, isLoading }: PreMatchDashboardProps) => {
     if (isLoading) return <div className="animate-pulse space-y-8">
         <div className="h-48 bg-white/5 rounded-3xl" />
         <div className="h-64 bg-white/5 rounded-3xl" />

@@ -4,6 +4,7 @@
 // ENUMS ESPEJADOS DE PRISMA (Exactamente igual al Schema)
 // ==========================================
 export enum SubscriptionTier {
+  NONE = "NONE",
   TIER_1 = "TIER_1", // Ej: Socio Bronce
   TIER_2 = "TIER_2", // Ej: Socio Plata
   TIER_3 = "TIER_3", // Ej: Socio Oro

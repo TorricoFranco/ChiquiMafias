@@ -12,6 +12,7 @@ interface RowData {
   teamName: string;
   teamLogo?: string;
   played: number;
+  pts: string;
   won: number;
   draw: number;
   lost: number;

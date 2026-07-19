@@ -1,18 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { subscriptionApi } from "@/services/subscriptionsApi";
 import { useUserStore } from "@/store/useUserStore";
-import { SubscriptionTier } from "@/types";
+import { SubscriptionTier } from "@/types/subscription";
 
 
 export function useSubscriptions() {
   const queryClient = useQueryClient();
   const username = useUserStore((state) => state.username);
   const userTier = useUserStore((state) => state.tier);
-  const setUserInfo = useUserStore((state) => state.setUserInfo); // 👈 Traemos esto
+  const setUserInfo = useUserStore((state) => state.setUserInfo);
 
   const plansQuery = useQuery({
     queryKey: ["subscription-plans", userTier],
-    queryFn: () => subscriptionApi.getPlans(userTier),
+    queryFn: () => subscriptionApi.getPlans(userTier as SubscriptionTier),
   });
 
   const currentSubQuery = useQuery({

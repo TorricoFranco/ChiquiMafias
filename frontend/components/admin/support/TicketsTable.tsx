@@ -5,13 +5,22 @@ import { useAdminTickets } from '@/hook/react-query/useAdminSupport';
 import { TicketStatus, TicketCategory } from '@/services/supportApi';
 import TicketDetailsDrawer from './TicketDetailsDrawer';
 
+interface TicketsResponse {
+  data: any[]; // Aquí podrías poner Ticket[]
+  meta: {
+    lastPage: number;
+  };
+}
+
 export default function TicketsTable() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | undefined>();
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null); // <-- Estado para el Drawer
   const limit = 10;
 
-  const { data, isLoading, isError } = useAdminTickets(page, limit, statusFilter);
+  const { data: rawData, isLoading, isError } = useAdminTickets(page, limit, statusFilter);
+
+  const data = rawData as TicketsResponse | undefined;
 
   if (isLoading) return <div className="p-4 text-center text-gray-500">Cargando tickets...</div>;
   if (isError) return <div className="p-4 text-red-500 text-center">Error al cargar los tickets.</div>;
@@ -20,7 +29,7 @@ export default function TicketsTable() {
     <div className="relative">
       {/* Filtros */}
       <div className="mb-4 flex gap-4">
-        <select 
+        <select
           className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           value={statusFilter || ''}
           onChange={(e) => {
@@ -55,16 +64,16 @@ export default function TicketsTable() {
                 <td className="px-6 py-4">{ticket.category}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium
-                    ${ticket.status === 'OPEN' ? 'bg-green-100 text-green-800' : 
-                      ticket.status === 'CLOSED' ? 'bg-gray-100 text-gray-800' : 
-                      ticket.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'}`}>
+                    ${ticket.status === 'OPEN' ? 'bg-green-100 text-green-800' :
+                      ticket.status === 'CLOSED' ? 'bg-gray-100 text-gray-800' :
+                        ticket.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-blue-100 text-blue-800'}`}>
                     {ticket.status}
                   </span>
                 </td>
                 <td className="px-6 py-4">{new Date(ticket.createdAt).toLocaleDateString()}</td>
                 <td className="px-6 py-4 text-right">
-                  <button 
+                  <button
                     onClick={() => setSelectedTicketId(ticket.id)} // <-- Abrimos el Drawer
                     className="text-blue-600 hover:text-blue-900 font-semibold text-sm transition-colors"
                   >
@@ -83,14 +92,14 @@ export default function TicketsTable() {
           Mostrando página {page} de {data?.meta.lastPage || 1}
         </p>
         <div className="flex gap-2">
-          <button 
+          <button
             disabled={page === 1}
             onClick={() => setPage(p => p - 1)}
             className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Anterior
           </button>
-          <button 
+          <button
             disabled={page >= (data?.meta.lastPage || 1)}
             onClick={() => setPage(p => p + 1)}
             className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -102,9 +111,9 @@ export default function TicketsTable() {
 
       {/* COMPONENTE DRAWER */}
       {selectedTicketId && (
-        <TicketDetailsDrawer 
-          ticketId={selectedTicketId} 
-          onClose={() => setSelectedTicketId(null)} 
+        <TicketDetailsDrawer
+          ticketId={selectedTicketId}
+          onClose={() => setSelectedTicketId(null)}
         />
       )}
     </div>

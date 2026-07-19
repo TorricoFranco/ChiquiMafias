@@ -111,6 +111,7 @@ export default function Header() {
               onOpenProfile={() => setShowProfile(true)}
               onOpenStore={() => setShowStore(true)}
               onOpenCustomizer={() => setShowCustomizer(true)}
+              onOpenSupport={() => console.log("Soporte aún no implementado")}
             />
           )}
         </div>

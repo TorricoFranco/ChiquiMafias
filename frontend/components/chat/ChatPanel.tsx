@@ -27,7 +27,7 @@ export default function ChatPanel({
   matchId?: string;
 }) {
   const { items: inventoryItems, fetchInventory, consumeMegaphone } = useInventoryStore();
-  const { messages, sendMessage, deleteMessage, timeoutUntil, setTimeoutUntil } = useChatSocket(matchId);
+  const { messages, sendMessage, deleteMessage, timeoutUntil, setTimeoutUntil } = useChatSocket();
   const [input, setInput] = useState("");
   const [showLogin, setShowLogin] = useState(false);
 
