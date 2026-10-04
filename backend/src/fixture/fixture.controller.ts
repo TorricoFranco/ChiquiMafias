@@ -11,7 +11,9 @@ import { GetActiveMatchdayResponseDto } from './dto/response/active-matchday.dto
 import { GetLiveScoresResponseDto } from './dto/response/live-score.dto'
 import { TournamentBracketsResponseDto } from './dto/response/tournament-bracket.dto'
 import { AvailableStagesResponseDto } from './dto/response/available-stages.dto'
+import { Public } from 'src/auth/decorators/auth.decorator'
 
+@Public()
 @Controller('fixtures')
 export class FixtureController {
   constructor(private readonly fixturesService: FixtureService) { }
@@ -48,7 +50,6 @@ export class FixtureController {
     @Param('tournament') tournament: string,
     @Param('matchday') matchday: string,
   ): Promise<GetFixtureMatchdayResponseDto> {
-    // Tipado estricto en el retorno
     return this.fixturesService.getFixtureByMatchday(
       season,
       tournament,
@@ -205,7 +206,6 @@ export class FixtureController {
     @Param('season') season: string,
     @Param('tournament') tournament: string,
   ): Promise<AvailableStagesResponseDto> {
-    // <--- Tipamos la respuesta de la función
     return await this.fixturesService.getAvailableStages(season, tournament)
   }
 }

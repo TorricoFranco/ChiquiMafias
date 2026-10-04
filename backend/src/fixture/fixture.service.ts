@@ -55,15 +55,26 @@ export class FixtureService {
     if (cached) {
       matches = JSON.parse(cached)
     } else {
-      matches = await this.prisma.matches.findMany({
-        where: {
-          season: Number(season),
-          tournament: tournament.toUpperCase() as any,
+      const whereClause: any = {
+        season: Number(season),
+        tournament: tournament.toUpperCase() as any,
+        round: {
+          contains: dbSearchTerm,
+          mode: 'insensitive',
+        },
+      }
+
+      if (dbSearchTerm === 'final') {
+        whereClause.NOT = {
           round: {
-            contains: dbSearchTerm,
+            contains: 'semi',
             mode: 'insensitive',
           },
-        },
+        }
+      }
+
+      matches = await this.prisma.matches.findMany({
+        where: whereClause,
         include: {
           home_team: { select: { name: true, logo_url: true } },
           away_team: { select: { name: true, logo_url: true } },
@@ -104,14 +115,12 @@ export class FixtureService {
   ): Promise<GetYearlyCalendarResponseDto> {
     const cacheKey = `calendar:128:${season}:full`
 
-    // 1. Intentamos sacar el calendario completo del cache
     const cached = await this.redisService.redis.get(cacheKey)
     let allMatches
 
     if (cached) {
       allMatches = JSON.parse(cached)
     } else {
-      // 2. Si no hay cache, traemos TODO (Apertura + Clausura + Playoffs)
       allMatches = await this.prisma.matches.findMany({
         where: {
           season: Number(season),
@@ -123,7 +132,6 @@ export class FixtureService {
         orderBy: { date: 'asc' },
       })
 
-      // Guardamos en Redis por 30 min (1800 segundos)
       if (allMatches.length > 0) {
         await this.redisService.redis.set(
           cacheKey,
@@ -157,7 +165,6 @@ export class FixtureService {
 
     return {
       season,
-      // Devolvemos el objeto agrupado y una lista de días con partidos para las flechitas
       availableDays: Object.keys(calendar).sort(),
       calendar,
     }
@@ -220,6 +227,7 @@ export class FixtureService {
   }
 
   async getLiveLeagueScores(): Promise<GetLiveScoresResponseDto[]> {
+
     const liveScores = await this.redisService.redis.hgetall(
       `live_scores:league:${this.LEAGUE_API_ID}`,
     )
@@ -237,6 +245,7 @@ export class FixtureService {
         ap: live.away_penalty_goals,
         homeTeamId: live.home_team_id,
         awayTeamId: live.away_team_id,
+        elapsed: live.elapsed,
         status: live.status_short,
         isLive: true,
         isPlayoff: isPlayoffRound(live.round || ''),
@@ -482,8 +491,13 @@ export class FixtureService {
 
       const matchesInDb = playoffDbMatches.filter((m) => {
         if (!m.round) return false
-        const regex = new RegExp(`\\b${round.dbLabel}\\b`, 'i')
-        return regex.test(m.round)
+        const roundLower = m.round.toLowerCase()
+
+        if (round.key === 'final' && roundLower.includes('semi')) {
+          return false
+        }
+
+        return roundLower.includes(round.dbLabel.toLowerCase())
       })
 
       for (let i = 0; i < round.expected; i++) {
@@ -496,7 +510,6 @@ export class FixtureService {
 
         const pos = round.key === 'final' ? 0 : i % (round.expected / 2)
 
-        // Validamos la posición exacta en el árbol de brackets
         const match = matchesInDb.find((dbM) =>
           this.isMatchInBracketPosition(
             dbM,
@@ -577,6 +590,11 @@ export class FixtureService {
     octavos: any[],
   ): boolean {
     const dbRoundLower = dbMatch.round?.toLowerCase() || ''
+
+    if (roundKey === 'final' && dbRoundLower.includes('semi')) {
+      return false
+    }
+
     if (!dbRoundLower.includes(roundKey)) {
       return false
     }
