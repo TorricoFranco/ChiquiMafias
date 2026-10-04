@@ -24,13 +24,21 @@ import { AllowBannedForAppeal } from 'src/auth/decorators/allow-banned.decorator
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { Public } from 'src/auth/decorators/auth.decorator'
-import { TicketStatus, TicketCategory } from '@prisma/client'
+import { TicketStatus, TicketCategory, ReportStatus } from '@prisma/client'
 
 @ApiTags('Support & Moderation (Soporte, Reportes y Moderación)')
 @ApiBearerAuth()
 @Controller('support')
 export class SupportController {
   constructor(private readonly supportService: SupportService) { }
+
+
+  @Get('admin/stats')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.MODERATOR)
+  async getSupportStats() {
+    return this.supportService.getSupportStats();
+  }
 
   @Post('report')
   @ApiOperation({
@@ -42,6 +50,22 @@ export class SupportController {
     @Body() createReportDto: CreateReportDto,
   ) {
     return await this.supportService.createReport(reporterId, createReportDto)
+  }
+
+  @Get('reports')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.MODERATOR)
+  @ApiOperation({ summary: 'Obtener todos los reportes con paginación y filtro (Solo Admins)' })
+  async getReports(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('status') status?: ReportStatus,
+  ) {
+    return await this.supportService.getReports(
+      Number(page),
+      Number(limit),
+      status,
+    );
   }
 
   @Post('ticket')
@@ -84,7 +108,7 @@ export class SupportController {
   @Post('report/:id/resolve')
   @Public()
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   @ApiOperation({ summary: 'Resolver un reporte (Acción de moderación)' })
   async resolveReport(
     @Param('id') reportId: string,
@@ -105,17 +129,9 @@ export class SupportController {
     )
   }
 
-  @Get('reports')
-  @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
-  @ApiOperation({ summary: 'Obtener todos los reportes (Solo Admins)' })
-  async getReports() {
-    return await this.supportService.getReports()
-  }
-
   @Get('tickets')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   @ApiOperation({
     summary: 'Obtener todos los tickets con filtros y paginación',
   })
@@ -135,7 +151,7 @@ export class SupportController {
 
   @Get('ticket/:id')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   @ApiOperation({ summary: 'Ver detalles de cualquier ticket (Solo Admin)' })
   async getAdminTicketDetails(@Param('id') ticketId: string) {
     return await this.supportService.getAdminTicketDetails(ticketId)
@@ -143,7 +159,7 @@ export class SupportController {
 
   @Patch('ticket/:id/status')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   @ApiOperation({ summary: 'Cambiar el estado de un ticket (Admin)' })
   async updateTicketStatus(
     @Param('id') ticketId: string,

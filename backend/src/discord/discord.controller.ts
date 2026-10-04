@@ -23,7 +23,7 @@ export class DiscordController {
   constructor(
     private readonly supportService: SupportService,
     private readonly configService: ConfigService<EnvironmentVariables>,
-  ) {}
+  ) { }
 
   @Post('action')
   @Public()
@@ -131,7 +131,7 @@ export class DiscordController {
   @Public()
   async getBotReports(@Headers('x-discord-bot-token') token: string) {
     this.validateToken(token)
-    const reports = await this.supportService.getReports()
-    return reports.slice(0, 10)
+    const reports = await this.supportService.getReports(1, 10)
+    return reports.data
   }
 }

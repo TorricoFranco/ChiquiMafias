@@ -11,7 +11,8 @@ import { CreateTicketMessageDto } from './dto/create-ticket-message.dto'
 import { SystemRole } from 'src/auth/enums/roles.enum'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { ReportResolvedPayload } from './interfaces/report-resolved.interface'
-import { TicketCategory, TicketStatus } from '@prisma/client/wasm'
+import { TicketCategory, TicketStatus, ReportStatus } from '@prisma/client'
+
 
 @Injectable()
 export class SupportService {
@@ -19,6 +20,22 @@ export class SupportService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
   ) { }
+
+  async getSupportStats() {
+    const [openTickets, pendingReports] = await Promise.all([
+      this.prisma.ticket.count({
+        where: { status: TicketStatus.OPEN },
+      }),
+      this.prisma.report.count({
+        where: { status: ReportStatus.PENDING },
+      }),
+    ]);
+
+    return {
+      openTickets,
+      pendingReports,
+    };
+  }
 
   async createReport(reporterId: string, dto: CreateReportDto) {
     if (reporterId === dto.reportedId) {
@@ -28,8 +45,19 @@ export class SupportService {
     const reportedUser = await this.prisma.user.findUnique({
       where: { id: dto.reportedId },
     })
+
     if (!reportedUser) {
       throw new NotFoundException('El usuario reportado no existe.')
+    }
+
+    if (dto.commentId) {
+      const comment = await this.prisma.comment.findUnique({ where: { id: dto.commentId } });
+      if (!comment) throw new NotFoundException('El comentario que intentas reportar no existe.');
+    }
+
+    if (dto.pollId) {
+      const poll = await this.prisma.poll.findUnique({ where: { id: dto.pollId } });
+      if (!poll) throw new NotFoundException('La encuesta que intentas reportar no existe.');
     }
 
     const report = await this.prisma.report.create({
@@ -38,6 +66,8 @@ export class SupportService {
         reportedId: dto.reportedId,
         reason: dto.reason,
         details: dto.details,
+        commentId: dto.commentId,
+        pollId: dto.pollId,
       },
     })
 
@@ -45,6 +75,114 @@ export class SupportService {
 
     return report
   }
+
+
+  async resolveReport(
+    reportId: string,
+    adminIdentifier: string,
+    action: 'BAN' | 'MUTE' | 'WARN' | 'UNBAN',
+    durationHours?: number,
+    reason?: string,
+  ) {
+    const report = await this.prisma.report.findUnique({
+      where: { id: reportId },
+    })
+
+    if (!report) throw new NotFoundException('Reporte no encontrado')
+    if (report.status === 'RESOLVED')
+      throw new BadRequestException('El reporte ya fue resuelto')
+
+    const isFromWebAdmin = adminIdentifier.length === 36
+
+    const resolvedReport = await this.prisma.report.update({
+      where: { id: reportId },
+      data: {
+        status: 'RESOLVED',
+        resolvedById: isFromWebAdmin ? adminIdentifier : null,
+      },
+    })
+
+    this.eventEmitter.emit('report.resolved', {
+      reportId: resolvedReport.id,
+      targetUserId: report.reportedId,
+      action,
+      durationHours,
+      reason,
+    } as ReportResolvedPayload)
+
+    return resolvedReport
+  }
+
+
+  async getReports(
+    page: number = 1,
+    limit: number = 10,
+    status?: ReportStatus,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const whereCondition: any = {};
+    if (status) {
+      whereCondition.status = status;
+    }
+
+    const [reports, total] = await Promise.all([
+      this.prisma.report.findMany({
+        where: whereCondition,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          reporter: {
+            select: {
+              id: true,
+              username: true,
+              email: true,
+            },
+          },
+          reported: {
+            select: {
+              id: true,
+              username: true,
+              email: true,
+            },
+          },
+          resolvedBy: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+          comment: {
+            select: {
+              id: true,
+              text: true,
+              createdAt: true,
+            },
+          },
+          poll: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+      }),
+      this.prisma.report.count({ where: whereCondition }),
+    ]);
+
+    return {
+      data: reports,
+      meta: {
+        total,
+        page,
+        limit,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
+  }
+
+
 
   async createTicket(userId: string, dto: CreateTicketDto) {
     const ticket = await this.prisma.ticket.create({
@@ -89,16 +227,17 @@ export class SupportService {
     if (ticket.status === 'CLOSED')
       throw new BadRequestException('Este ticket ya está cerrado.')
 
-    // Si viene de Discord, salteamos esta validación porque el rol ya viene forzado como ADMIN
+    // Si viene de Discord, salteamos esta validación porque el rol ya viene forzado como admin
     if (
       !fromDiscord &&
       ticket.userId !== senderId &&
-      role !== SystemRole.ADMIN
+      role !== SystemRole.ADMIN &&
+      role !== SystemRole.MODERATOR &&
+      role !== SystemRole.PRESIDENT
     ) {
       throw new ForbiddenException('No podés responder en un ticket ajeno.')
     }
 
-    // --- RESOLUCIÓN DEL SENDER ID RELACIONAL ---
     let dbSenderId = senderId
 
     if (fromDiscord) {
@@ -123,11 +262,10 @@ export class SupportService {
       }
     }
 
-    // Guardamos el mensaje usando un ID que la base de datos sí reconozca
     const newMessage = await this.prisma.ticketMessage.create({
       data: {
         ticketId: ticket.id,
-        senderId: dbSenderId, // <-- ID de la DB garantizado
+        senderId: dbSenderId,
         message: dto.message,
         screenshotUrl: dto.screenshotUrl || null,
         fromDiscord,
@@ -145,15 +283,7 @@ export class SupportService {
     return newMessage
   }
 
-  async getReports() {
-    return await this.prisma.report.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        reporter: { select: { id: true, username: true, email: true } },
-        reported: { select: { id: true, username: true, email: true } },
-      },
-    })
-  }
+
 
   async getTickets(
     page: number,
@@ -172,7 +302,7 @@ export class SupportService {
         where: whereCondition,
         skip: skip,
         take: limit,
-        orderBy: { createdAt: 'desc' }, // Los más nuevos primero
+        orderBy: { createdAt: 'desc' },
         include: { user: { select: { id: true, username: true } } },
       }),
       this.prisma.ticket.count({ where: whereCondition }),
@@ -188,41 +318,6 @@ export class SupportService {
     }
   }
 
-  async resolveReport(
-    reportId: string,
-    adminIdentifier: string,
-    action: 'BAN' | 'MUTE' | 'WARN' | 'UNBAN',
-    durationHours?: number,
-    reason?: string,
-  ) {
-    const report = await this.prisma.report.findUnique({
-      where: { id: reportId },
-    })
-
-    if (!report) throw new NotFoundException('Reporte no encontrado')
-    if (report.status === 'RESOLVED')
-      throw new BadRequestException('El reporte ya fue resuelto')
-
-    const isFromWebAdmin = adminIdentifier.length === 36
-
-    const resolvedReport = await this.prisma.report.update({
-      where: { id: reportId },
-      data: {
-        status: 'RESOLVED',
-        resolvedById: isFromWebAdmin ? adminIdentifier : null,
-      },
-    })
-
-    this.eventEmitter.emit('report.resolved', {
-      reportId: resolvedReport.id,
-      targetUserId: report.reportedId,
-      action,
-      durationHours,
-      reason,
-    } as ReportResolvedPayload)
-
-    return resolvedReport
-  }
 
   async getMyTickets(userId: string) {
     return await this.prisma.ticket.findMany({
@@ -262,15 +357,21 @@ export class SupportService {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
       include: {
-        user: { select: { id: true, username: true } },
+        user: { select: { id: true, username: true, role: true } },
         messages: {
           orderBy: { createdAt: 'asc' },
           include: {
-            sender: { select: { id: true, username: true } },
+            sender: {
+              select: {
+                id: true,
+                username: true,
+                role: true
+              }
+            }
           },
         },
       },
-    })
+    });
 
     if (!ticket) throw new NotFoundException('Ticket no encontrado')
     return ticket
