@@ -29,7 +29,11 @@ async function bootstrap() {
   app.use(cookieParser())
 
   app.enableCors({
-    origin: clientUrl,
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3005',
+      'https://chiquimafias.com',
+    ],
     credentials: true,
   })
 
