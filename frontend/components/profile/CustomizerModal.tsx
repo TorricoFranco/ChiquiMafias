@@ -1,4 +1,3 @@
-// src/components/profile/CustomizerModal.tsx
 "use client";
 
 import { useInventoryStore } from "@/store/useInventoryStore";
@@ -9,7 +8,6 @@ export default function CustomizerModal({ onClose }: { onClose: () => void }) {
   const { items: inventoryItems, equipCosmetic, unequipCosmetic, loading } = useInventoryStore();
   const [syncId, setSyncId] = useState<string | null>(null);
 
-  // Filtramos solo los equipables permanentes
   const equipables = inventoryItems.filter(
     (i) => i.item.type === "NAME_COLOR" || i.item.type === "BANNER"
   );
@@ -18,10 +16,8 @@ export default function CustomizerModal({ onClose }: { onClose: () => void }) {
     try {
       setSyncId(itemId);
       if (isEquipped) {
-        // Si ya está equipado, el usuario quiere sacárselo y volver al default
         await unequipCosmetic(type as any);
       } else {
-        // Si no está equipado, lo activamos (el backend se encarga de desequipar el anterior del mismo tipo)
         await equipCosmetic(itemId);
       }
     } catch (err) {

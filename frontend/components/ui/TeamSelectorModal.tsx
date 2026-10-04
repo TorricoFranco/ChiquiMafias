@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import Image from "next/image"; // 🚀 Optimización de imágenes automática
+import Image from "next/image";
 import { Search, Trophy, Shield, X } from "lucide-react";
 
 interface Team {
@@ -23,14 +23,13 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
 
     if (!isOpen) return null;
 
-    // 🔍 Filtrado inteligente en el cliente (rápido porque es solo texto)
     const filteredTeams = teams.filter((team) => {
         const matchesSearch = team.name.toLowerCase().includes(search.toLowerCase());
 
         if (!matchesSearch) return false;
         if (activeTab === "LIGA_PRO") return team.tier === 1;
         if (activeTab === "NACIONAL_B") return team.tier === 2;
-        return true; // "ALL" muestra el remanente y todo lo demás
+        return true;
     });
 
     return (
@@ -62,7 +61,6 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
                     </div>
                 </div>
 
-                {/* PESTAÑAS DE PRIORIDAD (UX PREMIUM) */}
                 <div className="flex bg-[#111] px-2 pt-2 border-b border-[#2b2b2b] gap-1">
                     <button
                         onClick={() => setActiveTab("LIGA_PRO")}
@@ -95,7 +93,6 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
                     </button>
                 </div>
 
-                {/* CONTENEDOR GRID CON LAZY LOADING */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-[#1a1a1a]">
                     {filteredTeams.length === 0 ? (
                         <div className="text-center py-12">
@@ -116,7 +113,7 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
                                             fill
                                             sizes="56px"
                                             className="object-contain"
-                                            loading="lazy" // ⚡️ Clave de rendimiento: solo carga lo visible
+                                            loading="lazy" 
                                         />
                                     </div>
                                     <span className="text-xs font-medium text-gray-200 group-hover:text-white transition-colors line-clamp-2">
