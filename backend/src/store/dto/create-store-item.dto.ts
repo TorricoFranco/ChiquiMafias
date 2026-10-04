@@ -23,7 +23,7 @@ export class CreateStoreItemDto {
 
   @IsEnum(ItemType, {
     message:
-      'El tipo de ítem debe ser uno de los permitidos: STICKER_PACK, NAME_COLOR, BANNER, MEGAPHONE o CUSTOM_POLL.',
+      'El tipo de ítem debe ser uno de los permitidos: STICKER_PACK, NAME_COLOR, BANNER, CHAT_BUBBLE, MEGAPHONE o CUSTOM_POLL.',
   })
   type: ItemType
 
@@ -36,4 +36,7 @@ export class CreateStoreItemDto {
 
   @IsOptional()
   isActive?: boolean
+
+  @IsOptional()
+  isPurchasable?: boolean
 }

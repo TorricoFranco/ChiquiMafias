@@ -7,6 +7,7 @@ import {
   Body,
   Patch,
   Delete,
+  ParseArrayPipe,
 } from '@nestjs/common'
 import { StoreService } from './store.service'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
@@ -14,6 +15,8 @@ import { CreateStoreItemDto } from './dto/create-store-item.dto'
 import { CreateStoreDiscountDto } from './dto/create-store-discount.dto'
 import { UpdateStoreItemDto } from './dto/update-store-item.dto'
 import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { SystemRole } from 'src/auth/enums/roles.enum'
 
 @Controller('store')
 export class StoreController {
@@ -25,12 +28,19 @@ export class StoreController {
     return this.storeService.getStoreItems(userId)
   }
 
+  @Get('all-items')
+  @OptionalAuth()
+  async getStoreItemsAll() {
+    return this.storeService.getStoreItemsAll()
+  }
+
   @Post('buy/:itemId')
   async buyItem(
     @Param('itemId') itemId: string,
+    @Body('quantity') quantity: number,
     @GetUser('id') userId: string,
   ) {
-    const purchase = await this.storeService.buyItem(userId, itemId)
+    const purchase = await this.storeService.buyItem(userId, itemId, quantity)
 
     return {
       status: 'success',
@@ -39,7 +49,8 @@ export class StoreController {
     }
   }
 
-  @Post('item') // TODO: Meter roles de Admin a futuro
+  @Post('item')
+  @Roles(SystemRole.ADMIN)
   async createStoreItem(@Body() dto: CreateStoreItemDto) {
     const item = await this.storeService.createStoreItem(dto)
     return {
@@ -47,6 +58,19 @@ export class StoreController {
       message: 'Artículo creado en la tienda.',
       data: item,
     }
+  }
+
+  @Post('item/bulk')
+  @Roles(SystemRole.ADMIN)
+  async createStoreItemsBulk(
+    @Body(new ParseArrayPipe({ items: CreateStoreItemDto })) dtos: CreateStoreItemDto[]
+  ) {
+    const result = await this.storeService.createStoreItemsBulk(dtos);
+    return {
+      status: 'success',
+      message: 'Proceso masivo finalizado.',
+      data: result,
+    };
   }
 
   @Patch('item/:id')
