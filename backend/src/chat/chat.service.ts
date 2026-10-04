@@ -4,7 +4,10 @@ import { RedisService } from 'src/redis/redis.service'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ChatClient } from './interfaces/ChatClient'
 import { RateLimitState } from './interfaces/RateLimitState'
-import { OnEvent } from '@nestjs/event-emitter'
+import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter'
+import { Interval } from '@nestjs/schedule'
+import { CHAT_RATE_LIMITS, DEFAULT_RATE_LIMIT } from './constants/chat-rules'
+
 
 @Injectable()
 export class ChatService {
@@ -14,6 +17,7 @@ export class ChatService {
   constructor(
     private readonly redisService: RedisService,
     private readonly prismaService: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
   ) { }
 
   @OnEvent('report.resolved')
@@ -24,8 +28,36 @@ export class ChatService {
     }
   }
 
-  onClientConnected(client: ChatClient) {
-    this.clients.set(client.socketId, client)
+
+  @Interval(1000)
+  async processMegaphoneQueue() {
+    const activeMegaphone = await this.redisService.redis.get('chat:megaphone:active');
+
+    if (activeMegaphone) {
+      return;
+    }
+
+    const nextMegaphone = await this.redisService.redis.lpop('chat:megaphone:queue');
+
+    if (nextMegaphone) {
+      await this.redisService.redis.set('chat:megaphone:active', nextMegaphone, 'EX', 15);
+
+      const payload = JSON.parse(nextMegaphone);
+
+      this.eventEmitter.emit('megaphone.show', payload);
+    }
+  }
+
+  onClientConnected(clientData: ChatClient) {
+    this.clients.set(clientData.socketId, {
+      socketId: clientData.socketId,
+      userId: clientData.userId,
+      username: clientData.username,
+      teamName: clientData.teamName,
+      badgeUrl: clientData.badgeUrl,
+      tier: clientData.tier || 'NONE',
+      role: clientData.role || 'USER',
+    });
   }
 
   onClientDisconnected(socketId: string) {
@@ -63,41 +95,43 @@ export class ChatService {
     }
   }
 
-  checkMessageRate(userId: string) {
-    const now = Date.now()
-    const windowMs = 10_000
-    const maxMessages = 5
-    const penalties = [15, 30, 120]
+  checkMessageRate(userId: string, tier: string = 'NONE') {
+    const now = Date.now();
+    
+    const limits = CHAT_RATE_LIMITS[tier] ?? DEFAULT_RATE_LIMIT;
+    const { windowMs, maxMessages, penalties } = limits;
 
-    const state = this.rateMap.get(userId) ?? { timestamps: [], strikes: 0 }
+    const state = this.rateMap.get(userId) ?? { timestamps: [], strikes: 0 };
 
     if (state.blockedUntil && now < state.blockedUntil) {
       return {
         allowed: false,
         retryIn: Math.ceil((state.blockedUntil - now) / 1000),
-      }
+      };
     }
 
-    state.timestamps = state.timestamps.filter((t) => now - t < windowMs)
+    state.timestamps = state.timestamps.filter((t) => now - t < windowMs);
 
     if (state.timestamps.length >= maxMessages) {
-      state.strikes += 1
-      const penaltySeconds = penalties[state.strikes - 1] ?? 300
-      state.blockedUntil = now + penaltySeconds * 1000
-      state.timestamps = []
-      this.rateMap.set(userId, state)
+      state.strikes += 1;
+      const penaltySeconds = penalties[state.strikes - 1] ?? penalties[penalties.length - 1] ?? 300; 
+      
+      state.blockedUntil = now + penaltySeconds * 1000;
+      state.timestamps = [];
+      this.rateMap.set(userId, state);
 
       return {
         allowed: false,
         retryIn: penaltySeconds,
         strike: state.strikes,
-      }
+      };
     }
 
-    state.timestamps.push(now)
-    this.rateMap.set(userId, state)
-    return { allowed: true }
-  }
+    state.timestamps.push(now);
+    this.rateMap.set(userId, state);
+    
+    return { allowed: true };
+}
 
   async deleteGlobalMessage(messageId: string): Promise<boolean> {
     const globalKey = 'chat:global:history'
@@ -150,18 +184,33 @@ export class ChatService {
     let finalStickerId: string | null = null
     let isMegaphoneActive = false
 
-    let [finalNameColor, finalBanner] = await this.redisService.redis.mget(
+    let [finalNameColor, finalChatBubble] = await this.redisService.redis.mget(
       `user:cosmetics:${userId}:color`,
-      `user:cosmetics:${userId}:banner`,
+      `user:cosmetics:${userId}:chat_bubble`,
     )
 
-    if (!finalNameColor || !finalBanner) {
+    if (!finalNameColor || !finalChatBubble) {
       const user = await this.prismaService.user.findUnique({
         where: { id: userId },
         include: { inventory: { include: { item: true } } },
       })
 
       if (user) {
+        if (!finalChatBubble && user.activeChatBubbleId) {
+          const item = await this.prismaService.storeItem.findUnique({
+            where: { id: user.activeChatBubbleId },
+          })
+          finalChatBubble = item?.assetId || null
+          if (finalChatBubble) {
+            await this.redisService.redis.set(
+              `user:cosmetics:${userId}:chat_bubble`,
+              finalChatBubble,
+              'EX',
+              86400,
+            )
+          }
+        }
+
         if (!finalNameColor && user.activeNameColorId) {
           const item = await this.prismaService.storeItem.findUnique({
             where: { id: user.activeNameColorId },
@@ -171,19 +220,6 @@ export class ChatService {
             await this.redisService.redis.set(
               `user:cosmetics:${userId}:color`,
               finalNameColor,
-              'EX',
-              86400,
-            )
-        }
-        if (!finalBanner && user.activeBannerId) {
-          const item = await this.prismaService.storeItem.findUnique({
-            where: { id: user.activeBannerId },
-          })
-          finalBanner = item?.assetId || null
-          if (finalBanner)
-            await this.redisService.redis.set(
-              `user:cosmetics:${userId}:banner`,
-              finalBanner,
               'EX',
               86400,
             )
@@ -233,7 +269,7 @@ export class ChatService {
       }
     }
 
-    return { finalStickerId, finalNameColor, finalBanner, isMegaphoneActive }
+    return { finalStickerId, finalNameColor, finalChatBubble, isMegaphoneActive }
   }
 
   async executeMute(userId: string, durationSeconds: number) {

@@ -28,6 +28,8 @@ import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { SystemRole } from 'src/auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { INotificationResponse } from 'src/notifications/interfaces/notification-response.interface'
+import { OnEvent } from '@nestjs/event-emitter'
+import { CreatePollDto } from 'src/polls/dto/create-poll.dto'
 
 import {
   OnGatewayConnection,
@@ -67,12 +69,31 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         `[Chat] ${wsUser.username} entró a la tribuna global. Tier: ${wsUser.tier}`,
       )
 
+      // CHEQUEO DE RECOMPENSAS PENDIENTES
+      const pendingRewardKey = `pending_reward:${wsUser.id}`;
+      const pendingRewardStr = await this.redisService.redis.get(pendingRewardKey);
+
+      if (pendingRewardStr) {
+        try {
+          const pendingReward = JSON.parse(pendingRewardStr);
+          // Emitimos la recompensa pendiente
+          socket.emit('subscription_gift_received', pendingReward);
+          // Borramos de Redis para que no se duplique al recargar F5
+          await this.redisService.redis.del(pendingRewardKey);
+          this.logger.log(`[Chat] Recompensa pendiente entregada a ${wsUser.username}`);
+        } catch (error) {
+          this.logger.error(`Error parseando recompensa de ${wsUser.username}`, error);
+        }
+      }
+
       this.chatService.onClientConnected({
         socketId: socket.id,
         userId: wsUser.id,
         username: wsUser.username,
         teamName: wsUser.team?.name || null,
         badgeUrl: wsUser.team?.badgeUrl || null,
+        tier: wsUser.tier || null,
+        role: wsUser.role || 'USER'
       })
 
       this.server.emit(
@@ -117,7 +138,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = client.data.user
 
     // Rate Limit
-    const rate = this.chatService.checkMessageRate(user.id)
+
+    const userTier = user.tier || 'NONE';
+    const rate = this.chatService.checkMessageRate(user.id, userTier)
+
     if (!rate.allowed) {
       throw new WsException({
         code: 'RATE_LIMIT',
@@ -126,13 +150,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       })
     }
 
-    const { finalStickerId, finalNameColor, finalBanner, isMegaphoneActive } =
+    const { finalStickerId, finalNameColor, finalChatBubble, isMegaphoneActive } =
       await this.chatService.processMessageAssets(
         user.id,
         body.stickerId,
         body.useMegaphone,
       )
-
     const profile = this.chatService.getProfileBySocketId(client.id)
 
     const messagePayload = {
@@ -144,25 +167,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       message: body.body,
       stickerId: finalStickerId,
       nameColor: finalNameColor,
-      bannerId: finalBanner,
+      tier: profile?.tier || user.tier || 'NONE',
+      role: profile?.role || user.role || 'USER',
+      chatBubbleId: finalChatBubble,
       isMegaphone: isMegaphoneActive,
       timestamp: Date.now(),
     }
 
+    // GLOBAL MESSAGE HISTORY
     const globalKey = 'chat:global:history'
     await this.redisService.redis.rpush(
       globalKey,
       JSON.stringify(messagePayload),
     )
     await this.redisService.redis.ltrim(globalKey, -50, -1)
+    // MESSAGE COUNT
+    await this.redisService.redis.zincrby('leaderboard:chat-messages', 1, user.id);
+
 
     if (isMegaphoneActive) {
-      await this.redisService.redis.set(
-        'chat:global:pinned',
-        JSON.stringify(messagePayload),
-        'EX',
-        300,
-      )
+      await this.redisService.redis.rpush(
+        'chat:megaphone:queue',
+        JSON.stringify(messagePayload)
+      );
+
+      const queuePosition = await this.redisService.redis.llen('chat:megaphone:queue');
+
+      this.server.to(`user:${user.id}`).emit('megaphone_queued', {
+        position: queuePosition,
+        message: 'Tu megáfono está en cola',
+      });
     }
 
     this.server.emit('on-message', messagePayload)
@@ -205,4 +239,43 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       `[Sockets] Saldo actualizado enviado a user:${userId} -> $${balance}`,
     )
   }
+
+  @OnEvent('megaphone.show')
+  handleMegaphoneBroadcast(payload: any) {
+    this.server.emit('megaphone_show', payload)
+    this.logger.debug(`[ChatGateway] Megáfono emitido para el usuario ${payload.name}`)
+  }
+
+  @OnEvent('poll.created')
+  async handlePollCreated(poll: any) {
+    const pollPayload = {
+      id: poll.id,
+      title: poll.title,
+      timestamp: Date.now(),
+    };
+
+    this.server.emit('poll_show', pollPayload);
+    this.logger.debug(`[ChatGateway] Evento poll_show emitido para la encuesta ${poll.id}`);
+  }
+
+  @OnEvent('subscription.purchased')
+  async handleSubscriptionPurchased(payload: { userId: string; tier: string; giftData: any }) {
+    const rewardPayload = {
+      tier: payload.tier,
+      gifts: payload.giftData,
+    };
+
+    await this.redisService.redis.setex(
+      `pending_reward:${payload.userId}`,
+      86400,
+      JSON.stringify(rewardPayload)
+    );
+
+    this.server.to(`user:${payload.userId}`).emit('subscription_gift_received', rewardPayload);
+
+    this.logger.debug(
+      `[ChatGateway] Regalos de suscripción (Tier ${payload.tier}) guardados en Redis y emitidos al usuario ${payload.userId}`,
+    );
+  }
+
 }
