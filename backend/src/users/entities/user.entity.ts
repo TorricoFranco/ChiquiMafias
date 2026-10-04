@@ -23,8 +23,13 @@ export class UserEntity implements User {
   streakRewardClaimed: boolean
   activeNameColorId: string | null
   activeBannerId: string | null
+  activeChatBubbleId: string | null
   createdAt: Date
   teamId: string | null
+  wallet?: {
+    balance: number
+  } | null
+
 
   @ApiProperty({ type: () => Object, nullable: true })
   team?: FootballTeam | null

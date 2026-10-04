@@ -1,4 +1,3 @@
-// src/users/moderation.controller.ts
 import { Controller, Post, Body, Get, Param, UseGuards } from '@nestjs/common'
 import { RedisService } from 'src/redis/redis.service'
 import { TimeoutDto } from './dto/timeout.dto'
@@ -7,6 +6,7 @@ import { SystemRole } from '../auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { ChatService } from 'src/chat/chat.service'
 
 @Controller('moderation')
 export class ModerationController {
@@ -14,7 +14,8 @@ export class ModerationController {
     private readonly redisService: RedisService,
     private readonly chatGateway: ChatGateway,
     private readonly prisma: PrismaService,
-  ) {}
+    private readonly chatService: ChatService,
+  ) { }
 
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
@@ -25,7 +26,7 @@ export class ModerationController {
     const mutedUsers = await this.prisma.user.findMany({
       where: {
         mutedUntil: {
-          gt: now, // mutedUntil > now
+          gt: now,
         },
       },
       select: {
@@ -67,7 +68,6 @@ export class ModerationController {
       data: { mutedUntil: new Date(timeoutUntil) },
     })
 
-    // 3. Emit al front
     this.chatGateway.server.emit('user-timeout', { userId, timeoutUntil })
 
     return {
@@ -103,5 +103,33 @@ export class ModerationController {
       isMuted: true,
       timeoutUntil: Date.now() + ttl * 1000,
     }
+  }
+
+
+  @Get('stats')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.MODERATOR)
+  async getAdminStats() {
+    const [
+      pendingPolls,
+      openMarkets,
+      openTickets,
+      pendingReports,
+    ] = await Promise.all([
+      this.prisma.poll.count({ where: { status: 'PENDING' } }),
+      this.prisma.market.count({ where: { status: 'OPEN' } }),
+      this.prisma.ticket.count({ where: { status: 'OPEN' } }),
+      this.prisma.report.count({ where: { status: 'PENDING' } }),
+    ]);
+
+    const onlineUsersCount = this.chatService.getConnectedClients().length;
+
+    return {
+      pendingPolls,
+      openMarkets,
+      openTickets,
+      pendingReports,
+      onlineUsers: onlineUsersCount,
+    };
   }
 }

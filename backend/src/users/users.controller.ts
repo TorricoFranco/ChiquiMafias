@@ -6,8 +6,10 @@ import {
   Body,
   Put,
   UseGuards,
+  Query,
+  Req
 } from '@nestjs/common'
-import { UserBalanceResponse, UsersService } from './users.service'
+import { UsersService } from './users.service'
 import { CompleteProfileDto } from './dto/complete-profile.dto'
 import { ChatService } from 'src/chat/chat.service'
 import { ChatClient } from 'src/chat/interfaces/ChatClient'
@@ -17,26 +19,39 @@ import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
 import { UpdateRoleDto } from './dto/update-role.dto'
+import { GetUsersQueryDto } from './dto/get-users-query.dto'
+import type { ActiveUser } from 'src/auth/interfaces/active-user.interface'
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly chatService: ChatService,
-  ) {}
+  ) { }
 
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
-  async findAll() {
-    return this.usersService.findAll()
+  @Roles(SystemRole.MODERATOR)
+  async findAll(@Query() query: GetUsersQueryDto) {
+    return this.usersService.findAll(query)
+  }
+
+  @Get('balances')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.MODERATOR)
+  async getAllBalances() {
+    return this.usersService.getAllUsersBalances()
   }
 
   @Patch(':id/role')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
-  async updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
-    return this.usersService.updateRole(id, dto.role)
+  @Roles(SystemRole.MODERATOR)
+  async updateRole(
+    @Param('id') targetUserId: string,
+    @Body() dto: UpdateRoleDto,
+    @GetUser() currentUser: ActiveUser,
+  ) {
+    return this.usersService.updateRole(currentUser, targetUserId, dto.role)
   }
 
   @Put('complete-profile')
@@ -57,29 +72,29 @@ export class UsersController {
 
   @Patch(':id/ban')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   async banUser(@Param('id') id: string) {
     return this.usersService.banUser(id)
   }
 
   @Patch(':id/unban')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   async unbanUser(@Param('id') id: string) {
     return this.usersService.unbanUser(id)
   }
 
   @Get('online')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   getOnlineClients(): ChatClient[] {
     return this.chatService.getConnectedClients()
   }
 
-  @Get('test/all-balances')
-  @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
-  async getAllBalances(): Promise<UserBalanceResponse[]> {
-    return this.usersService.getAllUsersBalances()
+  @Get(':id/public-profile')
+  @OptionalAuth()
+  async getPublicProfile(@Param('id') id: string) {
+    return this.usersService.getPublicProfile(id)
   }
+
 }
