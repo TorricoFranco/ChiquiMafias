@@ -9,6 +9,7 @@ import { ApiFixture } from '../interfaces/fixture'
 import { FINAL_STATUSES, ACTIVE_STATUSES } from '../mappers/API_STATUSES'
 import { ROUND_MAP } from '../mappers/roundTranslation'
 import { LiveMatchData } from 'src/fixture/types/fixtures'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 
 @Injectable()
 export class LiveScoreCron {
@@ -18,6 +19,7 @@ export class LiveScoreCron {
     private readonly prisma: PrismaService,
     private readonly http: ApiFootballHttp,
     private readonly redisService: RedisService,
+    private readonly eventEmitter: EventEmitter2,
   ) { }
 
   @Cron('*/30 * * * * *')
@@ -83,6 +85,40 @@ export class LiveScoreCron {
         const isFinished = FINAL_STATUSES.includes(apiStatus)
 
         if (!matchDb) continue
+
+        if (isFinished) {
+          await this.prisma.matches.update({
+            where: { id: matchDb.id },
+            data: {
+              home_goals: apiMatch.goals.home ?? 0,
+              away_goals: apiMatch.goals.away ?? 0,
+              status_short: apiStatus,
+              home_penalty_goals: apiMatch.score?.penalty?.home ?? null,
+              away_penalty_goals: apiMatch.score?.penalty?.away ?? null,
+              elapsed: apiMatch.fixture.status.elapsed,
+              is_live_finished: true,
+              tracked: false,
+            },
+          })
+
+          await this.handleMatchCleanup(matchDb.id, leagueId)
+
+          const roundForDb = ROUND_MAP[apiMatch.league.round] || apiMatch.league.round || ''
+          const tournamentForDb = roundForDb.toUpperCase().includes('CLAUSURA') ? 'CLAUSURA' : 'APERTURA'
+          const detail = roundForDb.split(' - ')[1]?.trim() || roundForDb.trim()
+          const matchdayKey = !isNaN(Number(detail)) ? `fecha:${detail}` : detail.toLowerCase().replace(/\s+/g, '_')
+
+          await this.redisService.redis.del(`fixtures:128:2026:${tournamentForDb}:${matchdayKey}`)
+
+          // Actualizar los standings
+          this.logger.log(`Partido ${matchDb.id} terminado. Solicitando actualización de Standings...`);
+
+          this.eventEmitter.emit('match.finished', {
+            leagueId: leagueId,
+            season: 2026
+          });
+          continue
+        }
 
         const roundForDb =
           ROUND_MAP[apiMatch.league.round] ||
@@ -181,7 +217,6 @@ export class LiveScoreCron {
   }
 
   private async handleMatchCleanup(matchId: string, leagueId: number) {
-    // Eliminar el partido del Hash de la liga en Redis
     await this.redisService.redis.hdel(
       `live_scores:league:${leagueId}`,
       matchId,

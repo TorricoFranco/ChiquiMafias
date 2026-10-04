@@ -10,15 +10,17 @@ export async function upsertVenue(
   if (!venue || !venue.name) return null
 
   try {
-    const existingVenue = await prisma.venues.findFirst({
-      where: {
-        OR: [
-          ...(venue.id ? [{ api_venue_id: venue.id }] : []),
-          { name: venue.name },
-        ],
-      },
-      select: { id: true },
-    })
+    const existingVenue =
+      (venue.id
+        ? await prisma.venues.findUnique({
+          where: { api_venue_id: venue.id },
+          select: { id: true },
+        })
+        : null)
+      ?? await prisma.venues.findFirst({
+        where: { name: venue.name },
+        select: { id: true },
+      })
 
     const data: any = {
       name: venue.name,
@@ -45,7 +47,7 @@ export async function upsertVenue(
     })
     return created.id
   } catch (error) {
-    console.error(`Error en estadio ${venue.name}:`, error.message)
+    console.error(`Error en estadio ${venue?.name}:`, error.message)
     return null
   }
 }
