@@ -25,7 +25,7 @@ export class StandingsController {
     type: FullStandingsResponseDto,
   })
   async getStandings(
-    @Param('season', ParseIntPipe) season: number, // Aprovechamos e integrás ParseIntPipe nativo de NestJS
+    @Param('season', ParseIntPipe) season: number,
   ): Promise<FullStandingsResponseDto> {
     return this.standingsService.getStandings(season)
   }
