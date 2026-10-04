@@ -4,13 +4,14 @@ import { MatchesService } from './matches.service'
 import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
+import { Public } from 'src/auth/decorators/auth.decorator'
 
 @ApiTags('Matches')
 @Controller('matches')
+@Public()
 export class MatchesController {
   constructor(private readonly matchesService: MatchesService) { }
 
-  // matches.controller.ts
   @Get('leagues/:leagueId/seasons/:season/matches/:matchId')
   @ApiOperation({ summary: 'Detalles completos de un partido' })
   @ApiResponse({

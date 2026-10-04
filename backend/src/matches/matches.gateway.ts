@@ -94,6 +94,13 @@ export class MatchesGateway
                 player: lastEvent.player?.name,
                 minute: lastEvent.time?.elapsed,
               })
+
+              const teamName = lastEvent.team?.name || 'el equipo';
+              const playerName = lastEvent.player?.name || 'un jugadorazo';
+
+              this.sendBotGoalMessage(update.matchId, teamName, playerName).catch(err => {
+                this.logger.error(`Error enviando mensaje de bot para el gol: ${err.message}`);
+              });
             }
             break
 
@@ -153,8 +160,20 @@ export class MatchesGateway
     const { matchId, message, stickerId, useMegaphone } = body
     const user = client.data.user
 
-    // 1. Rate Limit
-    const rate = this.chatService.checkMessageRate(user.id)
+    const matchStatus = await this.redisService.redis.get(`match:${matchId}:status`)
+
+    const activeStatuses = ['1H', '2H', 'HT', 'ET', 'PEN']
+
+    if (!matchStatus || !activeStatuses.includes(matchStatus)) {
+      throw new WsException({
+        code: 'MATCH_INACTIVE',
+        message: 'El partido no está activo, la tribuna está cerrada 🛑'
+      })
+    }
+
+    const userTier = user.tier || 'NONE';
+    const rate = this.chatService.checkMessageRate(user.id, userTier)
+
     if (!rate.allowed) {
       throw new WsException({
         code: 'RATE_LIMIT',
@@ -163,7 +182,7 @@ export class MatchesGateway
       })
     }
 
-    const { finalStickerId, finalNameColor, finalBanner, isMegaphoneActive } =
+    const { finalStickerId, finalNameColor, finalChatBubble, isMegaphoneActive } =
       await this.chatService.processMessageAssets(
         user.id,
         body.stickerId,
@@ -180,8 +199,10 @@ export class MatchesGateway
       badgeUrl: profile?.badgeUrl,
       message: message,
       stickerId: finalStickerId,
-      bannerId: finalBanner,
       nameColor: finalNameColor,
+      tier: profile?.tier || user.tier || 'NONE',
+      role: profile?.role || user.role || 'USER',
+      chatBubbleId: finalChatBubble,
       isMegaphone: isMegaphoneActive,
       timestamp: Date.now(),
     }
@@ -193,6 +214,24 @@ export class MatchesGateway
     )
     await this.redisService.redis.ltrim(matchKey, -50, -1)
 
+    await this.redisService.redis.zincrby('leaderboard:chat-messages', 1, user.id);
+
+    if (isMegaphoneActive) {
+      const megaphoneQueueKey = `chat:match:${matchId}:megaphone:queue`;
+      await this.redisService.redis.rpush(
+        megaphoneQueueKey,
+        JSON.stringify(messagePayload)
+      );
+
+      const queuePosition = await this.redisService.redis.llen(megaphoneQueueKey);
+
+      this.server.to(`user:${user.id}`).emit('megaphone_queued', {
+        position: queuePosition,
+        message: 'Tu megáfono está en cola para este partido',
+      });
+    }
+
+    // 8. Emisión del mensaje
     this.server.to(`match_${matchId}`).emit('on-message', messagePayload)
   }
 
@@ -222,5 +261,49 @@ export class MatchesGateway
     this.server.to(`match_${matchId}`).emit('on_message_deleted', { messageId })
 
     return { status: 'ok', message: 'Mensaje de partido eliminado' }
+  }
+
+
+  // Agregá este método al final de tu clase MatchesGateway
+  private async sendBotGoalMessage(matchId: string, teamName: string, playerName: string) {
+    // Array de frases random con la jerga que pediste
+    const templates = [
+      `¡GOOOLASOOO de ${playerName}! ⚽🔥`,
+      `¡GOL de ${teamName}! 💥`,
+      `¡Apareció ${playerName} para gritar el gol! Agarrate Agarrate 😱`,
+      `¡GOL de la ${teamName.toLowerCase()}neta! 🚙💨`,
+      `¡Grito sagrado de ${playerName}! Explotó la tribuna 🏟️🔊`,
+      `Definió como los dioses... ¡Gooool de ${teamName}! 🏆`
+    ];
+
+    const randomIndex = Math.floor(Math.random() * templates.length);
+    const botText = templates[randomIndex];
+
+    const messagePayload = {
+      messageId: randomUUID(),
+      matchId,
+      userId: 'bot-system-001',
+      name: 'VAR Bot 🤖',
+      teamName: 'AFA',
+      badgeUrl: null,
+      message: botText,
+      stickerId: null,
+      nameColor: '#d2f000',
+      tier: 'SYSTEM',
+      role: 'BOT',
+      chatBubbleId: null,
+      isMegaphone: false,
+      timestamp: Date.now(),
+    };
+
+    const matchKey = `chat:match:${matchId}:history`;
+
+    await this.redisService.redis.rpush(
+      matchKey,
+      JSON.stringify(messagePayload)
+    );
+    await this.redisService.redis.ltrim(matchKey, -50, -1);
+
+    this.server.to(`match_${matchId}`).emit('on-message', messagePayload);
   }
 }

@@ -1,12 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator'
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, ValidateIf } from 'class-validator'
 
 export class SendMatchMessageDto {
   @IsString()
   @IsNotEmpty()
-  matchId?: string
+  matchId: string
 
+  @ValidateIf(o => !o.stickerId)
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'El mensaje no puede estar vacío si no mandás un sticker' })
   message: string
 
   @IsOptional()

@@ -17,14 +17,14 @@ export class MatchesMappers {
         .map((e) => ({
           min: e.minute ?? 0,
           player: e.player?.name || 'Unknown',
-          team: e.team?.id ? String(e.team.id) : 'Unknown', // <-- Mapeo seguro del objeto team
+          team: e.team?.id ? String(e.team.id) : 'Unknown',
         })),
       redCards: events
         .filter(
           (e) =>
             e.type === 'Card' &&
             (e.detail?.toLowerCase().includes('red card') ||
-              e.detail?.toLowerCase().includes('roja')), // Por las dudas si cambia el idioma
+              e.detail?.toLowerCase().includes('roja')),
         )
         .map((e) => ({
           min: e.minute ?? 0,
@@ -37,13 +37,15 @@ export class MatchesMappers {
 
   static toPreMatchResponse(
     apiData: any,
-    hId: number,
-    aId: number,
+    hId: string,
+    aId: string,
+    hIdApi: string,
+    aIdApi: string,
   ): PreMatchResponse {
     const { h2h, hForm, aForm, standings } = apiData
 
     return {
-      history: this.formatH2H(h2h, hId),
+      history: this.formatH2H(h2h, hIdApi),
       form: {
         home: this.translateForm(hForm),
         away: this.translateForm(aForm),
@@ -60,7 +62,7 @@ export class MatchesMappers {
       .join('')
   }
 
-  static formatH2H(h2hMatches: any[], currentHomeId: number) {
+  static formatH2H(h2hMatches: any[], currentHomeId: string) {
     if (!Array.isArray(h2hMatches))
       return { homeWins: 0, awayWins: 0, draws: 0, total: 0, lastMatches: [] }
 
@@ -71,27 +73,31 @@ export class MatchesMappers {
 
     const stats = finishedMatches.reduce(
       (acc, match) => {
-        const homeGoals = match.goals.home ?? 0
-        const awayGoals = match.goals.away ?? 0
+        const homeTeam = match.teams.home
+        const awayTeam = match.teams.away
 
-        if (homeGoals === awayGoals) {
-          acc.draws++
-        } else {
-          const winnerId =
-            homeGoals > awayGoals ? match.teams.home.id : match.teams.away.id
-          if (winnerId === currentHomeId) {
+        if (homeTeam.winner === true) {
+          if (String(homeTeam.id) === String(currentHomeId)) {
             acc.homeWins++
           } else {
             acc.awayWins++
           }
+        } else if (awayTeam.winner === true) {
+          if (String(awayTeam.id) === String(currentHomeId)) {
+            acc.homeWins++
+          } else {
+            acc.awayWins++
+          }
+        } else {
+          acc.draws++
         }
+
         return acc
       },
       { homeWins: 0, awayWins: 0, draws: 0 },
     )
 
-    // Mapeamos para cumplir estrictamente con MatchHistoryItem
-    const lastMatches: MatchHistoryItem[] = finishedMatches
+    const lastMatches = finishedMatches
       .slice(0, 5)
       .map((m) => ({
         fixture: {
@@ -129,62 +135,118 @@ export class MatchesMappers {
   }
 
   static formatMiniTable(
-    apiStandings: any[][],
-    homeId: number,
-    awayId: number,
+    standings: {
+      apertura?: { tournament: string; groups: Record<string, any[]> };
+      clausura?: { tournament: string; groups: Record<string, any[]> };
+      annual?: any[];
+      averages?: any[];
+    } | null | undefined,
+    homeId: string,
+    awayId: string,
   ) {
-    const tournamentTables = apiStandings.filter(
-      (t) =>
-        t[0]?.group.toLowerCase().includes('apertura') ||
-        t[0]?.group.toLowerCase().includes('clausura'),
-    )
-    const annualTable = apiStandings.find((t) =>
-      t[0]?.group.toLowerCase().includes('anual'),
-    )
-    const averagesTable = apiStandings.find((t) =>
-      t[0]?.group.toLowerCase().includes('promedios'),
-    )
+    if (!standings) {
+      return {
+        activeTournament: 'apertura' as const,
+        tournament: { home: [], away: [] },
+        annual: { home: [], away: [] },
+        averages: { home: [], away: [] },
+      };
+    }
+
+    const isClausuraActive = Boolean(
+      standings.clausura?.groups &&
+      Object.values(standings.clausura.groups).some((group) =>
+        Array.isArray(group) && group.some((team) => team.played > 0),
+      ),
+    );
+
+    const activeTournamentKey: 'clausura' | 'apertura' = isClausuraActive
+      ? 'clausura'
+      : 'apertura';
+
+    const currentTournament = standings[activeTournamentKey];
+
+    const tournamentTables: any[][] = currentTournament?.groups
+      ? Object.values(currentTournament.groups).map(group =>
+        Array.isArray(group) ? group.map((t, i) => ({ ...t, position: t.position ?? i + 1 })) : []
+      )
+      : [];
+
+    const annualTable = Array.isArray(standings.annual)
+      ? standings.annual.map((t, i) => ({ ...t, position: t.position ?? i + 1 }))
+      : [];
+
+    const averagesTable = Array.isArray(standings.averages)
+      ? standings.averages.map((t, i) => ({ ...t, position: t.position ?? i + 1 }))
+      : [];
 
     return {
+      activeTournament: activeTournamentKey,
       tournament: {
         home: this.extractNeighborhoodDynamic(tournamentTables, homeId),
         away: this.extractNeighborhoodDynamic(tournamentTables, awayId),
       },
       annual: {
-        home: annualTable ? this.getNeighborhood(annualTable, homeId) : [],
-        away: annualTable ? this.getNeighborhood(annualTable, awayId) : [],
+        home: annualTable.length ? this.getNeighborhood(annualTable, homeId, 1, 'Annual Home') : [],
+        away: annualTable.length ? this.getNeighborhood(annualTable, awayId, 1, 'Annual Away') : [],
       },
       averages: {
-        home: averagesTable ? this.getNeighborhood(averagesTable, homeId) : [],
-        away: averagesTable ? this.getNeighborhood(averagesTable, awayId) : [],
+        home: averagesTable.length ? this.getNeighborhood(averagesTable, homeId, 1, 'Averages Home') : [],
+        away: averagesTable.length ? this.getNeighborhood(averagesTable, awayId, 1, 'Averages Away') : [],
       },
-    }
+    };
   }
 
-  private static extractNeighborhoodDynamic(tables: any[][], teamId: number) {
+  static getNeighborhood(
+    table: any[],
+    targetId: string | number,
+    margin = 1,
+    context = 'Desconocido'
+  ): any[] {
+    if (!Array.isArray(table)) return [];
+
+    const index = table.findIndex(
+      (item) => {
+        const currentId = String(item.teamId ?? item.team_id ?? item.id ?? item.team?.id);
+        return currentId === String(targetId);
+      }
+    );
+
+    if (index === -1) return [];
+
+    let start = index - margin;
+    let end = index + margin;
+
+    if (start < 0) {
+      const diff = 0 - start;
+      start = 0;
+      end += diff;
+    }
+
+    if (end >= table.length) {
+      const diff = end - (table.length - 1);
+      end = table.length - 1;
+      start -= diff;
+
+      if (start < 0) start = 0;
+    }
+
+    return table.slice(start, end + 1);
+  }
+
+  static extractNeighborhoodDynamic(
+    tables: any[][],
+    targetId: string | number,
+  ): any[] {
+    if (!Array.isArray(tables)) return [];
+
     for (const table of tables) {
-      const neighborhood = this.getNeighborhood(table, teamId)
-      if (neighborhood.length > 0) return neighborhood
+      if (!Array.isArray(table)) continue;
+      const neighborhood = this.getNeighborhood(table, targetId, 1, 'Tournament');
+      if (neighborhood.length > 0) return neighborhood;
     }
-    return []
+    return [];
   }
 
-  private static getNeighborhood(table: any[], teamId: number) {
-    const index = table.findIndex((item) => item.team.id === teamId)
-    if (index === -1) return []
 
-    const start = Math.max(0, index - 1)
-    const end = index + 2
-
-    return table.slice(start, end).map((item) => ({
-      rank: item.rank,
-      teamId: item.team.id,
-      name: item.team.name,
-      logo: item.team.logo,
-      points: item.points,
-      played: item.all.played,
-      goalsDiff: item.goalsDiff,
-      isTarget: item.team.id === teamId,
-    }))
-  }
 }
