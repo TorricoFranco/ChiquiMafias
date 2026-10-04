@@ -5,7 +5,7 @@ import {
   ConnectedSocket,
   WebSocketGateway,
 } from '@nestjs/websockets'
-import { Server, Socket } from 'socket.io'
+import { Server } from 'socket.io'
 import { VoteService } from './vote.service'
 import {
   UseGuards,
@@ -61,7 +61,7 @@ export class PollsGateway {
 
     this.server
       .to(`poll_${data.pollId}`)
-      .emit('votoActualizado', updatedResults)
+      .emit(`votoActualizado_${data.pollId}`, updatedResults);
 
     return { status: 'success' }
   }

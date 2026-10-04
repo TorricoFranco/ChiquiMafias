@@ -18,7 +18,7 @@ export class TasksService {
   async handlePollStatus() {
     const now = new Date()
 
-    //  ACTIVAR: Pasar de PENDING a ACTIVE
+    // Pasar de PENDING a ACTIVE
     this.logger.log(`NOW: ${now.toISOString()}`)
     const toActivate = await this.prisma.poll.updateMany({
       where: {
@@ -32,7 +32,7 @@ export class TasksService {
       this.logger.log(`1Se activo ${toActivate.count} encuesta.`)
     }
 
-    // CERRAR: Pasar de ACTIVE a CLOSED
+    // Pasar de ACTIVE a CLOSED
     const pollsToClose = await this.prisma.poll.findMany({
       where: {
         status: 'ACTIVE',
