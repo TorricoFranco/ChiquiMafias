@@ -15,7 +15,7 @@ import { Wallet, TransactionType } from '@prisma/client'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
 
 @Controller('wallet')
-@UseGuards( RolesGuard)
+@UseGuards(RolesGuard)
 export class WalletController {
   constructor(private readonly walletService: WalletService) { }
 
@@ -31,7 +31,7 @@ export class WalletController {
   }
 
   @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.PRESIDENT)
   async adminAddCoins(@Body() dto: AdminAddCoinsDto): Promise<Wallet> {
     return this.walletService.addCoins({
       userId: dto.userId,

@@ -139,4 +139,22 @@ export class NotificationsListener {
       referenceId: payload.reportId,
     })
   }
+
+  @OnEvent('wallet.admin_gift')
+  async handleAdminGift(payload: {
+    userId: string
+    amount: number
+    description: string
+    newBalance: number
+  }) {
+    await this.notificationsService.createPersonalNotification({
+      userId: payload.userId,
+      title: '🎁 ¡Regalo de la Presidencia!',
+      message: `¡Has recibido ${payload.amount} chiqui-coins!\nMotivo: ${payload.description}`,
+      type: NotifyType.ADMIN_GIFT,
+      metadata: { coins: payload.amount },
+    })
+
+    this.chatGateway.sendWalletUpdate(payload.userId, payload.newBalance)
+  }
 }
