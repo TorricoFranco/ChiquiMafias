@@ -23,13 +23,13 @@ import {
 } from './dto/subscription-response.dto'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
 import { SubscriptionTier } from '@prisma/client'
-import { UpdatePlanPriceDto } from './dto/update-plan-price.dto'
 import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 import { SubscriptionCheckoutService } from './subscription-checkout.service'
 import { SubscriptionPricingService } from './domain/subscription-pricing.service'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { SystemRole } from '@prisma/client'
+import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto'
 /**
  * SubscriptionsController
  * Maneja todos los endpoints relacionados con suscripciones recurrentes
@@ -55,6 +55,23 @@ export class SubscriptionsController {
     @GetUser('activeSubscriptionTier') userTier: SubscriptionTier | null,
   ) {
     return await this.subscriptionPricingService.getPlans(userTier)
+  }
+
+
+  @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles(SystemRole.ADMIN)
+  async updatePlan(
+    @Param('id') id: string,
+    @Body() dto: UpdateSubscriptionPlanDto,
+  ) {
+    const updatedPlan = await this.subscriptionsService.updatePlan(id, dto);
+
+    return {
+      status: 'success',
+      message: 'Plan actualizado correctamente',
+      data: updatedPlan,
+    };
   }
 
   /**
@@ -144,19 +161,6 @@ export class SubscriptionsController {
     )
   }
 
-  @Patch('plans/price')
-  @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  async updatePlanPrice(@Body() dto: UpdatePlanPriceDto) {
-    this.logger.log(
-      `[PATCH /plans/price] Solicitud de cambio de precio para ${dto.tier}`,
-    )
-    return await this.subscriptionsService.updatePlanPrice(
-      dto.tier,
-      dto.basePriceARS,
-    )
-  }
 
   @Delete('admin/reset/:userId')
   @UseGuards(RolesGuard)

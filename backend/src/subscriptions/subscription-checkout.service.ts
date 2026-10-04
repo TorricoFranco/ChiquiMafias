@@ -16,9 +16,10 @@ import { randomUUID } from 'crypto'
 import {
   SUBSCRIPTION_CYCLE_DAYS,
   GRACE_PERIOD_HOURS,
-  COINS_PER_DAY_UPGRADE,
   MERCADO_PAGO_CONSTANTS,
 } from './constants/subscription.constants'
+
+import { SUBSCRIPTION_GIFTS } from './constants/subscription-rewards.constant'
 
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
@@ -31,6 +32,8 @@ import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service'
 
 import { RedisService } from '../redis/redis.service'
 import { SubscriptionPricingService } from './domain/subscription-pricing.service'
+import { EventEmitter2 } from '@nestjs/event-emitter'
+import { SubscriptionRewardsService } from './Subscription-rewards.service'
 
 @Injectable()
 export class SubscriptionCheckoutService {
@@ -38,32 +41,34 @@ export class SubscriptionCheckoutService {
 
   constructor(
     private readonly pricingService: SubscriptionPricingService,
+    private readonly subscriptionRewardsService: SubscriptionRewardsService,
     private readonly prisma: PrismaService,
     private readonly mercadoPagoService: MercadoPagoService,
     private readonly redis: RedisService,
     private readonly configService: ConfigService<EnvironmentVariables>,
+    private readonly eventEmitter: EventEmitter2,
   ) { }
 
-  private getMercadoPagoConfig() {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL', {
-      infer: true,
-    })
+  // private getMercadoPagoConfig() {
+  //   const frontendUrl = this.configService.get<string>('FRONTEND_URL', {
+  //     infer: true,
+  //   })
 
-    return {
-      API_BASE_URL: this.configService.get<string>('MERCADO_PAGO_API_URL', {
-        infer: true,
-      }),
-      ACCESS_TOKEN: this.configService.get<string>(
-        'MERCADO_PAGO_ACCESS_TOKEN',
-        { infer: true },
-      ),
-      WEBHOOK_URL: this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL', {
-        infer: true,
-      }),
-      FRONTEND_SUCCESS_URL: `${frontendUrl}/${this.configService.get<string>('FRONTEND_SUCCESS_URL', { infer: true })}`,
-      ...MERCADO_PAGO_CONSTANTS,
-    }
-  }
+  //   return {
+  //     API_BASE_URL: this.configService.get<string>('MERCADO_PAGO_API_URL', {
+  //       infer: true,
+  //     }),
+  //     ACCESS_TOKEN: this.configService.get<string>(
+  //       'MERCADO_PAGO_ACCESS_TOKEN',
+  //       { infer: true },
+  //     ),
+  //     WEBHOOK_URL: this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL', {
+  //       infer: true,
+  //     }),
+  //     FRONTEND_SUCCESS_URL: `${frontendUrl}/${this.configService.get<string>('FRONTEND_SUCCESS_URL', { infer: true })}`,
+  //     ...MERCADO_PAGO_CONSTANTS,
+  //   }
+  // }
 
   /**
    * CHECKOUT / ALTA O UPGRADE DE SUSCRIPCIÓN
@@ -87,10 +92,7 @@ export class SubscriptionCheckoutService {
           'El plan Popular es gratuito, no requiere checkout',
         )
 
-      // NUEVA COMPRA vs UPGRADE
-
       if (!isUpgrade) {
-        // FLUJO NORMAL: Si es nueva, NO debe tener una suscripción activa
         const existingActive = await this.prisma.userSubscription.findFirst({
           where: { userId, status: SubscriptionStatus.ACTIVE },
         })
@@ -101,7 +103,6 @@ export class SubscriptionCheckoutService {
           )
         }
       } else {
-        // FLUJO UPGRADE: Si es upgrade, SÍ O SÍ debe tener una suscripción activa
         const existingActive = await this.prisma.userSubscription.findFirst({
           where: { userId, status: SubscriptionStatus.ACTIVE },
         })
@@ -119,7 +120,7 @@ export class SubscriptionCheckoutService {
 
       const pricing = this.pricingService.calculateCurrentPrice(plan)
       const mpExternalRef = randomUUID()
-      const mpConfig = this.getMercadoPagoConfig()
+      const mpConfig = this.mercadoPagoService.getMercadoPagoConfig()
 
       const now = new Date()
       const futureStartDate = new Date(now.getTime() + 5 * 60 * 1000)
@@ -222,11 +223,17 @@ export class SubscriptionCheckoutService {
       if (
         payload.type !== 'payment' &&
         payload.type !== 'preapproval_payment' &&
-        payload.type !== 'subscription_preapproval' && // 👈 Agregado
-        payload.type !== 'subscription_authorized_payment' // 👈 Agregado
+        payload.type !== 'subscription_preapproval' &&
+        payload.type !== 'subscription_authorized_payment'
       ) {
         this.logger.warn(`[Webhook] Evento no procesable: ${payload.type}`)
         return { status: 'ignored', message: 'Evento no aplicable' }
+      }
+
+
+      if (payload.type === 'payment') {
+        this.logger.log(`[Webhook] Ignorando evento 'payment' aislado. Se espera el evento de suscripción.`);
+        return { status: 'ignored', message: 'Evento payment ignorado en flujo de suscripciones' }
       }
 
       const paymentId = payload.data?.id
@@ -248,7 +255,7 @@ export class SubscriptionCheckoutService {
           )
 
         if (preapprovalDetails?.status === 'cancelled') {
-          // 2. Buscamos la suscripción en nuestra DB local
+          // suscripción en DB local
           const localSub = await this.prisma.userSubscription.findFirst({
             where: {
               mpPreapprovalId: paymentId,
@@ -257,7 +264,6 @@ export class SubscriptionCheckoutService {
           })
 
           if (localSub) {
-            // 3. La pasamos a CANCELLATION_PENDING igual que si hubiera tocado el botón en tu app
             await this.prisma.userSubscription.update({
               where: { id: localSub.id },
               data: {
@@ -281,13 +287,10 @@ export class SubscriptionCheckoutService {
           }
         }
 
-        // Si viene en otro estado (ej: "authorized" al crearse), dejamos que siga el flujo normal
       }
 
-      // Protección contra Replay Attacks (Acá sigue tu código de siempre para los PAGOS)
       const isAlreadyProcessed = await this.prisma.processedPayment.findUnique({
         where: { paymentId: String(paymentId) },
-        // Nota: Asegurate de parsearlo a String o Number según cómo esté definido en tu schema.prisma
       })
 
       if (isAlreadyProcessed) {
@@ -297,7 +300,6 @@ export class SubscriptionCheckoutService {
         return { status: 'idempotent', message: 'Pago ya fue procesado' }
       }
 
-      // Obtener detalles del pago
       const paymentDetails = await this.mercadoPagoService.getPaymentDetails(
         paymentId,
         payload.type,
@@ -308,7 +310,6 @@ export class SubscriptionCheckoutService {
         )
       }
 
-      // Validar estado aprobado
       if (
         paymentDetails.status !== 'approved' &&
         paymentDetails.status !== 'authorized' &&
@@ -358,9 +359,16 @@ export class SubscriptionCheckoutService {
           throw e
         }
 
+        const now = new Date();
+        const nextBillingDate = new Date(now.getTime() + (SUBSCRIPTION_CYCLE_DAYS * 24 * 60 * 60 * 1000));
+
         const updatedSubscription = await tx.userSubscription.update({
           where: { id: subscription.id },
-          data: { status: SubscriptionStatus.ACTIVE },
+          data: {
+            status: SubscriptionStatus.ACTIVE,
+            startsAt: now,
+            endsAt: nextBillingDate
+          },
         })
 
         // Sincronizar el nuevo tier en el usuario
@@ -375,22 +383,6 @@ export class SubscriptionCheckoutService {
           where: { tier: subscription.tier },
         })
 
-        const benefits = dbPlan?.benefits || []
-
-        for (const benefit of benefits) {
-          await tx.userInventory.upsert({
-            where: {
-              userId_itemId: { userId: subscription.userId, itemId: benefit },
-            },
-            update: { quantity: { increment: 1 } },
-            create: {
-              userId: subscription.userId,
-              itemId: benefit,
-              quantity: 1,
-            },
-          })
-        }
-
         // Registrar transacción base de Mercado Pago
         await tx.coinTransaction.create({
           data: {
@@ -402,16 +394,20 @@ export class SubscriptionCheckoutService {
           },
         })
 
-        //  LÓGICA EXCLUSIVA DE UPGRADE (DENTRO DE LA TRANSACCIÓN)
         if (upgradeOldSubId) {
           const oldSub = await tx.userSubscription.findUnique({
             where: { id: upgradeOldSubId },
           })
 
-          // Doble verificación: que exista y siga activa para evitar doble reclamo
           if (oldSub && oldSub.status === SubscriptionStatus.ACTIVE) {
-            const { daysRemaining, bonusCoins } =
-              this.pricingService.calculateUpgradeBonus(oldSub.endsAt)
+
+            const { daysRemaining, bonusCoins, coinsPerDay } =
+              this.pricingService.calculateUpgradeBonus(
+                oldSub.endsAt,
+                oldSub.tier,
+                subscription.tier
+              )
+
             if (bonusCoins > 0) {
               const updatedWallet = await tx.wallet.update({
                 where: { userId: subscription.userId },
@@ -423,10 +419,15 @@ export class SubscriptionCheckoutService {
                   walletId: updatedWallet.id,
                   amount: bonusCoins,
                   type: TransactionType.ADMIN_GIFT,
-                  description: `Bono de upgrade: ${daysRemaining} días restantes × ${COINS_PER_DAY_UPGRADE} coins`,
+                  description: `Bono de upgrade: ${daysRemaining} días restantes × ${coinsPerDay} coins`,
                   referenceId: oldSub.id,
                 },
               })
+
+              await this.redis.redis.set(
+                `wallet:${subscription.userId}:balance`,
+                updatedWallet.balance
+              )
             }
 
             // Pisamos el estado de la vieja a EXPIRED para que quede inactiva localmente
@@ -447,7 +448,13 @@ export class SubscriptionCheckoutService {
           )
         }
 
-        return { subscription: updatedSubscription, user: updatedUser }
+        const giftData = await this.subscriptionRewardsService.grantRewards(
+          subscription.userId,
+          subscription.tier,
+          tx
+        );
+
+        return { subscription: updatedSubscription, user: updatedUser, giftData }
       })
 
       // Dar de baja el debito automático viejo en Mercado Pago
@@ -472,6 +479,15 @@ export class SubscriptionCheckoutService {
       this.logger.log(
         `[Webhook OK] Proceso completado para suscripción ${subscription.id}`,
       )
+
+      const giftData = SUBSCRIPTION_GIFTS[subscription.tier];
+
+      this.eventEmitter.emit('subscription.purchased', {
+        userId: subscription.userId,
+        tier: subscription.tier,
+        giftData: giftData
+      });
+
       return {
         status: 'success',
         message: 'Pago procesado y beneficios aplicados correctamente.',
@@ -507,7 +523,7 @@ export class SubscriptionCheckoutService {
           status: SubscriptionStatus.ACTIVE,
         },
         orderBy: {
-          createdAt: 'desc', // 👈 Nos asegura agarrar el Tier real actual
+          createdAt: 'desc',
         },
         include: { user: true },
       })
@@ -518,14 +534,13 @@ export class SubscriptionCheckoutService {
         )
       }
 
-      // 2. Llamar a Mercado Pago para cancelar la preapproval
       if (subscription.mpPreapprovalId) {
         try {
           await this.mercadoPagoService.cancelPreapprovalInMercadoPago(
             subscription.mpPreapprovalId,
           )
         } catch (mpError: any) {
-          // 💡 SI MERCADO PAGO DICE QUE YA ESTÁ CANCELADA, NO ROMPEMOS EL FLUJO.
+          //  SI MERCADO PAGO DICE QUE YA ESTÁ CANCELADA, NO ROMPEMOS EL FLUJO.
           // Aprovechamos el error para limpiar nuestra base de datos local.
           const isAlreadyCancelled =
             mpError?.response?.data?.message?.includes(
@@ -543,7 +558,7 @@ export class SubscriptionCheckoutService {
         }
       }
 
-      // 3. Actualizar en base de datos local (Pasa a CANCELLATION_PENDING)
+      //  Actualizar en base de datos local (Pasa a CANCELLATION_PENDING)
       const updated = await this.prisma.userSubscription.update({
         where: { id: subscription.id },
         data: {
@@ -574,7 +589,6 @@ export class SubscriptionCheckoutService {
    */
   async upgradeSubscription(userId: string, newTier: SubscriptionTier) {
     try {
-      // Validar que el usuario tenga una suscripción ACTIVE actual
       const currentSubscription = await this.prisma.userSubscription.findFirst({
         where: {
           userId,
@@ -600,12 +614,14 @@ export class SubscriptionCheckoutService {
       }
 
       const { bonusCoins: estimatedBonusCoins } =
-        this.pricingService.calculateUpgradeBonus(currentSubscription.endsAt)
+        this.pricingService.calculateUpgradeBonus(
+          currentSubscription.endsAt,
+          currentSubscription.tier,
+          newTier
+        )
 
-      // Iniciamos el checkout pasando "true" como tercer parámetro (isUpgrade)
       const checkoutResult = await this.startCheckout(userId, newTier, true)
 
-      //  Guardamos el puente en Redis para el Webhook
       await this.redis.redis.set(
         `subscription:upgrade:${checkoutResult.external_reference}`,
         currentSubscription.id,
