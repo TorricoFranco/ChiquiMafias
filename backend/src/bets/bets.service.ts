@@ -20,6 +20,8 @@ import { PLACE_BET_LUA_SCRIPT } from './bets.scripts'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 
+import { calculateMarketOdds } from './utils/odds.util'
+
 @Injectable()
 export class BetsService {
   private readonly logger = new Logger(BetsService.name)
@@ -35,22 +37,24 @@ export class BetsService {
   ) { }
 
   /**
-   * Resuelve el GET del Frontend trayendo mercados abiertos o pausados en vivo
+   * Resuelve el GET del Frontend trayendo mercados abiertos o pausados en vivo con cuotas calculadas
    */
   async getActiveMarkets() {
-    return this.prisma.market.findMany({
+    const markets = await this.prisma.market.findMany({
       where: {
-        status: { in: ['OPEN', 'LOCKED'] },
+        status: { in: ['OPEN'] },
       },
       include: {
         options: true,
       },
       orderBy: { closesAt: 'asc' },
     })
+
+    return markets.map((market) => calculateMarketOdds(market))
   }
 
   /**
-   * Procesa de forma atómica la creación de una apuesta y distribuye por WS
+   * Procesa de forma atómica la creación de una apuesta y distribuye por WS las cuotas recalculadas
    */
   async placeBet(userId: string, dto: CreateBetDto) {
     const { optionId, stake, marketId } = dto
@@ -80,9 +84,39 @@ export class BetsService {
 
     this.chatGateway.sendWalletUpdate(userId, result.new_balance)
 
+    // Recuperar mercado de la DB para recalcular cuotas con Pari-Mutuel
+    const market = await this.prisma.market.findUnique({
+      where: { id: marketId },
+      include: { options: true },
+    })
+
+    let newOdds = 1.0
+    let updatedOptions: any[] = []
+
+    if (market) {
+      const marketWithUpdatedStakes = {
+        ...market,
+        options: market.options.map((opt) =>
+          opt.id === optionId ? { ...opt, totalStaked: result.new_pool } : opt,
+        ),
+      }
+      const calculatedMarket = calculateMarketOdds(marketWithUpdatedStakes)
+      const targetOption = calculatedMarket.options.find(
+        (o) => o.id === optionId,
+      )
+      newOdds = targetOption?.currentOdds ?? 1.0
+      updatedOptions = calculatedMarket.options.map((o) => ({
+        id: o.id,
+        currentOdds: o.currentOdds,
+        totalStaked: o.totalStaked,
+      }))
+    }
+
     this.betsGateway.emitPoolUpdate(marketId, {
       optionId: optionId,
       newTotalStaked: result.new_pool,
+      newOdds: newOdds,
+      options: updatedOptions,
     })
 
     await this.betsQueue.add('persist-bet', {
@@ -102,9 +136,13 @@ export class BetsService {
   }
 
   async createManualMarket(dto: CreateMarketDto) {
-    const market = await this.prisma.market.create({
+    const market = (await this.prisma.market.create({
       data: {
         title: dto.title,
+        type: dto.type ?? 'CUSTOM',
+        category: dto.category,
+        description: dto.description,
+        metadata: dto.metadata ? (dto.metadata as any) : undefined,
         closesAt: new Date(dto.closesAt),
         isManual: true,
         status: 'OPEN',
@@ -117,7 +155,7 @@ export class BetsService {
         },
       },
       include: { options: true },
-    })
+    })) as any
 
     const redis = this.redisService.redis
     const marketKey = `market:${market.id}`
@@ -134,13 +172,14 @@ export class BetsService {
       await redis.hset(marketKey, opt.id, '0')
     }
 
-    this.betsGateway.emitMarketCreated(market)
+    const calculatedMarket = calculateMarketOdds(market)
+    this.betsGateway.emitMarketCreated(calculatedMarket)
 
-    return market
+    return calculatedMarket
   }
 
   async getUserBets(userId: string) {
-    return this.prisma.bet.findMany({
+    const bets = await this.prisma.bet.findMany({
       where: { userId },
       include: {
         option: {
@@ -153,7 +192,19 @@ export class BetsService {
         },
       },
       orderBy: { createdAt: 'desc' },
-    })
+    });
+
+    return bets.map((bet) => ({
+      id: bet.id,
+      marketTitle: bet.option.market.title,
+      optionName: bet.option.name,
+      stake: bet.stake,
+      payout: bet.payout ?? 0,
+      multiplier: bet.multiplier ?? 0,
+      status: bet.status,
+      marketStatus: bet.option.market.status,
+      createdAt: bet.createdAt,
+    }));
   }
 
   async settleMarket(marketId: string, dto: SettleMarketDto) {
@@ -247,7 +298,11 @@ export class BetsService {
             })
             await tx.bet.update({
               where: { id: bet.id },
-              data: { status: 'REFUNDED' },
+              data: {
+                status: 'REFUNDED',
+                payout: bet.stake,
+                multiplier: 1,
+              },
             })
 
             pendingEvents.push({
@@ -290,7 +345,36 @@ export class BetsService {
             })
             await tx.bet.update({
               where: { id: bet.id },
-              data: { status: 'WON' },
+              data: {
+                status: 'WON',
+                payout: bet.stake,
+                multiplier: multiplier
+              },
+            })
+
+            const currentStats = await tx.userStats.findUnique({ where: { userId: bet.userId } })
+
+            const newStreak = (currentStats?.currentWinStreak || 0) + 1
+            const newMaxStreak = Math.max(currentStats?.longestWinStreak || 0, newStreak)
+            const newHighestMult = Math.max(currentStats?.highestMultiplier || 0, multiplier)
+
+            await tx.userStats.upsert({
+              where: { userId: bet.userId },
+              create: {
+                userId: bet.userId,
+                totalBetsWon: 1,
+                totalCoinsWon: payout,
+                currentWinStreak: 1,
+                longestWinStreak: 1,
+                highestMultiplier: multiplier
+              },
+              update: {
+                totalBetsWon: { increment: 1 },
+                totalCoinsWon: { increment: payout },
+                currentWinStreak: newStreak,
+                longestWinStreak: newMaxStreak,
+                highestMultiplier: newHighestMult
+              }
             })
 
             pendingEvents.push({
@@ -302,7 +386,16 @@ export class BetsService {
           } else {
             await tx.bet.update({
               where: { id: bet.id },
-              data: { status: 'LOST' },
+              data: {
+                status: 'LOST',
+                payout: 0,
+                multiplier: multiplier
+              },
+            })
+
+            await tx.userStats.updateMany({
+              where: { userId: bet.userId },
+              data: { currentWinStreak: 0 }
             })
 
             pendingEvents.push({

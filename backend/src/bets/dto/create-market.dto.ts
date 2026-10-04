@@ -7,8 +7,38 @@ import {
   IsNumber,
   Min,
   Max,
+  IsEnum,
+  IsOptional,
+  IsObject
 } from 'class-validator'
 import { Type } from 'class-transformer'
+import { MarketType } from '@prisma/client'
+
+class TeamMetadataDto {
+  @IsNotEmpty()
+  @IsString()
+  name!: string      
+
+  @IsNotEmpty()
+  @IsString()
+  short!: string     // Ej: "BOC"
+
+  @IsNotEmpty()
+  @IsString()
+  logoUrl!: string  
+}
+
+class MarketMetadataDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TeamMetadataDto)
+  homeTeam?: TeamMetadataDto
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TeamMetadataDto)
+  awayTeam?: TeamMetadataDto
+}
 
 class MarketOptionDto {
   @IsNotEmpty()
@@ -26,6 +56,27 @@ export class CreateMarketDto {
   @IsNotEmpty()
   @IsString()
   title!: string
+
+  @IsOptional()
+  @IsEnum(MarketType)
+  type?: MarketType
+
+  @IsOptional()
+  @IsString()
+  category?: string
+
+  @IsOptional()
+  @IsString()
+  description?: string
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MarketMetadataDto)
+  metadata?: MarketMetadataDto
+
+  @IsOptional()
+  @IsNumber()
+  fixtureId?: number 
 
   @IsNotEmpty()
   @IsDateString()

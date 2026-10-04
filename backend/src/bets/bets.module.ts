@@ -7,9 +7,11 @@ import { ChatModule } from 'src/chat/chat.module'
 import { AuthModule } from 'src/auth/auth.module'
 import { BullModule } from '@nestjs/bullmq'
 import { BetsProcessor } from './bets.processor'
+import { BetsCronService } from './bets-cron'
+
 @Module({
   controllers: [BetsController],
-  providers: [BetsService, BetsGateway, BetsProcessor],
+  providers: [BetsService, BetsGateway, BetsProcessor, BetsCronService],
   imports: [
     BullModule.registerQueue({
       name: 'bets-queue',
