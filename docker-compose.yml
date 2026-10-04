@@ -30,12 +30,11 @@ services:
     restart: unless-stopped
     ports:
       - "3007:3007"
-    env_file:         
-      - .env   
+    env_file:
+      - .env
     depends_on:
       - postgres
       - redis
-    # Agregamos migrate deploy para que la BD de prod se actualice sola
     command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:prod"
     environment:
       PORT: ${PORT}
@@ -63,17 +62,51 @@ services:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      NODE_ENV: ${NODE_ENV}
+
 
   frontend:
     container_name: football_frontend
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+        - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+        - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+        - API_INTERNAL_URL=${API_INTERNAL_URL}
+        
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+      - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+      - API_INTERNAL_URL=${API_INTERNAL_URL}
     depends_on:
       - backend
+
+  new_frontend: 
+    container_name: football_new_frontend
+    build:
+      context: ./new_frontend
+      args:
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+        - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+        - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=${NEW_FRONTEND_PORT}
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+      - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+      - API_INTERNAL_URL=${API_INTERNAL_URL}
+      - NODE_ENV=production
+    depends_on:
+      - backend
+
 
   discord_bot:
     container_name: football_discord_bot
@@ -82,8 +115,12 @@ services:
     ports:
       - "3001:3001"
     environment:
+      PORT: 3001
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_MODERATION_CHANNEL_ID: ${DISCORD_MODERATION_CHANNEL_ID}
+      DISCORD_TICKETS_CHANNEL_ID: ${DISCORD_TICKETS_CHANNEL_ID}
       DISCORD_INTERNAL_SECRET: ${DISCORD_INTERNAL_SECRET}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
       BACKEND_URL: "http://backend:3007" 
     depends_on:
       - backend
