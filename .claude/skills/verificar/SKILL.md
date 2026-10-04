@@ -7,6 +7,7 @@ allowed-tools:
   - Bash(git diff *)
   - Bash(npm run build *)
   - Bash(npm run lint *)
+  - Bash(npm run test:unit *)
   - Bash(npx jest src/*)
   - Bash(npx prisma generate *)
   - Bash(npx prisma validate *)
@@ -33,7 +34,7 @@ Desde `backend/`, en este orden y sin frenar al primer error:
 
 1. Si cambió `prisma/schema.prisma`: `npx prisma validate` + `npx prisma generate`.
 2. `npm run build`
-3. `npx jest src/`. **Nunca** `npm test` ni `npm run test:unit`, porque incluyen los e2e que borran la DB.
+3. `npm run test:unit` (= `jest src/`). **Nunca** `npm test`, porque incluye los e2e que borran la DB.
 4. `npm run lint`. Aplica `--fix`: si modifica archivos, mostrá cuáles. El CI no corre lint, así que esto es lo único que lo controla.
 
 Si el cambio toca `wallet/`, `bets/`, `subscriptions/`, `webhook/`, `coin-shop/`, `store/` o `streaks/`, recomendá además correr el subagente `backend-reviewer`.

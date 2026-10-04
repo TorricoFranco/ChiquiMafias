@@ -37,5 +37,5 @@ Estas carpetas mueven monedas o dinero real. Un bug acá significa doble gasto, 
 
 ## Antes de terminar
 
-- Todo cambio acá lleva su test unitario (`*.spec.ts` al lado del service, con Prisma mockeado y un `$transaction` que ejecuta el callback; ver `bets.service.spec.ts`) y `npx jest src/` en verde.
+- Todo cambio acá lleva su test unitario (`*.spec.ts` al lado del service, con Prisma mockeado y un `$transaction` que ejecuta el callback; ver `bets.service.spec.ts`) y `npm run test:unit` en verde.
 - Pedí revisión al subagente `backend-reviewer`.

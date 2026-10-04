@@ -41,7 +41,7 @@ npx jest src/<nombre>
 npm run lint             # aplica --fix; revisá el diff que deja
 ```
 
-No corras `npm test` ni `npm run test:unit`: incluyen los e2e, que borran la DB.
+No corras `npm test`: incluye los e2e, que borran la DB. Para todos los unitarios: `npm run test:unit`.
 
 ## 5. Cerrar
 

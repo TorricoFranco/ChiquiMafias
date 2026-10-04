@@ -52,7 +52,7 @@ Producción: `docker-compose.yml`.
 ## Reglas que siempre aplican
 
 - Nunca leer, mostrar ni commitear `.env`, `.env.dev`, `*/.env` ni `backup_dev.sql`. Las variables existentes están en `.env.example` y `backend/src/config/env.validation.ts`.
-- **Los e2e del backend borran tablas de la DB a la que apunte `DATABASE_URL`.** `npm test` y `npm run test:unit` también los incluyen. Para tests unitarios usá `npx jest src/` desde `backend/`, y no corras e2e sin confirmación.
+- **Los e2e del backend borran tablas de la DB a la que apunte `DATABASE_URL`.** `npm test` también los incluye. Para tests unitarios usá `npm run test:unit` (= `jest src/`) desde `backend/`, y no corras e2e sin confirmación.
 - No modificar `frontend/`.
 - Antes de decir que algo está listo, corré build + lint (+ unit tests en el backend) de la app tocada: `/verificar`.
 - Para cambios en monedas, apuestas, suscripciones o webhooks de pago, proponé un plan antes de editar y al terminar pasalo por el subagente `backend-reviewer`.

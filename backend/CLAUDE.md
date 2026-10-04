@@ -20,16 +20,15 @@ npm run build          # nest build -> dist/
 npm run start:prod     # node dist/main
 npm run lint           # eslint --fix (flat config, type-checked)
 npm run format         # prettier --write src y test
-npx jest src/          # unit puros (solo src/**/*.spec.ts) ← usar este
-npm run test:unit      # ⚠ también corre los e2e (ver gotchas)
+npm run test:unit      # unit puros: jest src/ (solo src/**/*.spec.ts)
 npm run test:e2e       # solo *.e2e-spec.ts (requiere Postgres + Redis)
 npm run test:cov       # coverage
 ```
 
 ### Gotchas de tests
 
-- **`npm test` corre TODO**: el `testRegex` de `package.json` matchea `.spec.ts` **y** `.e2e-spec.ts`.
-- **`npm run test:unit` también corre los e2e**: su patrón `jest ".spec.ts$"` es una regex y el `.` matchea el `-` de `.e2e-spec.ts` (verificado con `npx jest --listTests ".spec.ts$"`). Para unit puro usá **`npx jest src/`**.
+- **`npm test` corre TODO**, e2e incluidos: el `testRegex` de `package.json` matchea `.spec.ts` **y** `.e2e-spec.ts`. Para unit puro usá **`npm run test:unit`** (`jest src/`).
+- No vuelvas a poner `test:unit` como `jest ".spec.ts$"`: es una regex y el `.` matchea el `-` de `.e2e-spec.ts`, así que corría los e2e.
 - Un test unit puntual: `npx jest src/bets/bets.service.spec.ts`
 - Un e2e puntual: `npx jest test/bets.e2e-spec.ts --config ./test/jest-e2e.json`
 - `test/bets.e2e-spec.ts` corre `npx prisma db push` en `beforeAll` y **borra todas las tablas en `afterEach`** contra la DB de `DATABASE_URL` → necesita Postgres + Redis corriendo y **una DB descartable**, nunca la de desarrollo ni la real. No correr e2e sin confirmación del usuario.

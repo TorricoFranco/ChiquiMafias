@@ -21,7 +21,7 @@ Checklist, por prioridad:
 6. **Tiempo real**: ¿algún cron emite directo por socket en vez de publicar en Redis? ¿Hay listeners o suscripciones sin limpiar?
 7. **Async**: promesas sin `await` (la regla `no-floating-promises` está solo en warn), errores tragados en `catch` vacíos.
 8. **Secretos**: tokens, secrets o datos personales en logs o en respuestas.
-9. **Tests**: ¿la lógica nueva de dinero o estado tiene `*.spec.ts`? Podés correr `npx jest src/<modulo>` (nunca `npm test` ni `npm run test:unit`, que incluyen los e2e que borran la DB).
+9. **Tests**: ¿la lógica nueva de dinero o estado tiene `*.spec.ts`? Podés correr `npx jest src/<modulo>` o `npm run test:unit` (nunca `npm test`, que incluye los e2e que borran la DB).
 
 ## Cómo reportar
 
