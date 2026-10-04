@@ -5,6 +5,7 @@ import {
   Body,
   ValidationPipe,
   Headers,
+  Query,
 } from '@nestjs/common'
 import { Public } from 'src/auth/decorators/auth.decorator'
 import { WebhookService } from './webhook.service'
@@ -22,7 +23,8 @@ export class WebhookController {
     @Body() payload: any,
     @Headers('x-signature') xSignature: string,
     @Headers('x-request-id') xRequestId: string,
+    @Query() query: any,
   ) {
-    return this.webHookService.processWebhook(payload, xSignature, xRequestId)
+    return this.webHookService.processWebhook(payload, xSignature, xRequestId, query)
   }
 }
