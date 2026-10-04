@@ -24,13 +24,17 @@ export class AuthController {
   ) { }
 
   private get cookieOptions() {
-    return {
+    // const isProduction = this.configService.get('NODE_ENV', { infer: true }) === 'production';
+    const isProduction = false;
+
+    const options = {
       httpOnly: true,
-      secure:
-        this.configService.get('NODE_ENV', { infer: true }) === 'production',
-      sameSite: 'lax' as const,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      domain: isProduction ? '.chiquimafias.com' : undefined,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     }
+    return options
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -71,6 +75,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Public()
   @ApiOperation({ summary: 'Cerrar sesión limpiando cookies y base de datos' })
   async logout(
     @Req() req: express.Request,

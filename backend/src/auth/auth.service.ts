@@ -7,15 +7,17 @@ import {
 import { OAuth2Client } from 'google-auth-library'
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { RedisService } from 'src/redis/redis.service'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import * as bcrypt from 'bcrypt'
-import { User } from '@prisma/client'
+import { FootballTeam, User } from '@prisma/client'
 import {
   JwtPayload,
   RefreshTokenPayload,
 } from './interfaces/active-user.interface'
 import { UserEntity } from 'src/users/entities/user.entity'
+
 
 @Injectable()
 export class AuthService {
@@ -26,12 +28,46 @@ export class AuthService {
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
+    private redisService: RedisService,
     private readonly configService: ConfigService<EnvironmentVariables>,
   ) {
     const googleClientId = this.configService.get('GOOGLE_CLIENT_ID', {
       infer: true,
     })
     this.client = new OAuth2Client(googleClientId)
+  }
+  private async enrichUserWithCosmetics(user: User & { team?: FootballTeam | null }): Promise<UserEntity> {
+    let [color, banner, bubble] = await this.redisService.redis.mget(
+      `user:cosmetics:${user.id}:color`,
+      `user:cosmetics:${user.id}:banner`,
+      `user:cosmetics:${user.id}:chat_bubble`,
+    )
+
+    // 2. Si hay "Cache Miss" (no está en Redis) pero el usuario TIENE un cosmético activo en BD, lo buscamos y lo guardamos.
+    if (!color && user.activeNameColorId) {
+      const item = await this.prisma.storeItem.findUnique({ where: { id: user.activeNameColorId } })
+      color = item?.assetId || null
+      if (color) await this.redisService.redis.set(`user:cosmetics:${user.id}:color`, color, 'EX', 86400)
+    }
+
+    if (!banner && user.activeBannerId) {
+      const item = await this.prisma.storeItem.findUnique({ where: { id: user.activeBannerId } })
+      banner = item?.assetId || null
+      if (banner) await this.redisService.redis.set(`user:cosmetics:${user.id}:banner`, banner, 'EX', 86400)
+    }
+
+    if (!bubble && user.activeChatBubbleId) {
+      const item = await this.prisma.storeItem.findUnique({ where: { id: user.activeChatBubbleId } })
+      bubble = item?.assetId || null
+      if (bubble) await this.redisService.redis.set(`user:cosmetics:${user.id}:chat_bubble`, bubble, 'EX', 86400)
+    }
+
+    return new UserEntity({
+      ...user,
+      activeNameColorId: color || null,
+      activeBannerId: banner || null,
+      activeChatBubbleId: bubble || null,
+    })
   }
 
   private async generateTokens(user: User & { team?: any }) {
@@ -97,10 +133,12 @@ export class AuthService {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
+        include: { team: true },
       })
 
       if (!user) return null
-      return new UserEntity(user)
+
+      return await this.enrichUserWithCosmetics(user)
     } catch (error) {
       return null
     }
@@ -134,10 +172,12 @@ export class AuthService {
     const tokens = await this.generateTokens(user)
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
 
+    const userWithCosmetics = await this.enrichUserWithCosmetics(user)
+
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: new UserEntity(user),
+      user: userWithCosmetics,
     }
   }
 
@@ -166,14 +206,15 @@ export class AuthService {
       if (!isTokenMatched)
         throw new UnauthorizedException('Token manipulado o inválido')
 
-
       const tokens = await this.generateTokens(user)
       await this.updateRefreshTokenHash(user.id, tokens.refreshToken)
+
+      const userWithCosmetics = await this.enrichUserWithCosmetics(user)
 
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        user: new UserEntity(user),
+        user: userWithCosmetics,
       }
     } catch (error) {
       if (error instanceof ForbiddenException) throw error
