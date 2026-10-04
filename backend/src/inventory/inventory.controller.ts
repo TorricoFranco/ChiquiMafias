@@ -1,4 +1,3 @@
-// src/inventory/inventory.controller.ts
 import { Controller, Get, Post, Param, } from '@nestjs/common'
 import { InventoryService } from './inventory.service'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
@@ -22,7 +21,7 @@ export class InventoryController {
 
   @Post('unequip/:type')
   async unequipItem(
-    @Param('type') type: 'NAME_COLOR' | 'BANNER',
+    @Param('type') type: 'NAME_COLOR' | 'BANNER' | 'CHAT_BUBBLE',
     @GetUser('id') userId: string,
   ) {
     return this.inventoryService.unequipItem(userId, type)
