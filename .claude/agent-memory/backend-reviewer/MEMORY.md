@@ -1,0 +1,3 @@
+- [Patrones de bug recurrentes](recurring-bug-patterns.md): Roles/Public, endpoints de debug, sanciones con assertCanSanction, auth de sockets, stale cache, TOCTOU
+- [Env de prod](prod-env-config.md): docker-compose.yml usa env_file .env, así que no listar una var en environment: no la excluye
+- [Decisiones de diseño](dev-tools-design.md): DevToolsGuard, api-football solo ADMIN en prod, Discord solo sanciona USERs, WARN sin jerarquía
