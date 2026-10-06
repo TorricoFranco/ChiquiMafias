@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useUserStore } from "@/store/useUserStore";
 import { streakApi } from "@/features/streak/api/streakApi";
-import { usePathname } from "next/navigation";
 import { authApi } from "@/features/auth/api/authApi";
-import BannedScreen from "@/features/auth/components/BannedScreen";
+import BannedAppealScreen from "@/features/supports/components/appeal/BannedAppealScreen";
 import Cookies from "js-cookie";
 import LoginModal from "@/features/auth/components/LoginModal";
 
@@ -21,8 +20,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const setLoginModalOpen = useUserStore((state) => state.setLoginModalOpen);
 
     const [loading, setLoading] = useState(true);
-
-    const pathname = usePathname();
 
     useEffect(() => {
         async function restoreSession() {
@@ -40,8 +37,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
                 if (res.ok) {
                     const data = await res.json();
-
-                    console.log("Datos que llegan del Backend en refresh():", data.user);
 
                     Cookies.set("accessToken", data.access_token, {
                         secure: process.env.NODE_ENV === "production",
@@ -62,6 +57,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
                         activeChatBubbleId: data.user.activeChatBubbleId || null,
                         activeBannerId: data.user.activeBannerId || null,
                     });
+
+                    // El refresh no rechaza a un usuario baneado: conserva el token para poder apelar.
+                    if (data.user.status === "BANNED") {
+                        setIsBanned(true);
+                        return;
+                    }
 
                     if (data.user.balance !== undefined) {
                         useUserStore.getState().setBalance(data.user.balance);
@@ -100,8 +101,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         );
     }
 
-    if (isBanned && !pathname.startsWith('/support')) {
-        return <BannedScreen />;
+    if (isBanned) {
+        return <BannedAppealScreen />;
     }
 
 

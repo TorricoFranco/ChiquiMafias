@@ -11,7 +11,12 @@ import { CreateTicketMessageDto } from './dto/create-ticket-message.dto'
 import { SystemRole } from 'src/auth/enums/roles.enum'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { ReportResolvedPayload } from './interfaces/report-resolved.interface'
-import { TicketCategory, TicketStatus, ReportStatus } from '@prisma/client'
+import {
+  Prisma,
+  TicketCategory,
+  TicketStatus,
+  ReportStatus,
+} from '@prisma/client'
 
 
 @Injectable()
@@ -184,26 +189,66 @@ export class SupportService {
 
 
 
-  async createTicket(userId: string, dto: CreateTicketDto) {
-    const ticket = await this.prisma.ticket.create({
-      data: {
-        userId,
-        category: dto.category,
-        subject: dto.subject,
-        messages: {
-          create: {
-            senderId: userId,
-            message: dto.message,
-            screenshotUrl: dto.screenshotUrl || null,
+  async createTicket(userId: string, dto: CreateTicketDto, isBanned = false) {
+    const ticket = await this.prisma.$transaction(async (tx) => {
+      if (isBanned) {
+        // Serializa las apelaciones de un mismo usuario: dos requests en paralelo
+        // no pueden pasar las dos el chequeo de "apelación en curso".
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`appeal:${userId}`}))`
+        await this.assertCanOpenAppeal(tx, userId, dto.category)
+      }
+
+      return tx.ticket.create({
+        data: {
+          userId,
+          category: dto.category,
+          subject: dto.subject,
+          messages: {
+            create: {
+              senderId: userId,
+              message: dto.message,
+              screenshotUrl: dto.screenshotUrl || null,
+            },
           },
         },
-      },
-      include: { messages: true },
+        include: { messages: true },
+      })
     })
 
+    // Fuera de la transacción: si hiciera rollback, el evento ya habría salido.
     this.eventEmitter.emit('ticket.created', ticket)
 
     return ticket
+  }
+
+  // Con la cuenta suspendida solo se puede abrir una apelación, y de a una por vez.
+  private async assertCanOpenAppeal(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    category: TicketCategory,
+  ) {
+    if (category !== TicketCategory.APPEAL) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: 'Con la cuenta suspendida solo podés abrir una apelación.',
+        code: 'USER_BANNED',
+      })
+    }
+
+    const openAppeal = await tx.ticket.findFirst({
+      where: {
+        userId,
+        category: TicketCategory.APPEAL,
+        status: { in: [TicketStatus.OPEN, TicketStatus.UNDER_REVIEW] },
+      },
+      select: { id: true },
+    })
+
+    if (openAppeal) {
+      throw new BadRequestException(
+        'Ya tenés una apelación en curso. Seguí la conversación en ese ticket.',
+      )
+    }
   }
 
   async createTicketMessage(
@@ -212,6 +257,7 @@ export class SupportService {
     role: SystemRole,
     dto: CreateTicketMessageDto,
     fromDiscord: boolean = false,
+    senderIsBanned: boolean = false,
   ) {
     const ticket = await this.prisma.ticket.findFirst({
       where: {
@@ -220,12 +266,42 @@ export class SupportService {
           { discordThreadId: ticketIdOrThreadId },
         ],
       },
-      select: { id: true, userId: true, status: true, discordThreadId: true },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        category: true,
+        discordThreadId: true,
+      },
     })
 
     if (!ticket) throw new NotFoundException('El ticket no existe.')
     if (ticket.status === 'CLOSED')
       throw new BadRequestException('Este ticket ya está cerrado.')
+
+    // Una cuenta suspendida no conserva poderes de staff: aunque sea MODERATOR o ADMIN,
+    // solo puede escribir en su propia apelación en curso.
+    if (senderIsBanned) {
+      if (
+        ticket.category !== TicketCategory.APPEAL ||
+        ticket.userId !== senderId
+      ) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          message:
+            'Con la cuenta suspendida solo podés responder en tu apelación.',
+          code: 'USER_BANNED',
+        })
+      }
+      if (
+        ticket.status !== TicketStatus.OPEN &&
+        ticket.status !== TicketStatus.UNDER_REVIEW
+      ) {
+        throw new BadRequestException(
+          'Esta apelación ya fue resuelta. Si querés, abrí una nueva.',
+        )
+      }
+    }
 
     // Si viene de Discord, salteamos esta validación porque el rol ya viene forzado como admin
     if (
@@ -283,8 +359,6 @@ export class SupportService {
     return newMessage
   }
 
-
-
   async getTickets(
     page: number,
     limit: number,
@@ -319,9 +393,12 @@ export class SupportService {
   }
 
 
-  async getMyTickets(userId: string) {
+  async getMyTickets(userId: string, isBanned = false) {
     return await this.prisma.ticket.findMany({
-      where: { userId },
+      where: {
+        userId,
+        ...(isBanned && { category: TicketCategory.APPEAL }),
+      },
       orderBy: { createdAt: 'desc' },
     })
   }
@@ -338,9 +415,13 @@ export class SupportService {
     })
   }
 
-  async getMyTicketDetails(ticketId: string, userId: string) {
+  async getMyTicketDetails(ticketId: string, userId: string, isBanned = false) {
     const ticket = await this.prisma.ticket.findFirst({
-      where: { id: ticketId, userId: userId },
+      where: {
+        id: ticketId,
+        userId: userId,
+        ...(isBanned && { category: TicketCategory.APPEAL }),
+      },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },

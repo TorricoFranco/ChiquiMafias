@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { uploadToCloudinary } from "@/lib/uploadHelper";
 import { TicketCategory, CreateTicketPayload } from '../../types';
+import { TICKET_MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH } from '../../constants';
 
 interface CreateTicketModalProps {
   isOpen: boolean;
@@ -124,7 +125,12 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       />
 
       {/* Modal Container */}
-      <div className="relative bg-[#1c1b1b] border border-[#353534] rounded-2xl max-w-xl w-full p-6 z-10 shadow-2xl overflow-y-auto max-h-[90vh]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Crear Nuevo Reclamo / Ticket"
+        className="relative bg-[#1c1b1b] border border-[#353534] rounded-2xl max-w-xl w-full p-6 z-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+      >
         {/* Header */}
         <div className="flex justify-between items-center border-b border-[#353534] pb-4 mb-5">
           <div className="flex items-center gap-2.5">
@@ -142,6 +148,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="text-[#c6c9ab] hover:text-[#e5e2e1] p-1 rounded-lg hover:bg-[#2a2a2a] transition-colors"
           >
             <X className="w-5 h-5" />
@@ -163,6 +170,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                   <button
                     key={cat.id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => setCategory(cat.id)}
                     className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-2 transition-all cursor-pointer ${isSelected
                       ? 'bg-[#d2f000]/10 border-[#d2f000] shadow-[0_0_12px_rgba(210,240,0,0.15)]'
@@ -195,7 +203,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           {/* Subject Field */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#c6c9ab]">
+              <label htmlFor="ticket-subject" className="block text-[11px] font-bold uppercase tracking-wider text-[#c6c9ab]">
                 2. Asunto del Reclamo <span className="text-[#d2f000]">*</span>
               </label>
               <span
@@ -206,7 +214,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               </span>
             </div>
             <input
+              id="ticket-subject"
               type="text"
+              maxLength={TICKET_SUBJECT_MAX_LENGTH}
               placeholder="Ej: Problema al acreditar pago de fichas #19208..."
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -225,7 +235,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           {/* Initial Message Field */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#c6c9ab]">
+              <label htmlFor="ticket-message" className="block text-[11px] font-bold uppercase tracking-wider text-[#c6c9ab]">
                 3. Detalle o Explicación <span className="text-[#d2f000]">*</span>
               </label>
               <span
@@ -236,7 +246,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               </span>
             </div>
             <textarea
+              id="ticket-message"
               rows={4}
+              maxLength={TICKET_MESSAGE_MAX_LENGTH}
               placeholder="Explicá con claridad lo ocurrido (ID de transacción, hora aproximada, detalle del problema)..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}

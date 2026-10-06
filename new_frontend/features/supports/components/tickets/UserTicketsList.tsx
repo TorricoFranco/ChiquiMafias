@@ -192,6 +192,7 @@ export const UserTicketsList: React.FC<UserTicketsListProps> = ({
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#909378]" />
           <input
             type="text"
+            aria-label="Buscar en mis tickets"
             placeholder="Buscar en mis tickets por asunto o ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -202,6 +203,7 @@ export const UserTicketsList: React.FC<UserTicketsListProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           {/* Status Filter */}
           <select
+            aria-label="Filtrar por estado"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-[#131313] border border-[#353534] text-xs font-bold text-[#e5e2e1] px-3 py-2 rounded-xl outline-none cursor-pointer"
@@ -215,6 +217,7 @@ export const UserTicketsList: React.FC<UserTicketsListProps> = ({
 
           {/* Category Filter */}
           <select
+            aria-label="Filtrar por categoría"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="bg-[#131313] border border-[#353534] text-xs font-bold text-[#e5e2e1] px-3 py-2 rounded-xl outline-none cursor-pointer"
@@ -260,10 +263,12 @@ export const UserTicketsList: React.FC<UserTicketsListProps> = ({
             const CategoryIcon = categoryInfo.icon;
 
             return (
-              <div
+              <button
+                type="button"
                 key={ticket.id}
                 onClick={() => onSelectTicket(ticket.id)}
-                className="bg-[#1c1b1b] hover:bg-[#232323] border border-[#353534] hover:border-[#4d4d4c] p-4 rounded-2xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group shadow-sm"
+                aria-label={`Ver ticket: ${ticket.subject}`}
+                className="w-full text-left bg-[#1c1b1b] hover:bg-[#232323] border border-[#353534] hover:border-[#4d4d4c] p-4 rounded-2xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group shadow-sm"
               >
                 <div className="flex items-start gap-3.5 flex-1 min-w-0">
                   <div className="p-2.5 bg-[#131313] border border-[#353534] rounded-xl flex-shrink-0 mt-0.5">
@@ -323,7 +328,7 @@ export const UserTicketsList: React.FC<UserTicketsListProps> = ({
                     <ChevronRight className="w-4 h-4" />
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

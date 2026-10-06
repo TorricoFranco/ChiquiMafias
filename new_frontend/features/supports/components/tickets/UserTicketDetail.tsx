@@ -23,6 +23,7 @@ import {
     TicketCategory,
 } from '../../types';
 import { uploadToCloudinary } from "@/lib/uploadHelper";
+import { TICKET_MESSAGE_MAX_LENGTH } from "../../constants";
 
 interface UserTicketDetailProps {
     ticket: MyTicketDetails;
@@ -368,7 +369,9 @@ export const UserTicketDetail: React.FC<UserTicketDetailProps> = ({
 
                     <textarea
                         rows={3}
+                        aria-label="Tu respuesta"
                         placeholder="Escribe tu mensaje o aclaración..."
+                        maxLength={TICKET_MESSAGE_MAX_LENGTH}
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         className="w-full bg-[#131313] border border-[#353534] focus:border-[#d2f000] text-xs text-[#e5e2e1] p-3 rounded-xl outline-none resize-none transition-colors"
