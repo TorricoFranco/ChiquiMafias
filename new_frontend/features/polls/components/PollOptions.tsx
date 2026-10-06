@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import { usePollSocket } from "@/features/polls/socket/usePollSocket";
 import { Poll } from "@/features/polls/types";
 import { useUserStore } from "@/store/useUserStore";
@@ -18,12 +19,16 @@ export const PollOptions = ({ poll, onVoteUpdate }: { poll: Poll, onVoteUpdate: 
     }, [totalVotes, connected, onVoteUpdate]);
 
     const handleVote = (optionId: number) => {
-        if (!userId || localVotedOptionId) return;
+        if (localVotedOptionId) return;
+        if (!userId) {
+            useUserStore.getState().setLoginModalOpen(true);
+            return;
+        }
         castVote(optionId, userId, (res: any) => {
             if (res.status === "ok" || res.status === "success" || res.success) {
                 setLocalVotedOptionId(optionId);
             } else {
-                console.error("Error al votar:", res.message || res);
+                toast.error(res.message || "No se pudo registrar tu voto");
             }
         });
     };

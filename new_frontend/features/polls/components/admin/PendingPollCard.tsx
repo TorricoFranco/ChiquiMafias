@@ -4,7 +4,7 @@ import { AdminPollItem } from '../../types';
 
 
 export const PendingPollCard = ({ poll, onReject, onApprove }: { poll: AdminPollItem, onReject: (id: string) => void, onApprove: (poll: AdminPollItem) => void }) => (
-  <div className="bg-[#1c1b1b] border border-[#353534] hover:border-[#454932] rounded-2xl p-5 flex flex-col justify-between gap-4">
+  <article aria-label={poll.title} className="bg-[#1c1b1b] border border-[#353534] hover:border-[#454932] rounded-2xl p-5 flex flex-col justify-between gap-4">
     <div className="flex flex-col gap-3">
       {/* Header Info */}
       <div className="flex justify-between items-start border-b border-[#353534] pb-3">
@@ -48,5 +48,5 @@ export const PendingPollCard = ({ poll, onReject, onApprove }: { poll: AdminPoll
         <Check className="w-4 h-4" /> Aprobar
       </button>
     </div>
-  </div>
+  </article>
 );
