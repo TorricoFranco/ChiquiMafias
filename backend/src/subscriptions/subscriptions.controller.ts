@@ -12,6 +12,13 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common'
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 import { SubscriptionsService } from './subscriptions.service'
 import { CheckoutSubscriptionDto } from './dto/checkout-subscription.dto'
 import { CancelSubscriptionDto } from './dto/cancel-subscription.dto'
@@ -35,6 +42,7 @@ import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto'
  * Maneja todos los endpoints relacionados con suscripciones recurrentes
  * integradas con Mercado Pago
  */
+@ApiTags('Subscriptions (Suscripciones)')
 @Controller('subscriptions')
 export class SubscriptionsController {
   private readonly logger = new Logger(SubscriptionsController.name)
@@ -43,11 +51,14 @@ export class SubscriptionsController {
     private readonly subscriptionsService: SubscriptionsService,
     private readonly subscriptionCheckoutService: SubscriptionCheckoutService,
     private readonly subscriptionPricingService: SubscriptionPricingService,
-  ) { }
+  ) {}
 
-  /**
-   * Grilla informativa de planes con precios dinámicos actuales
-   */
+  @ApiOperation({
+    summary: 'Grilla de planes de suscripción con precios dinámicos',
+    description:
+      'Si el usuario está autenticado, devuelve los precios ajustados según su tier actual (ej. costo de upgrade).',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de planes disponibles.' })
   @Get('plans')
   @OptionalAuth()
   @HttpCode(HttpStatus.OK)
@@ -57,7 +68,14 @@ export class SubscriptionsController {
     return await this.subscriptionPricingService.getPlans(userTier)
   }
 
-
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Actualizar la configuración de un plan de suscripción (solo ADMIN)',
+  })
+  @ApiParam({ name: 'id', description: 'ID del plan a actualizar' })
+  @ApiResponse({ status: 200, description: 'Plan actualizado.' })
+  @ApiResponse({ status: 404, description: 'El plan no existe.' })
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)
@@ -65,18 +83,24 @@ export class SubscriptionsController {
     @Param('id') id: string,
     @Body() dto: UpdateSubscriptionPlanDto,
   ) {
-    const updatedPlan = await this.subscriptionsService.updatePlan(id, dto);
+    const updatedPlan = await this.subscriptionsService.updatePlan(id, dto)
 
     return {
       status: 'success',
       message: 'Plan actualizado correctamente',
       data: updatedPlan,
-    };
+    }
   }
 
-  /**
-   * Obtiene los detalles de la suscripción actual del usuario autenticado
-   */
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Detalle de la suscripción actual del usuario logueado',
+  })
+  @ApiResponse({
+    status: 200,
+    type: SubscriptionDetailResponseDto,
+    description: 'Suscripción actual, o null si no tiene.',
+  })
   @Get('me')
   @HttpCode(HttpStatus.OK)
   async getCurrentSubscription(
@@ -89,11 +113,21 @@ export class SubscriptionsController {
     return await this.subscriptionsService.getCurrentSubscription(userId)
   }
 
-  /**
-
- * Inicia el proceso de compra de una suscripción
- * El usuario selecciona el tier deseado y recibe un link de Mercado Pago
- */
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Iniciar el checkout de una suscripción',
+    description:
+      'Crea una suscripción en estado pendiente y devuelve el link de pago (preapproval) de Mercado Pago para el tier elegido. Los beneficios se activan al recibir el webhook de pago aprobado.',
+  })
+  @ApiResponse({
+    status: 200,
+    type: CheckoutSubscriptionResponseDto,
+    description: 'Checkout iniciado.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Usuario no autenticado o tier inválido.',
+  })
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
   async checkout(
@@ -114,11 +148,20 @@ export class SubscriptionsController {
     )
   }
 
-  /**
-
- * Cancela la suscripción ACTIVE del usuario (Estilo Spotify)
- * Los beneficios se mantienen activos hasta el fin del ciclo
- */
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cancelar la suscripción activa (estilo Spotify)',
+    description:
+      'Marca la suscripción para no renovarse; los beneficios se mantienen activos hasta el fin del ciclo ya pagado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Suscripción marcada para cancelación.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Usuario no autenticado o sin suscripción activa.',
+  })
   @Post('cancel')
   @HttpCode(HttpStatus.OK)
   async cancel(
@@ -137,10 +180,22 @@ export class SubscriptionsController {
     )
   }
 
-  /**
-   * Upgradea la suscripción a un tier superior
-   * Genera bonus coins por los días restantes del plan viejo
-   */
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Upgradear la suscripción a un tier superior',
+    description:
+      'Cambia la suscripción activa al tier indicado y acredita monedas de bonificación proporcionales a los días restantes del plan anterior.',
+  })
+  @ApiResponse({
+    status: 200,
+    type: UpgradeSubscriptionResponseDto,
+    description: 'Upgrade realizado.',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Usuario no autenticado o no tiene una suscripción activa para upgradear.',
+  })
   @Post('upgrade')
   @HttpCode(HttpStatus.OK)
   async upgrade(
@@ -161,7 +216,17 @@ export class SubscriptionsController {
     )
   }
 
-
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Borrar todas las suscripciones de un usuario (solo ADMIN)',
+    description:
+      'Operación destructiva de soporte/testing: elimina el historial de suscripciones del usuario indicado.',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'ID del usuario cuyas suscripciones se eliminan',
+  })
+  @ApiResponse({ status: 200, description: 'Suscripciones eliminadas.' })
   @Delete('admin/reset/:userId')
   @UseGuards(RolesGuard)
   @Roles(SystemRole.ADMIN)

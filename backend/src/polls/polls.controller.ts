@@ -8,13 +8,15 @@ import {
   Patch,
   HttpCode,
   HttpStatus,
-  Query
+  Query,
 } from '@nestjs/common'
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { SystemRole } from '../auth/enums/roles.enum'
@@ -28,26 +30,39 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator'
 import { Public } from 'src/auth/decorators/auth.decorator'
 import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { ReactDto } from './dto/reaction.dto';
-
+import { CreateCommentDto } from './dto/create-comment.dto'
+import { ReactDto } from './dto/reaction.dto'
 
 @ApiTags('Polls (Encuestas)')
 @Controller('polls')
 export class PollsController {
-  constructor(private readonly pollsService: PollsService) { }
+  constructor(private readonly pollsService: PollsService) {}
 
-
+  @ApiOperation({ summary: 'Historial paginado de encuestas cerradas' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página (default 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Resultados por página (default 10)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de encuestas cerradas.',
+  })
   @Get('history')
   async getHistory(
     @Query('page') page: string,
     @Query('limit') limit: string,
-    @GetUser('id') userId: string
+    @GetUser('id') userId: string,
   ) {
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 10;
+    const pageNum = parseInt(page, 10) || 1
+    const limitNum = parseInt(limit, 10) || 10
 
-    return this.pollsService.getClosedPolls(pageNum, limitNum, userId);
+    return this.pollsService.getClosedPolls(pageNum, limitNum, userId)
   }
 
   @Post('propose')
@@ -55,6 +70,14 @@ export class PollsController {
   @ApiOperation({
     summary:
       'Proponer una encuesta gastando 1 consumible CUSTOM_POLL (CLIENTE)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Encuesta propuesta, queda pendiente de aprobación.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'El usuario no tiene el consumible CUSTOM_POLL disponible.',
   })
   async propose(@Body() dto: ProposePollDto, @GetUser('id') userId: string) {
     return this.pollsService.proposePoll(userId, dto)
@@ -65,7 +88,13 @@ export class PollsController {
   @UseGuards(RolesGuard)
   @Roles(SystemRole.MODERATOR)
   @ApiOperation({
-    summary: 'Aprobar y activar una encuesta pendiente (Solo ADMIN)',
+    summary: 'Aprobar y activar una encuesta pendiente (Solo MODERATOR+)',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la encuesta pendiente' })
+  @ApiResponse({ status: 200, description: 'Encuesta aprobada y activada.' })
+  @ApiResponse({
+    status: 404,
+    description: 'La encuesta no existe o no está pendiente.',
   })
   async approve(@Param('id') id: string, @Body() dto: ApprovePollDto) {
     return this.pollsService.approvePoll(id, dto)
@@ -77,7 +106,16 @@ export class PollsController {
   @Roles(SystemRole.MODERATOR)
   @ApiOperation({
     summary:
-      'Rechazar una encuesta pendiente y reembolsar el consumible (Solo ADMIN)',
+      'Rechazar una encuesta pendiente y reembolsar el consumible (Solo MODERATOR+)',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la encuesta pendiente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Encuesta rechazada y consumible reembolsado.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La encuesta no existe o no está pendiente.',
   })
   async reject(@Param('id') id: string) {
     return this.pollsService.rejectPoll(id)
@@ -87,7 +125,7 @@ export class PollsController {
   @ApiBearerAuth()
   @UseGuards(RolesGuard)
   @Roles(SystemRole.MODERATOR)
-  @ApiOperation({ summary: 'Crear una nueva encuesta (Solo ADMIN)' })
+  @ApiOperation({ summary: 'Crear una nueva encuesta (Solo MODERATOR+)' })
   @ApiResponse({
     status: 201,
     description: 'La encuesta fue creada exitosamente.',
@@ -103,7 +141,7 @@ export class PollsController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Prohibido (El usuario no tiene el rol ADMIN).',
+    description: 'Prohibido (el usuario no tiene rol MODERATOR o superior).',
   })
   async create(@Body() createPollDto: CreatePollDto) {
     return this.pollsService.createPoll(createPollDto)
@@ -114,8 +152,9 @@ export class PollsController {
   @UseGuards(RolesGuard)
   @Roles(SystemRole.MODERATOR)
   @ApiOperation({
-    summary: 'Obtener encuestas pendientes de aprobación (Solo ADMIN)',
+    summary: 'Obtener encuestas pendientes de aprobación (Solo MODERATOR+)',
   })
+  @ApiResponse({ status: 200, description: 'Lista de encuestas pendientes.' })
   async findPending() {
     return this.pollsService.getPendingPolls()
   }
@@ -125,8 +164,9 @@ export class PollsController {
   @UseGuards(RolesGuard)
   @Roles(SystemRole.MODERATOR)
   @ApiOperation({
-    summary: 'Cerrar manualmente una encuesta activa (Solo ADMIN)',
+    summary: 'Cerrar manualmente una encuesta activa (Solo MODERATOR+)',
   })
+  @ApiParam({ name: 'id', description: 'ID de la encuesta a cerrar' })
   @ApiResponse({
     status: 200,
     description:
@@ -143,7 +183,7 @@ export class PollsController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Prohibido (Se requiere rol ADMIN).',
+    description: 'Prohibido (se requiere rol MODERATOR o superior).',
   })
   @ApiResponse({
     status: 404,
@@ -156,70 +196,116 @@ export class PollsController {
   @Get('active')
   @OptionalAuth()
   @ApiOperation({
-    summary: 'Obtener encuestas que estén actualmente activas (Público / Autenticado)',
+    summary:
+      'Obtener encuestas que estén actualmente activas (Público / Autenticado)',
   })
   async findActive(@GetUser('id') userId?: string) {
-    return this.pollsService.getActivePolls(userId);
+    return this.pollsService.getActivePolls(userId)
   }
 
   @Get(':id/comments')
   @OptionalAuth()
   @ApiOperation({ summary: 'Obtener comentarios de una encuesta (Paginados)' })
+  @ApiParam({ name: 'id', description: 'ID de la encuesta' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Número de página (default 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Resultados por página (default 20)',
+  })
+  @ApiResponse({ status: 200, description: 'Lista paginada de comentarios.' })
   async getComments(
     @Param('id') pollId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
   ) {
-    return this.pollsService.getPollComments(pollId, Number(page), Number(limit));
+    return this.pollsService.getPollComments(
+      pollId,
+      Number(page),
+      Number(limit),
+    )
   }
 
-
   @Get('rewards/pending')
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Obtiene la cantidad de encuestas votadas sin reclamar' })
+  @ApiOperation({
+    summary: 'Obtiene la cantidad de encuestas votadas sin reclamar',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cantidad de recompensas pendientes de reclamo.',
+  })
   async getPendingRewards(@GetUser('id') userId: string) {
-    return await this.pollsService.getPendingRewardsCount(userId);
+    return await this.pollsService.getPendingRewardsCount(userId)
   }
 
   @Post(':id/comments')
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Comentar en una encuesta' })
+  @ApiParam({ name: 'id', description: 'ID de la encuesta' })
+  @ApiResponse({ status: 201, description: 'Comentario creado.' })
+  @ApiResponse({ status: 404, description: 'La encuesta no existe.' })
   async addComment(
     @Param('id') pollId: string,
     @GetUser('id') userId: string,
     @Body() dto: CreateCommentDto,
   ) {
-    return this.pollsService.addComment(pollId, userId, dto);
+    return this.pollsService.addComment(pollId, userId, dto)
   }
 
   @Post(':id/react')
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Dar Like o Dislike a una encuesta' })
+  @ApiParam({ name: 'id', description: 'ID de la encuesta' })
+  @ApiResponse({
+    status: 201,
+    description: 'Reacción registrada o actualizada.',
+  })
   async reactToPoll(
     @Param('id') pollId: string,
     @GetUser('id') userId: string,
     @Body() dto: ReactDto,
   ) {
-    return this.pollsService.reactToPoll(pollId, userId, dto.type);
+    return this.pollsService.reactToPoll(pollId, userId, dto.type)
   }
 
   @Post('comments/:commentId/react')
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Dar Like o Dislike a un comentario' })
+  @ApiParam({ name: 'commentId', description: 'ID del comentario' })
+  @ApiResponse({
+    status: 201,
+    description: 'Reacción registrada o actualizada.',
+  })
   async reactToComment(
     @Param('commentId') commentId: string,
     @GetUser('id') userId: string,
     @Body() dto: ReactDto,
   ) {
-    return this.pollsService.reactToComment(commentId, userId, dto.type);
+    return this.pollsService.reactToComment(commentId, userId, dto.type)
   }
 
   @Post('rewards/claim-all')
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reclama las monedas de todas las encuestas pendientes' })
+  @ApiOperation({
+    summary:
+      'Reclama las monedas de todas las encuestas votadas pendientes de reclamo',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Monedas acreditadas por las recompensas reclamadas.',
+  })
   async claimAllRewards(@GetUser('id') userId: string) {
-    return await this.pollsService.claimAllPendingRewards(userId);
+    return await this.pollsService.claimAllPendingRewards(userId)
   }
-
 }

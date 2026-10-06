@@ -1,5 +1,5 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger'
 import { MatchesService } from './matches.service'
 import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
@@ -10,14 +10,22 @@ import { Public } from 'src/auth/decorators/auth.decorator'
 @Controller('matches')
 @Public()
 export class MatchesController {
-  constructor(private readonly matchesService: MatchesService) { }
+  constructor(private readonly matchesService: MatchesService) {}
 
   @Get('leagues/:leagueId/seasons/:season/matches/:matchId')
-  @ApiOperation({ summary: 'Detalles completos de un partido' })
+  @ApiOperation({
+    summary: 'Detalles completos de un partido',
+    description:
+      'Combina datos del fixture, equipos y estado en vivo (cacheado en Redis) para un partido puntual.',
+  })
+  @ApiParam({ name: 'leagueId', description: 'ID de la liga' })
+  @ApiParam({ name: 'season', description: 'Temporada (ej. 2026)' })
+  @ApiParam({ name: 'matchId', description: 'ID del partido' })
   @ApiResponse({
     status: 200,
     type: MatchDetailsResponseDto,
   })
+  @ApiResponse({ status: 404, description: 'El partido no existe.' })
   async getMatchDetails(
     @Param('leagueId') leagueId: string,
     @Param('season') season: string,
@@ -28,12 +36,13 @@ export class MatchesController {
 
   @Get(':matchId/events')
   @ApiOperation({ summary: 'Público: Eventos de un partido por matchId' })
+  @ApiParam({ name: 'matchId', description: 'ID del partido' })
   @ApiResponse({
     status: 200,
     description:
       'Lista ordenada cronológicamente de los eventos del partido (Goles, Tarjetas, Cambios).',
     type: MatchEventResponseDto,
-    isArray: true, 
+    isArray: true,
   })
   @ApiResponse({
     status: 404,
@@ -55,6 +64,7 @@ export class MatchesController {
   @ApiOperation({
     summary: 'Público: Información estadística previa al partido por matchId',
   })
+  @ApiParam({ name: 'matchId', description: 'ID del partido' })
   @ApiResponse({
     status: 200,
     description:

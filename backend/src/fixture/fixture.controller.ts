@@ -1,6 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common'
 
-import { ApiResponse, ApiParam, ApiOperation } from '@nestjs/swagger'
+import { ApiResponse, ApiParam, ApiOperation, ApiTags } from '@nestjs/swagger'
 
 import { FixtureService } from './fixture.service'
 
@@ -13,10 +13,11 @@ import { TournamentBracketsResponseDto } from './dto/response/tournament-bracket
 import { AvailableStagesResponseDto } from './dto/response/available-stages.dto'
 import { Public } from 'src/auth/decorators/auth.decorator'
 
+@ApiTags('Fixtures')
 @Public()
 @Controller('fixtures')
 export class FixtureController {
-  constructor(private readonly fixturesService: FixtureService) { }
+  constructor(private readonly fixturesService: FixtureService) {}
 
   @Get('seasons/:season/tournaments/:tournament/matchday/:matchday')
   @ApiOperation({
