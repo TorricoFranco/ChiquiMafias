@@ -362,8 +362,8 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
         away_team: { id: 'huracan', name: 'Huracán (5°A)', logo_url: 'https://media.api-sports.io/football/teams/440.png' },
         home_goals: 2,
         away_goals: 2,
-        home_pen: 4,
-        away_pen: 2,
+        home_penalty_goals: 4,
+        away_penalty_goals: 2,
         status_short: 'PEN',
         winnerTeamId: 'independiente',
     },
@@ -652,6 +652,8 @@ export function processStandingsWithSimulations(
     // Apply simulated scores
     for (const sim of simList) {
         const { h, a, homeTeamId, awayTeamId } = sim;
+        // Un resultado simulado a medio cargar todavía no cuenta como partido jugado.
+        if (h === null || a === null) continue;
         const allGroups = [apA, apB, clA, clB];
 
         for (const group of allGroups) {

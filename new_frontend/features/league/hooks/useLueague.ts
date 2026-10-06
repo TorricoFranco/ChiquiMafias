@@ -9,7 +9,8 @@ import {
   FullStandings,
   MatchStatus,
   BracketMatch,
-  AvailableStages
+  AvailableStages,
+  AverageRow
 } from '../type';
 
 import {
@@ -142,7 +143,6 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
 
   const currentRoundMatches = useMemo<LeagueMatch[]>(() => {
     if (!liveMatches) return [];
-    console.log(liveMatches)
     return liveMatches.map((m) => ({
       id: m.id,
       tournament: activeTournament,
