@@ -12,7 +12,7 @@ export class AdminAddCoinsDto {
 
   @ApiProperty({
     description:
-      'Cantidad de monedas a acreditar. La operación falla si el saldo resultante supera el tope MAX_COIN_BALANCE (50000).',
+      'Cantidad de monedas a acreditar. Si el saldo resultante superaría el tope MAX_COIN_BALANCE (50000), se recorta en silencio a ese tope en vez de fallar.',
     example: 100,
     minimum: 1,
   })

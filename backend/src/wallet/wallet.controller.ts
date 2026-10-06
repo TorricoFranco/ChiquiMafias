@@ -45,15 +45,15 @@ export class WalletController {
   @ApiOperation({
     summary: 'Acreditar monedas a un usuario (solo PRESIDENT)',
     description:
-      'Acredita monedas a cualquier usuario como regalo administrativo (TransactionType.ADMIN_GIFT). Falla si el saldo resultante supera el tope MAX_COIN_BALANCE (50000).',
+      'Acredita monedas a cualquier usuario como regalo administrativo (TransactionType.ADMIN_GIFT). Si el saldo resultante superaría el tope MAX_COIN_BALANCE (50000), se recorta en silencio a ese tope (no lanza error) y solo se registra la diferencia realmente acreditada.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Wallet actualizada con el nuevo saldo.',
+    description: 'Wallet actualizada con el nuevo saldo (recortado al tope si corresponde).',
   })
   @ApiResponse({
     status: 400,
-    description: 'El acreditado supera el tope máximo de saldo.',
+    description: 'El monto a acreditar es menor o igual a cero.',
   })
   @Post('admin/add-coins')
   @Roles(SystemRole.PRESIDENT)
