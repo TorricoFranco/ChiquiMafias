@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { betsApi } from '@/features/bets/api/betsApi';              
-import { Market } from '@/features/bets/types/index';
+import { Market, TeamMetadata } from '@/features/bets/types/index';
 
 export const useMarkets = () => {
   const query = useQuery<Market[]>({
@@ -21,10 +21,10 @@ export const useMarkets = () => {
     markets.filter((m) => m.type !== 'MATCH'), 
   [markets]);
 
-  const getMarketByTeams = (teamA: string, teamB: string) => {
-    return matchMarkets.find(m => 
-      m.metadata?.homeTeam?.short === teamA || m.metadata?.homeTeam?.name === teamA ||
-      m.metadata?.awayTeam?.short === teamB || m.metadata?.awayTeam?.name === teamB
+  const getMarketByTeams = (homeTeam: string, awayTeam: string) => {
+    const isTeam = (team: TeamMetadata | undefined, name: string) => team?.short === name || team?.name === name;
+    return matchMarkets.find((m) =>
+      isTeam(m.metadata?.homeTeam, homeTeam) && isTeam(m.metadata?.awayTeam, awayTeam)
     );
   };
 

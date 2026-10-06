@@ -33,7 +33,7 @@ export const BetsCarousel: React.FC = () => {
         >
             <div className="flex items-center justify-between mb-3">
                 <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-[#d2f000]">
+                    <span aria-hidden="true" className="material-symbols-outlined text-sm text-[#d2f000]">
                         trending_up
                     </span>
                     MERCADOS DESTACADOS
@@ -42,8 +42,11 @@ export const BetsCarousel: React.FC = () => {
                 {markets.length > 1 && (
                     <div className="flex gap-1">
                         {markets.map((_, idx) => (
-                            <div
+                            <button
+                                type="button"
                                 key={idx}
+                                aria-label={`Ver mercado ${idx + 1} de ${markets.length}`}
+                                aria-current={idx === currentIndex ? "true" : undefined}
                                 onClick={() => setCurrentIndex(idx)}
                                 className={`w-2 h-2 rounded-full cursor-pointer transition-all ${idx === currentIndex
                                         ? 'bg-[#d2f000]'

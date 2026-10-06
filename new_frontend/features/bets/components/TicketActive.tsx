@@ -13,9 +13,10 @@ export const TicketActive = () => {
     const balance = useUserStore((state) => state.balance);
     const { ticketItems, updateAmount, removeItem, clearTicket } = useTicketStore();
 
+    // En móvil la hoja no se abre sola: taparía los mercados y no dejaría sumar más selecciones.
+    // La barra colapsada muestra el contador y se abre al tocarla.
     useEffect(() => {
         if (ticketItems.length > 0) {
-            setIsOpenMobile(true);
             setIsDesktopOpen(true);
         } else {
             setIsOpenMobile(false);
@@ -39,9 +40,10 @@ export const TicketActive = () => {
         try {
             for (const item of ticketItems) {
                 await betsApi.placeBet(item.marketId, item.optionId, item.betAmount);
+                // Si falla una posterior, las ya hechas no deben quedar en el ticket para reenviarse.
+                removeItem(item.marketId, item.optionId);
             }
             toast.success('¡Apuestas confirmadas con éxito!');
-            clearTicket();
             setIsOpenMobile(false);
         } catch (error: any) {
             toast.error(error.message || 'Hubo un error al colocar la apuesta');
@@ -51,7 +53,7 @@ export const TicketActive = () => {
     };
 
     const renderContent = (isMobile = false) => (
-        <aside className={`w-full flex-shrink-0 bg-[#1c1b1b] border-[#353534] flex flex-col overflow-hidden ${isMobile ? 'border-none rounded-none h-full' : 'border rounded-xl max-h-[calc(100vh-220px)]'
+        <aside aria-label="Mi ticket" className={`w-full flex-shrink-0 bg-[#1c1b1b] border-[#353534] flex flex-col overflow-hidden ${isMobile ? 'border-none rounded-none h-full' : 'border rounded-xl max-h-[calc(100vh-220px)]'
             }`}>
             <div className="bg-[#131313] px-3 py-2.5 border-b border-[#353534] flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-[#e5e2e1] font-bold text-xs tracking-wider uppercase">
@@ -103,7 +105,7 @@ export const TicketActive = () => {
                                     <span className="text-[10px] text-[#c6c9ab] font-semibold leading-tight pr-5 uppercase tracking-wider line-clamp-1">
                                         {item.matchTitle}
                                     </span>
-                                    <button onClick={() => removeItem(item.marketId, item.optionId)} className="absolute top-2 right-2 p-0.5 text-[#353534] hover:text-[#ffb4ab] hover:bg-[#ffb4ab]/10 rounded transition-colors">
+                                    <button onClick={() => removeItem(item.marketId, item.optionId)} aria-label={`Quitar ${item.selectionLabel} del ticket`} className="absolute top-2 right-2 p-0.5 text-[#353534] hover:text-[#ffb4ab] hover:bg-[#ffb4ab]/10 rounded transition-colors">
                                         <Trash2 className="w-3 h-3" />
                                     </button>
                                 </div>
@@ -119,10 +121,11 @@ export const TicketActive = () => {
                                         <span className="text-[11px] text-[#c6c9ab]">Monto a apostar</span>
                                         <div className="flex items-center gap-1.5">
                                             <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0">
-                                                <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover opacity-80" />
+                                                <img src="/icons/chiqui-coin-icon.png" alt="" className="w-full h-full object-cover opacity-80" />
                                             </div>
                                             <input
                                                 type="number"
+                                                aria-label={`Monto a apostar en ${item.selectionLabel}`}
                                                 min="10"
                                                 step="50"
                                                 value={item.betAmount || ''}
@@ -194,6 +197,7 @@ export const TicketActive = () => {
 
                 <button
                     onClick={handleConfirmBets}
+                    aria-label={isSubmitting ? undefined : `Confirmar (${totalBet})`}
                     disabled={ticketItems.length === 0 || !hasEnoughCoins || totalBet <= 0 || isSubmitting}
                     className={`w-full py-2.5 rounded-lg font-extrabold text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${ticketItems.length === 0 || !hasEnoughCoins || totalBet <= 0 || isSubmitting
                         ? 'bg-[#1c1b1b] border border-[#353534] text-[#353534] cursor-not-allowed'
@@ -240,42 +244,45 @@ export const TicketActive = () => {
                 )}
             </div>
 
-            {/* VISTA MOBILE */}
-            <div className="block lg:hidden fixed bottom-0 left-0 right-0 z-50">
-                <div
-                    className={`bg-[#1c1b1b] border-t border-[#353534] rounded-t-2xl transition-transform duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col ${isOpenMobile ? 'translate-y-0 h-[80vh]' : 'translate-y-[calc(100%-56px)]'
-                        }`}
-                >
-                    <button
-                        onClick={() => setIsOpenMobile(!isOpenMobile)}
-                        className="w-full h-[56px] flex-shrink-0 flex items-center justify-between px-4 bg-[#131313] rounded-t-2xl border-b border-[#353534]"
+            {/* VISTA MOBILE: solo con selecciones; bottom-16 la deja arriba de la MobileNav fija */}
+            {ticketItems.length > 0 && (
+                <div className="block lg:hidden fixed bottom-16 left-0 right-0 z-40">
+                    <div
+                        className={`bg-[#1c1b1b] border-t border-[#353534] rounded-t-2xl transition-transform duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col ${isOpenMobile ? 'translate-y-0 h-[80vh]' : 'translate-y-[calc(100%-56px)]'
+                            }`}
                     >
-                        <div className="flex items-center gap-2">
-                            <Receipt className="w-4 h-4 text-[#d2f000]" />
-                            <span className="font-extrabold text-[#e5e2e1] text-xs uppercase tracking-wider">
-                                TICKET ({ticketItems.length})
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <span className="font-mono font-bold text-[#d2f000] text-xs flex items-center gap-1">
-                                <div className="w-3.5 h-3.5 rounded-full overflow-hidden flex-shrink-0">
-                                    <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover" />
-                                </div>
-                                <span>{totalBet}</span>
-                            </span>
-                            {isOpenMobile ? (
-                                <ChevronDown className="w-4 h-4 text-[#c6c9ab]" />
-                            ) : (
-                                <ChevronUp className="w-4 h-4 text-[#c6c9ab] animate-bounce" />
-                            )}
-                        </div>
-                    </button>
+                        <button
+                            onClick={() => setIsOpenMobile(!isOpenMobile)}
+                            aria-expanded={isOpenMobile}
+                            className="w-full h-[56px] flex-shrink-0 flex items-center justify-between px-4 bg-[#131313] rounded-t-2xl border-b border-[#353534]"
+                        >
+                            <div className="flex items-center gap-2">
+                                <Receipt className="w-4 h-4 text-[#d2f000]" />
+                                <span className="font-extrabold text-[#e5e2e1] text-xs uppercase tracking-wider">
+                                    TICKET ({ticketItems.length})
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-mono font-bold text-[#d2f000] text-xs flex items-center gap-1">
+                                    <div className="w-3.5 h-3.5 rounded-full overflow-hidden flex-shrink-0">
+                                        <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover" />
+                                    </div>
+                                    <span>{totalBet}</span>
+                                </span>
+                                {isOpenMobile ? (
+                                    <ChevronDown className="w-4 h-4 text-[#c6c9ab]" />
+                                ) : (
+                                    <ChevronUp className="w-4 h-4 text-[#c6c9ab] animate-bounce" />
+                                )}
+                            </div>
+                        </button>
 
-                    <div className="flex-1 overflow-hidden flex flex-col">
-                        {renderContent(true)}
+                        <div className="flex-1 overflow-hidden flex flex-col">
+                            {renderContent(true)}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </>
     );
 };

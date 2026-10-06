@@ -1,9 +1,9 @@
 import React from 'react';
 import { Layers, Coins, DollarSign, PlusCircle } from 'lucide-react';
-import { AdminMarket } from '../../types';
+import { Market } from '../../types';
 
 interface AdminBetsStatsProps {
-  markets: AdminMarket[];
+  markets: Market[];
   totalPoolCoins: number;
   onOpenCreateModal: () => void;
 }

@@ -82,7 +82,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   const totalPool = market.options?.reduce((sum, option) => sum + (option.totalStaked || 0), 0) || 0;
 
   return (
-    <article className={`flex flex-col gap-4 transition-all ${isCarouselMode
+    <article aria-label={market.title} className={`flex flex-col gap-4 transition-all ${isCarouselMode
       ? 'w-full'
       : 'bg-[#1c1b1b] border border-[#353534] border-l-4 border-l-[#d2f000] rounded-xl p-4 hover:border-[#d2f000]/60'
       }`}>
@@ -158,6 +158,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
               key={option.id}
               onClick={() => toggleBet(option)}
               disabled={market.status === 'LOCKED'}
+              aria-pressed={isSelected}
               className={`flex-1 rounded py-2 relative overflow-hidden transition-all border cursor-pointer ${isSelected
                 ? 'bg-[#d2f000] border-[#d2f000] text-[#191e00] font-bold shadow-[0_0_12px_rgba(210,240,0,0.3)]'
                 : 'bg-[#131313] border-[#353534] hover:border-[#d2f000]/60 text-[#e5e2e1]'
@@ -186,6 +187,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#c6c9ab] font-bold">$</span>
               <input
                 type="number"
+                aria-label="Monto a apostar"
                 value={betAmount}
                 onChange={(e) => setBetAmount(e.target.value)}
                 placeholder="0.00"
