@@ -41,7 +41,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
             : 'border-[#353534] hover:border-[#454932]');
 
     return (
-        <div className={`bg-[#1c1b1b] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all duration-300 group relative ${cardStyles}`}>
+        <article aria-label={item.name} className={`bg-[#1c1b1b] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all duration-300 group relative ${cardStyles}`}>
 
             {/* Brillo de fondo para ítems exclusivos */}
             {isExclusive && (
@@ -195,6 +195,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                     </button>
                 )}
             </div>
-        </div>
+        </article>
     );
 };

@@ -49,6 +49,17 @@ export interface UpgradeSubscriptionResponse {
   message: string;
 }
 
+export interface CancelSubscriptionResponse {
+  message: string;
+  subscription: {
+    id: string;
+    tier: SubscriptionTier;
+    status: SubscriptionStatus;
+    endsAt: string | null;
+  };
+  benefitsActiveUntil: string | null;
+}
+
 export interface SubscriptionDetailResponse {
   id: string | null;
   currentActualTier: SubscriptionTier | null;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Crown, Zap, ShoppingBag, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { StoreHeroBanner } from './StoreHeroBanner';
 import { SubscriptionTab } from '@/features/subscriptions/components/SubscriptionTab';
 import { CoinPacksTab } from './CoinPacksTab';
@@ -60,7 +61,7 @@ export const StoreView: React.FC = () => {
         try {
             await buyCoinPack(packId);
         } catch (error) {
-            console.error('Error al generar la preferencia de MP:', error);
+            toast.error(error instanceof Error && error.message ? error.message : 'No pudimos iniciar el pago. Probá de nuevo.');
         }
     };
 
@@ -126,8 +127,10 @@ export const StoreView: React.FC = () => {
                 expiresAt={globalExpiresAt}
             />
 
-            <div className="flex flex-wrap items-center gap-3 border-b border-[#353534] pb-4">
+            <div role="tablist" className="flex flex-wrap items-center gap-3 border-b border-[#353534] pb-4">
                 <button
+                    role="tab"
+                    aria-selected={activeTab === 'suscripciones'}
                     onClick={() => setActiveTab('suscripciones')}
                     className={`h-12 px-5 rounded-xl font-extrabold text-xs md:text-sm uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'suscripciones'
                         ? 'bg-[#d2f000] text-[#191e00] shadow-[0_0_15px_rgba(210,240,0,0.3)] scale-[1.02]'
@@ -138,6 +141,8 @@ export const StoreView: React.FC = () => {
                     <span>Suscripciones VIP (Mercado Pago $ARS)</span>
                 </button>
                 <button
+                    role="tab"
+                    aria-selected={activeTab === 'coins'}
                     onClick={() => setActiveTab('coins')}
                     className={`h-12 px-5 rounded-xl font-extrabold text-xs md:text-sm uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'coins'
                         ? 'bg-[#009ee3] text-white shadow-[0_0_15px_rgba(0,158,227,0.3)] scale-[1.02]'
@@ -148,6 +153,8 @@ export const StoreView: React.FC = () => {
                     <span>Packs Chiqui-Coins ($ARS)</span>
                 </button>
                 <button
+                    role="tab"
+                    aria-selected={activeTab === 'cosmeticos'}
                     onClick={() => setActiveTab('cosmeticos')}
                     className={`h-12 px-5 rounded-xl font-extrabold text-xs md:text-sm uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'cosmeticos'
                         ? 'bg-[#353534] text-[#d2f000] border border-[#d2f000] shadow-[0_0_15px_rgba(210,240,0,0.2)] scale-[1.02]'
@@ -158,7 +165,7 @@ export const StoreView: React.FC = () => {
                     <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
                         <img
                             src="/icons/chiqui-coin-icon.png"
-                            alt="Chiqui Coin"
+                            alt=""
                             className="w-full h-full object-cover"
                         />
                     </div>
@@ -194,7 +201,12 @@ export const StoreView: React.FC = () => {
             {/* MODAL DE COMPRA DE COSMÉTICOS (NO TOCA MP) */}
             {purchaseModalOpen && itemToBuy && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-[#1c1b1b] border border-[#353534] p-6 rounded-2xl w-full max-w-sm flex flex-col gap-5 shadow-2xl">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Confirmar Compra"
+                        className="bg-[#1c1b1b] border border-[#353534] p-6 rounded-2xl w-full max-w-sm flex flex-col gap-5 shadow-2xl"
+                    >
                         <div className="flex flex-col gap-1">
                             <h3 className="font-extrabold text-xl text-white">Confirmar Compra</h3>
                             <p className="text-sm text-[#c6c9ab]">

@@ -25,8 +25,9 @@ export const CoinPacksTab: React.FC<CoinPacksTabProps> = ({ packs, onBuyPack }) 
             {/* Grilla de Packs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {activePacks.map((pack) => (
-                    <div
+                    <article
                         key={pack.id}
+                        aria-label={pack.name}
                         className={`group bg-[#151515] rounded-3xl p-6 flex flex-col relative transition-all duration-300 hover:-translate-y-2 ${pack.isPopular // Cambiado a usar la propiedad del modelo
                                 ? 'border-2 border-[#009ee3] shadow-[0_10px_40px_rgba(0,158,227,0.15)]'
                                 : 'border border-[#2a2a2a] hover:border-[#454932] shadow-lg'
@@ -96,7 +97,7 @@ export const CoinPacksTab: React.FC<CoinPacksTabProps> = ({ packs, onBuyPack }) 
                                 Comprar
                             </button>
                         </div>
-                    </div>
+                    </article>
                 ))}
             </div>
 

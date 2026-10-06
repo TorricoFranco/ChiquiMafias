@@ -91,8 +91,9 @@ export const SubscriptionTab: React.FC<SubscriptionTabProps> = ({
             uiConfig?.badgeColor || (isPopular ? '#d2f000' : isVip ? '#e5e2e1' : '#909378');
 
           return (
-            <div
+            <article
               key={plan.id}
+              aria-label={plan.name}
               className={`relative bg-[#1c1b1b] border rounded-2xl p-6 flex flex-col justify-between transition-all duration-300 ${isCurrentPlan
                 ? 'border-[#d2f000] shadow-[0_0_25px_rgba(210,240,0,0.15)] ring-1 ring-[#d2f000]/50'
                 : isPopular
@@ -256,7 +257,7 @@ export const SubscriptionTab: React.FC<SubscriptionTabProps> = ({
                   </button>
                 )}
               </div>
-            </div>
+            </article>
           );
         })}
       </div>
