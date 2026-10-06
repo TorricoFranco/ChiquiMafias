@@ -20,6 +20,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
         <Filter className="w-3.5 h-3.5 text-[#d2f000]" /> Filtrar:
       </span>
       <select
+        aria-label="Filtrar reportes por estado"
         value={statusFilter}
         onChange={(e) => onStatusFilterChange(e.target.value)}
         className="bg-[#131313] border border-[#353534] text-xs font-bold text-[#e5e2e1] px-3 py-1.5 rounded-lg outline-none cursor-pointer"
@@ -31,6 +32,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({
       </select>
 
       <select
+        aria-label="Filtrar reportes por razón"
         value={reasonFilter}
         onChange={(e) => onReasonFilterChange(e.target.value)}
         className="bg-[#131313] border border-[#353534] text-xs font-bold text-[#e5e2e1] px-3 py-1.5 rounded-lg outline-none cursor-pointer"

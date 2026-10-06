@@ -15,7 +15,7 @@ import { UserEntity } from '../../types';
 import { ROLE_UI_CONFIG, TIER_UI_CONFIG, SubscriptionTier } from '@/features/auth/constants/ROLES_SUBSCRIPTION';
 import { AddCoinsModal } from './AdminAddCoinsModal';
 
-const SUBSCRIPTION_TRANSLATIONS: Record<SubscriptionTier, string> = {
+const SUBSCRIPTION_TRANSLATIONS: Partial<Record<SubscriptionTier, string>> = {
     [SubscriptionTier.TIER_1]: 'Popular',
     [SubscriptionTier.TIER_2]: 'Plateísta Pro',
     [SubscriptionTier.TIER_3]: 'Palco VIP',
@@ -66,6 +66,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#909378]" />
                     <input
                         type="text"
+                        aria-label="Buscar usuarios"
                         placeholder="Buscar por usuario, nombre o email..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -75,6 +76,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
 
                 <div className="flex items-center gap-2">
                     <select
+                        aria-label="Filtrar usuarios por rol"
                         value={roleFilter}
                         onChange={(e) => setRoleFilter(e.target.value)}
                         className="bg-[#131313] border border-[#353534] text-xs font-bold text-[#e5e2e1] px-3 py-2 rounded-xl outline-none cursor-pointer"
@@ -87,6 +89,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
                     </select>
 
                     <select
+                        aria-label="Filtrar usuarios por estado"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="bg-[#131313] border border-[#353534] text-xs font-bold text-[#e5e2e1] px-3 py-2 rounded-xl outline-none cursor-pointer"
@@ -107,6 +110,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
                                 <th className="py-3 px-4">Usuario</th>
                                 <th className="py-3 px-4">Club / Equipo</th>
                                 <th className="py-3 px-4">Rol & Nivel</th>
+                                <th className="py-3 px-4">Suscripción</th>
                                 <th className="py-3 px-4">Racha</th>
                                 <th className="py-3 px-4">Estado</th>
                                 <th className="py-3 px-4 text-right">Acciones Moderación</th>

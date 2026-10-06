@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { supportApi } from '../api/supportsApi';
 import { ReportStatus, TicketStatus, TicketCategory, ResolveReportPayload, TicketMessagePayload } from '../types';
 
@@ -64,8 +65,14 @@ export const useAdminUpdateTicketStatus = () => {
     return useMutation({
         mutationFn: ({ ticketId, status }: { ticketId: string; status: TicketStatus }) =>
             supportApi.adminUpdateTicketStatus(ticketId, status),
-        onSuccess: () => {
+        onSuccess: (_data, { ticketId }) => {
             queryClient.invalidateQueries({ queryKey: ['admin-tickets'] });
+            // El <select> de estado se controla con el detalle: sin esto vuelve al valor viejo.
+            queryClient.invalidateQueries({ queryKey: ['admin-ticket-details', ticketId] });
+            queryClient.invalidateQueries({ queryKey: ['admin-support-stats'] });
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || 'No se pudo actualizar el estado del ticket');
         },
     });
 };
@@ -76,7 +83,9 @@ export const useAdminResolveReport = () => {
         mutationFn: ({ reportId, data }: { reportId: string; data: ResolveReportPayload }) =>
             supportApi.adminResolveReport(reportId, data),
         onSuccess: () => {
+            toast.success('Reporte resuelto y sanción aplicada');
             queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+            queryClient.invalidateQueries({ queryKey: ['admin-support-stats'] });
         },
     });
 };
@@ -114,10 +123,11 @@ export const useAdminReplyTicket = () => {
 
             return { previousTicket };
         },
-        onError: (_err, { ticketId }, context) => {
+        onError: (err, { ticketId }, context) => {
             if (context?.previousTicket) {
                 queryClient.setQueryData(['admin-ticket-details', ticketId], context.previousTicket);
             }
+            toast.error(err.message || 'No se pudo enviar la respuesta');
         },
         onSettled: (_data, _error, { ticketId }) => {
             queryClient.invalidateQueries({ queryKey: ['admin-ticket-details', ticketId] });

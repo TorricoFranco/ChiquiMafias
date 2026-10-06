@@ -23,6 +23,7 @@ export const TicketFilters: React.FC<TicketFiltersProps> = ({
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#909378]" />
             <input
                 type="text"
+                aria-label="Buscar tickets"
                 placeholder="Buscar por usuario o asunto..."
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
@@ -32,6 +33,7 @@ export const TicketFilters: React.FC<TicketFiltersProps> = ({
 
         <div className="flex items-center gap-2 overflow-x-auto">
             <select
+                aria-label="Filtrar tickets por estado"
                 value={statusFilter}
                 onChange={(e) => onStatusFilterChange(e.target.value)}
                 className="bg-[#131313] border border-[#353534] text-[11px] font-bold text-[#c6c9ab] px-2.5 py-1.5 rounded-lg outline-none cursor-pointer"
@@ -44,6 +46,7 @@ export const TicketFilters: React.FC<TicketFiltersProps> = ({
             </select>
 
             <select
+                aria-label="Filtrar tickets por categoría"
                 value={categoryFilter}
                 onChange={(e) => onCategoryFilterChange(e.target.value)}
                 className="bg-[#131313] border border-[#353534] text-[11px] font-bold text-[#c6c9ab] px-2.5 py-1.5 rounded-lg outline-none cursor-pointer"
