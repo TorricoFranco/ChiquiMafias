@@ -2,13 +2,14 @@ import { useUserStore } from "@/store/useUserStore";
 import Cookies from "js-cookie";
 
 let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
+// `null` = el refresh falló: cada request en cola se resuelve con su 401 original.
+let refreshSubscribers: ((token: string | null) => void)[] = [];
 
-const subscribeTokenRefresh = (cb: (token: string) => void) => {
+const subscribeTokenRefresh = (cb: (token: string | null) => void) => {
     refreshSubscribers.push(cb);
 };
 
-const onRefreshed = (token: string) => {
+const onRefreshed = (token: string | null) => {
     refreshSubscribers.forEach((cb) => cb(token));
     refreshSubscribers = [];
 };
@@ -40,11 +41,24 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 
     let response = await fetch(url, options);
 
-    if (response.status === 401 && !url.includes("/auth/refresh") && !url.includes("/auth/google")) {
+    // Si la cuenta se suspende en medio de la sesión, el backend responde 403 USER_BANNED: mostramos la apelación.
+    if (response.status === 403 && typeof window !== "undefined") {
+        const body = await response.clone().json().catch(() => null);
+        if (body?.code === "USER_BANNED") {
+            useUserStore.getState().setIsBanned(true);
+        }
+    }
+
+    // Sin access token no hay sesión que renovar: un visitante no dispara refresh ni logout.
+    if (response.status === 401 && accessToken && !url.includes("/auth/refresh") && !url.includes("/auth/google")) {
 
         if (isRefreshing) {
             return new Promise((resolve) => {
-                subscribeTokenRefresh(async (newToken: string) => {
+                subscribeTokenRefresh(async (newToken) => {
+                    if (!newToken) {
+                        resolve(response);
+                        return;
+                    }
                     const retryHeaders = new Headers(options.headers);
                     retryHeaders.set("Authorization", `Bearer ${newToken}`);
                     options.headers = retryHeaders;
@@ -64,7 +78,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
             if (refreshRes.ok) {
                 const data = await refreshRes.json();
 
-                const newAccessToken = data.accessToken;
+                const newAccessToken = data.access_token;
 
                 if (typeof window !== "undefined") {
                     useUserStore.getState().setUserInfo({ accessToken: newAccessToken });
@@ -86,6 +100,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
                 return await fetch(url, options);
             } else {
                 isRefreshing = false;
+                onRefreshed(null);
                 if (typeof window !== "undefined") {
                     await useUserStore.getState().logout();
                 }
@@ -93,6 +108,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
             }
         } catch (error) {
             isRefreshing = false;
+            onRefreshed(null);
             if (typeof window !== "undefined") {
                 await useUserStore.getState().logout();
             }
