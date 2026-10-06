@@ -15,7 +15,7 @@ const navItems: Array<{ name: string; icon: string; filled?: boolean }> = [
   { name: "Ajustes", icon: "settings", filled: true },
 ];
 
-export const SidebarNav = () => {
+export const SidebarNav = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const activeTab = useNavigationStore((state) => state.activeTab);
@@ -38,11 +38,15 @@ export const SidebarNav = () => {
 
     setIsSettingsOpen(false);
     setActiveTab(tabName);
+    onNavigate?.();
   };
 
   return (
     <>
-      <aside className="h-full w-full sm:w-[240px] bg-[#1c1b1b] border-r border-[#353534] flex flex-col py-6 z-10">
+      <aside
+        aria-label="Secciones"
+        className="h-full w-full bg-[#1c1b1b] border-r border-[#353534] flex flex-col py-6 z-10"
+      >
         <nav className="flex-1 px-4 space-y-2 relative overflow-y-auto">
           {visibleNavItems.map((item) => {
             const isActive = activeTab === item.name || (item.name === "Ajustes" && isSettingsOpen);
@@ -52,6 +56,7 @@ export const SidebarNav = () => {
               <div key={item.name} className="relative">
                 <button
                   onClick={() => handleTabClick(item.name)}
+                  aria-current={isActive && item.name !== "Ajustes" ? "page" : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group text-left cursor-pointer ${isAdmin
                     ? isActive
                       ? "bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold border-l-4 border-yellow-200 shadow-lg shadow-amber-500/20"
@@ -62,6 +67,7 @@ export const SidebarNav = () => {
                     }`}
                 >
                   <span
+                    aria-hidden="true"
                     className={`material-symbols-outlined transition-transform ${isActive ? "" : "group-hover:scale-110 group-hover:rotate-6"
                       }`}
                     style={item.filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
@@ -80,13 +86,16 @@ export const SidebarNav = () => {
             onClick={() => {
               setIsSettingsOpen(false);
               setActiveTab("Soporte");
+              onNavigate?.();
             }}
+            aria-current={activeTab === "Soporte" ? "page" : undefined}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group text-left cursor-pointer ${activeTab === "Soporte"
               ? "bg-[#d2f000] text-[#5d6b00] font-bold border-l-4 border-[#b8d300] shadow-md"
               : "text-[#909378] hover:bg-[#353534] hover:text-[#e5e2e1]"
               }`}
           >
             <span
+              aria-hidden="true"
               className={`material-symbols-outlined transition-transform ${activeTab === "Soporte" ? "" : "group-hover:scale-110 group-hover:-rotate-6"
                 }`}
             >

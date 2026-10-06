@@ -23,7 +23,7 @@ export const ClaimRewardsBanner = () => {
           <p className="text-xs text-[#c6c9ab]">
             Participaste en <span className="font-bold text-[#e5e2e1]">{pending.count}</span> {pending.count === 1 ? 'encuesta' : 'encuestas'} y podés reclamar <span className="text-[#d2f000] font-bold inline-flex items-center gap-1">
               +<div className="w-3.5 h-3.5 rounded-full overflow-hidden flex-shrink-0 inline-flex">
-                <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover" />
+                <img src="/icons/chiqui-coin-icon.png" alt="" className="w-full h-full object-cover" />
               </div>
               {pending.potentialCoins} monedas
             </span>.
@@ -42,7 +42,7 @@ export const ClaimRewardsBanner = () => {
           <span className="flex items-center gap-1.5">
             <span>Reclamar</span>
             <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0">
-              <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover" />
+              <img src="/icons/chiqui-coin-icon.png" alt="" className="w-full h-full object-cover" />
             </div>
             <span>{pending.potentialCoins}</span>
           </span>

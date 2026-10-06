@@ -41,13 +41,15 @@ export const MatchTabs: React.FC<MatchTabsProps> = ({
     }
 
     return (
-        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[#2b2a2a] scrollbar-hide">
+        <div role="tablist" className="flex gap-2 overflow-x-auto pb-2 border-b border-[#2b2a2a] scrollbar-hide">
             {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.key;
                 return (
                     <button
                         key={tab.key}
+                        role="tab"
+                        aria-selected={isActive}
                         onClick={() => onChangeTab(tab.key)}
                         className={`flex items-center gap-2 px-4 py-3 rounded-t-xl transition-all font-bold text-sm whitespace-nowrap cursor-pointer ${isActive
                                 ? 'bg-[#2b2a2a] text-[#d2f000] border-b-2 border-[#d2f000]'

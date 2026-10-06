@@ -9,6 +9,7 @@ import StreakModal from '@/features/streak/components/StreakModal';
 import { useUIStore } from '@/store/useUIStore';
 import { AnimatedBalance } from '@/features/wallet/components/AnimatedBalance';
 import { useMyWinStreak } from '@/features/stats/hooks/useStats';
+import { MobileMenu } from './MobileMenu';
 
 interface HeaderProps {
     activeTab: string;
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveTab,
 }) => {
     const toggleMobileSidebar = useUIStore((state) => state.toggleMobileSidebar)
+    const isMobileSidebarOpen = useUIStore((state) => state.isMobileSidebarOpen)
     const [showUserMenu, setShowUserMenu] = useState(false);
 
     const id = useUserStore((state) => state.id);
@@ -56,8 +58,9 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="flex items-center gap-4 md:gap-6">
                         <button
                             onClick={toggleMobileSidebar}
-                            className="md:hidden p-2 text-[#c6c9ab] hover:text-[#e5e2e1] focus:outline-none"
-                            title="Abrir menú"
+                            className="lg:hidden p-2 text-[#c6c9ab] hover:text-[#e5e2e1] focus:outline-none"
+                            aria-label="Abrir menú"
+                            aria-expanded={isMobileSidebarOpen}
                         >
                             <Menu className="w-6 h-6" />
                         </button>
@@ -70,9 +73,10 @@ export const Header: React.FC<HeaderProps> = ({
                             />
                         </a>
 
-                        <nav className="hidden lg:flex items-center gap-6 ml-2">
+                        <nav aria-label="Vistas" className="hidden lg:flex items-center gap-6 ml-2">
                             <button
                                 onClick={() => setActiveTab('ligas')}
+                                aria-current={activeTab === 'ligas' ? 'page' : undefined}
                                 className={`font-semibold text-xs md:text-sm uppercase tracking-wider px-2 py-1 rounded transition-colors ${activeTab === 'ligas'
                                     ? 'text-[#d2f000] border-b-2 border-[#d2f000]'
                                     : 'text-[#c6c9ab] hover:text-[#e5e2e1] hover:bg-[#353534]/50'
@@ -82,6 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
                             </button>
                             <button
                                 onClick={() => setActiveTab('calendario')}
+                                aria-current={activeTab === 'calendario' ? 'page' : undefined}
                                 className={`font-semibold text-xs md:text-sm uppercase tracking-wider px-2 py-1 rounded transition-colors ${activeTab === 'calendario'
                                     ? 'text-[#d2f000] border-b-2 border-[#d2f000]'
                                     : 'text-[#c6c9ab] hover:text-[#e5e2e1] hover:bg-[#353534]/50'
@@ -91,6 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
                             </button>
                             <button
                                 onClick={() => setActiveTab('social')}
+                                aria-current={activeTab === 'social' ? 'page' : undefined}
                                 className={`font-semibold text-xs md:text-sm uppercase tracking-wider px-2 py-1 transition-transform ${activeTab === 'social'
                                     ? 'text-[#d2f000] border-b-2 border-[#d2f000] font-bold'
                                     : 'text-[#c6c9ab] hover:text-[#e5e2e1]'
@@ -185,10 +191,14 @@ export const Header: React.FC<HeaderProps> = ({
                                 </div>
 
                                 {/* Chiqui Coins */}
-                                <div className="flex items-center gap-1.5 bg-[#2a2a2a] px-2.5 py-1.5 rounded-full border border-[#353534]">
+                                <div
+                                    role="group"
+                                    aria-label="Saldo de monedas"
+                                    className="flex items-center gap-1.5 bg-[#2a2a2a] px-2.5 py-1.5 rounded-full border border-[#353534]"
+                                >
                                     <img
                                         src="/icons/chiqui-coin-icon.png"
-                                        alt="Chiqui Mafias Logo"
+                                        alt=""
                                         className="h-10 w-10 rounded-full object-cover transition-transform group-hover:scale-105"
                                     />
 
@@ -219,6 +229,8 @@ export const Header: React.FC<HeaderProps> = ({
             {isStreakModalOpen && (
                 <StreakModal onClose={() => setIsStreakModalOpen(false)} />
             )}
+
+            <MobileMenu activeMainTab={activeTab} onMainTabChange={setActiveTab} />
         </>
     );
 };

@@ -141,7 +141,11 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                                 )}
 
                                 {/* Marcador */}
-                                <div className="flex items-center gap-3 bg-[#131313] px-5 py-2.5 rounded-2xl border border-[#2b2a2a] shadow-inner">
+                                <div
+                                    role="group"
+                                    aria-label={`Marcador: ${teams.home.name} ${score.home}, ${teams.away.name} ${score.away}`}
+                                    className="flex items-center gap-3 bg-[#131313] px-5 py-2.5 rounded-2xl border border-[#2b2a2a] shadow-inner"
+                                >
                                     <span className="text-3xl md:text-4xl font-black text-[#e5e2e1] font-mono">
                                         {score.home}
                                     </span>

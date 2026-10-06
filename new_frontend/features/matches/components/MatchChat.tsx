@@ -121,7 +121,7 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
       )}
 
       {/* Lista de Mensajes */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+      <div role="log" aria-label="Mensajes del chat" className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
         {messages.map((msg) => (
           <ChatMessage
             key={msg.messageId}
@@ -175,7 +175,7 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
               useMegaphone ? "bg-amber-500 border-amber-400 text-black font-black" : "bg-[#222] hover:bg-[#2b2b2b] border-white/5 text-gray-400"
             )}
           >
-            <img src="/icons/megaphone-icon.png" alt="Megáfono" className="w-6 h-6 object-contain" />
+            <img src="/icons/megaphone-icon.png" alt="" className="w-6 h-6 object-contain" />
             <span>Megáfono ({megaphoneCount})</span>
           </button>
 
@@ -187,6 +187,7 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
         <div className="flex space-x-2">
           <div className="relative flex-1">
             <input
+              aria-label="Mensaje para el chat"
               maxLength={100}
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -211,6 +212,7 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
           </div>
           <button
             onClick={handleSend}
+            aria-label="Enviar mensaje"
             disabled={timeLeft !== null || input.trim().length === 0}
             className={clsx(
               "p-3 rounded-full disabled:opacity-50 transition-colors flex items-center justify-center flex-shrink-0",

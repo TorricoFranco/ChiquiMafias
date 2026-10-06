@@ -35,6 +35,9 @@ export default function NotificationBell() {
         <div className="relative" ref={containerRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : "Notificaciones"}
+                aria-expanded={isOpen}
+                aria-haspopup="dialog"
                 className="relative p-2 rounded-full bg-[#2b2b2b] hover:bg-[#3b3b3b] transition border border-transparent hover:border-gray-600 text-gray-300 hover:text-white"
             >
                 <Bell className="w-5 h-5" />
@@ -57,6 +60,8 @@ export default function NotificationBell() {
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
+                        role="dialog"
+                        aria-label="Notificaciones"
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}

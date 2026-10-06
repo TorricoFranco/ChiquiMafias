@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ShieldOff, MoreVertical, Trash2, Megaphone, Flag } from "lucide-react";
 import clsx from "clsx";
 import { getChatBubbleComponent } from "../config/chatBubbleRegistry";
@@ -47,6 +47,7 @@ export default function ChatMessage({
     const [reportDetails, setReportDetails] = useState('');
 
     const createReport = useCreateReport();
+    const reportFieldId = useId();
 
     const handleTimeout = async (minutes: number) => {
         if (!userId) return alert("Error: No se encontró el ID del usuario");
@@ -105,7 +106,10 @@ export default function ChatMessage({
 
     return (
         <>
-            <div className={clsx("flex w-full mb-1.5 rounded-2xl px-1.5 py-1 transition-colors hover:bg-white/[0.03]", isOwnMessage ? "justify-end" : "justify-start")}>
+            <article
+                aria-label={`Mensaje de ${user}`}
+                className={clsx("flex w-full mb-1.5 rounded-2xl px-1.5 py-1 transition-colors hover:bg-white/[0.03]", isOwnMessage ? "justify-end" : "justify-start")}
+            >
                 <div className={clsx(
                     "group relative px-3 py-2 rounded-2xl transition-all max-w-[85%]",
                     isMegaphone && "bg-gradient-to-r from-amber-500/15 via-amber-500/[0.05] to-transparent border border-amber-500/25 shadow-[0_0_15px_rgba(245,158,11,0.08)]",
@@ -118,6 +122,7 @@ export default function ChatMessage({
                     {variant === "global" && (
                         <button
                             onClick={onAvatarClick}
+                            aria-label={`Ver perfil de ${user}`}
                             className="w-10 h-10 rounded-full bg-gray-800/80 flex items-center justify-center text-base border-2 border-sky-400/50 overflow-hidden flex-shrink-0 hover:border-[#d2f000]/70 hover:scale-105 transition-all cursor-pointer shadow-[0_0_10px_rgba(56,189,248,0.15)]"
                         >
                             {avatar ? (
@@ -180,7 +185,10 @@ export default function ChatMessage({
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}
-                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700 rounded transition-opacity"
+                                        aria-label={`Opciones del mensaje de ${user}`}
+                                        aria-haspopup="menu"
+                                        aria-expanded={showMenu}
+                                        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 hover:bg-gray-700 rounded transition-opacity"
                                     >
                                         <MoreVertical className="w-4 h-4 text-gray-400" />
                                     </button>
@@ -245,20 +253,26 @@ export default function ChatMessage({
                         )}
                     </div>
                 </div>
-            </div>
+            </article>
 
             {/* MODAL DE REPORTE */}
             {
                 showReportModal && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                        <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl p-5 w-full max-w-sm shadow-2xl animate-in zoom-in-95">
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label={`Reportar a ${user}`}
+                            className="bg-[#1e1e1e] border border-gray-700 rounded-xl p-5 w-full max-w-sm shadow-2xl animate-in zoom-in-95"
+                        >
                             <h3 className="text-lg font-bold text-gray-100 mb-1">Reportar a {user}</h3>
                             <p className="text-xs text-gray-400 mb-4">El equipo de moderación revisará este mensaje.</p>
 
                             <form onSubmit={handleReportSubmit} className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-300 mb-1">Motivo</label>
+                                    <label htmlFor={`${reportFieldId}-reason`} className="block text-xs font-medium text-gray-300 mb-1">Motivo</label>
                                     <select
+                                        id={`${reportFieldId}-reason`}
                                         value={reportReason}
                                         onChange={(e) => setReportReason(e.target.value as any)}
                                         className="w-full bg-[#2a2a2a] border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
@@ -271,8 +285,9 @@ export default function ChatMessage({
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-300 mb-1">Detalles (Opcional)</label>
+                                    <label htmlFor={`${reportFieldId}-details`} className="block text-xs font-medium text-gray-300 mb-1">Detalles (Opcional)</label>
                                     <textarea
+                                        id={`${reportFieldId}-details`}
                                         rows={2}
                                         value={reportDetails}
                                         onChange={(e) => setReportDetails(e.target.value)}

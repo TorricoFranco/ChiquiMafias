@@ -128,7 +128,7 @@ export const AdminView: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div role="tablist" aria-label="Secciones de administración" className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -138,6 +138,8 @@ export const AdminView: React.FC = () => {
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={isActive}
               onClick={() => {
                 if (!isLocked) setActiveTab(tab.id as any);
               }}

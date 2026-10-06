@@ -14,6 +14,7 @@ import { AdminView } from "@/features/admin/components/AdminView";
 import { UserSupportView } from "@/features/supports/components/tickets/UserSupportView";
 import { useNavigationStore } from "@/store/useNavigationStore";
 import { SocialStatsView } from "@/features/stats/components/SocialStatsView";
+import { SidebarFixtureList } from "@/components/widgets/SidebarFixtureList";
 
 
 export const SocialView = () => {
@@ -23,8 +24,11 @@ export const SocialView = () => {
 
   return (
     <div className="flex flex-1 overflow-hidden h-full">
-      <SidebarNav />
-      
+      {/* En pantallas chicas las secciones están en el menú del header (MobileMenu). */}
+      <div className="hidden lg:block h-full w-[240px] flex-shrink-0">
+        <SidebarNav />
+      </div>
+
       <main className="flex-1 bg-[#131313] flex flex-col min-w-0 border-r border-[#353534] relative overflow-y-auto">
         
         <div className={activeTab === "Chat" ? "flex flex-1 overflow-hidden" : "hidden"}>
@@ -41,8 +45,14 @@ export const SocialView = () => {
           </div>
         )}
 
+        {activeTab === "Vivo" && (
+          <div className="w-full max-w-2xl mx-auto">
+            <SidebarFixtureList season="2026" leagueId="1" />
+          </div>
+        )}
+
         {activeTab === "Pronósticos" && (
-          <div className="p-6 w-full max-w-[1350px] mx-auto transition-all duration-300">
+          <div className="p-6 pb-20 lg:pb-6 w-full max-w-[1350px] mx-auto transition-all duration-300">
             <div className="flex flex-col lg:flex-row gap-6 items-start relative transition-all duration-300">
               <div className="flex-1 flex flex-col gap-6 w-full min-w-0 transition-all duration-300">
                 <ClaimRewardsBanner />
@@ -75,7 +85,9 @@ export const SocialView = () => {
       </main>
 
       {showRightSidebar && (
-        <RightSidebar currentTab={activeTab} />
+        <div className="hidden lg:flex h-full">
+          <RightSidebar currentTab={activeTab} />
+        </div>
       )}
     </div>
   );
