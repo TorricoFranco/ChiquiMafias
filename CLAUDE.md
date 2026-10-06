@@ -44,7 +44,9 @@ Producción: `docker-compose.yml`.
 
 ## Git
 
-- `develop` = integración, `main` = producción. El CI (`.github/workflows/pipeline.yml`) corre solo en push/PR a `main` y solo para el backend.
+- `develop` = integración, `main` = producción. CI:
+  - `.github/workflows/pipeline.yml`: backend, solo en push/PR a `main`.
+  - `.github/workflows/frontend.yml`: `new_frontend` (lint y typecheck de `e2e/`, build y Playwright mockeado), en push/PR a `develop` y `main` cuando cambia `new_frontend/`.
 - Ramas desde `develop`: `feat/…`, `fix/…`, `refactor/…`, `perf/…`, `security/…`, `test/…`, `chore/…`.
 - Commits convencionales en inglés: `tipo(scope): mensaje`, por ejemplo `fix(bets): …` o `test(webhook): …`.
 - No commitear, pushear ni crear ramas sin que te lo pidan.
@@ -54,7 +56,7 @@ Producción: `docker-compose.yml`.
 - Nunca leer, mostrar ni commitear `.env`, `.env.dev`, `*/.env` ni `backup_dev.sql`. Las variables existentes están en `.env.example` y `backend/src/config/env.validation.ts`.
 - **Los e2e del backend borran tablas de la DB a la que apunte `DATABASE_URL`.** `npm test` también los incluye. Para tests unitarios usá `npm run test:unit` (= `jest src/`) desde `backend/`, y no corras e2e sin confirmación.
 - No modificar `frontend/`.
-- Antes de decir que algo está listo, corré build + lint (+ unit tests en el backend) de la app tocada: `/verificar`.
+- Antes de decir que algo está listo, corré build + lint (+ unit tests en el backend, + e2e mockeados en `new_frontend`) de la app tocada: `/verificar`.
 - Para cambios en monedas, apuestas, suscripciones o webhooks de pago, proponé un plan antes de editar y al terminar pasalo por el subagente `backend-reviewer`.
 
 ## Herramientas del proyecto (`.claude/`)
