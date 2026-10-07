@@ -62,7 +62,7 @@ Producción: `docker-compose.yml`.
 ## Herramientas del proyecto (`.claude/`)
 
 - Skills: `/nest-module <nombre>`, `/frontend-feature <dominio>`, `/verificar`. `nestjs-best-practices` se activa sola en `backend/src`.
-- Subagentes: `backend-reviewer` (dinero, concurrencia, auth) y `contract-checker` (backend ↔ new_frontend).
+- Subagentes: `backend-reviewer` (dinero, concurrencia, auth), `frontend-reviewer` (new_frontend: sesión, flujos con monedas, sockets, Next 16, impacto en e2e) y `contract-checker` (backend ↔ new_frontend y backend ↔ discord-bot).
 - Reglas por zona en `.claude/rules/`: dinero y concurrencia, Prisma y UI. Se cargan solas según el archivo que se toque.
 - Permisos compartidos en `.claude/settings.json`; los personales van en `.claude/settings.local.json` (no se commitea).
 

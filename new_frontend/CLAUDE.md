@@ -69,6 +69,7 @@ npm run test:e2e:report      # último reporte HTML
 - Componentes con estado, hooks o eventos llevan `"use client"`.
 - Si cambia un DTO o un evento del backend, actualizá `features/<dominio>/types` y la api o el socket en el mismo cambio.
 - Antes de usar una API de Next (routing, caching, `cookies()`, params async, metadata, etc.), leé la guía en `node_modules/next/dist/docs/`, porque Next 16 cambió APIs.
+- Al terminar un cambio en `features/`, `app/`, `context/`, `store/` o `hooks/`, y antes de abrir la PR, pedí revisión al subagente `frontend-reviewer`.
 
 ## Diseño
 

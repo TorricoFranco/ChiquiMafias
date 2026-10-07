@@ -21,7 +21,7 @@ Microservicio de backoffice: soporte (tickets) y moderación (reportes) operados
 - Toda request, en ambos sentidos, lleva `x-discord-bot-token: <DISCORD_INTERNAL_SECRET>`. Las rutas entrantes lo validan: **toda ruta nueva tiene que validarlo también**.
 - Bot → backend: `${BACKEND_URL}/api/discord/webhook/*` (`action`, `ticket/message`, `ticket/status`, `tickets`, `reports`). Ver `backend/src/discord/discord.controller.ts`.
 - Backend → bot: `DISCORD_BOT_URL` + las rutas de arriba. Ver `backend/src/discord/discord.service.ts`.
-- Si cambia un payload, se cambian los dos lados en el mismo cambio.
+- Si cambia un payload, se cambian los dos lados en el mismo cambio. Después, corré el subagente `contract-checker` con el dominio `discord`: con `forbidNonWhitelisted`, un campo de más da 400 y el bot no mira la respuesta, así que el error es silencioso.
 
 ## Variables de entorno
 
