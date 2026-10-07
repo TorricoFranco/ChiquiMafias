@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "dev:e2e": "cross-env E2E_DEV_SERVER=1 NEXT_PUBLIC_API_URL=http://localhost:3007 NEXT_PUBLIC_GOOGLE_CLIENT_ID=e2e-google-client-id next dev --webpack -p 3100",
