@@ -70,4 +70,3 @@ Producción: `docker-compose.yml`.
 
 - `README.md` — arquitectura del backend, diagramas y flujos (auth, apuestas, webhooks).
 - `new_frontend/DESIGN.md` — sistema de diseño "Estadio Digital".
-- `match-details-ui-spec.md` — spec funcional de la página `/match/[id]`.
