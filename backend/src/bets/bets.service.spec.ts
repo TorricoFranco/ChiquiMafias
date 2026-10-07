@@ -31,6 +31,11 @@ describe('BetsService', () => {
     bet: {
       update: jest.fn(),
     },
+    userStats: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+      updateMany: jest.fn(),
+    },
   }
 
   const mockRedisService = {
@@ -138,14 +143,23 @@ describe('BetsService', () => {
       // 3. Verificamos los estados de las apuestas
       expect(mockPrisma.bet.update).toHaveBeenCalledWith({
         where: { id: 'bet-1' },
-        data: { status: 'WON' },
+        data: expect.objectContaining({ status: 'WON', multiplier: 1.5 }),
       })
       expect(mockPrisma.bet.update).toHaveBeenCalledWith({
         where: { id: 'bet-2' },
-        data: { status: 'LOST' },
+        data: { status: 'LOST', payout: 0, multiplier: 1.5 },
       })
 
-      // 4. Verificamos que se emitieron los eventos correctos
+      // 4. Stats: el ganador suma la victoria y el perdedor corta su racha
+      expect(mockPrisma.userStats.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 'user-1' } }),
+      )
+      expect(mockPrisma.userStats.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-2' },
+        data: { currentWinStreak: 0 },
+      })
+
+      // 5. Verificamos que se emitieron los eventos correctos
       expect(mockBetsGateway.emitMarketStatusChange).toHaveBeenCalledWith(
         marketId,
         'SETTLED',
@@ -195,7 +209,7 @@ describe('BetsService', () => {
 
       expect(mockPrisma.bet.update).toHaveBeenCalledWith({
         where: { id: 'bet-2' },
-        data: { status: 'REFUNDED' },
+        data: { status: 'REFUNDED', payout: 500, multiplier: 1 },
       })
 
       // debe ser REFUNDED y no SETTLED
