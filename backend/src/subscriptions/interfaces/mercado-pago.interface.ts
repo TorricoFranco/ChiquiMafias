@@ -65,8 +65,8 @@ export interface SubscriptionPricingModel {
   basePriceARS: number
   discountedPriceARS: number
   discountPercentage: number
-  promoMessage: string | null;
-  expiresAt: Date | null;
+  promoMessage: string | null
+  expiresAt: Date | null
   isWeekend: boolean
   currency: string
   appliedAt: Date

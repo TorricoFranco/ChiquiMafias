@@ -29,8 +29,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     const request = context.switchToHttp().getRequest()
     if (err || info || !user) {
-      console.log('Error de JWT:', err);
-      console.log('Info de JWT:', info?.message);
+      console.log('Error de JWT:', err)
+      console.log('Info de JWT:', info?.message)
     }
     const isOptional = this.reflector.getAllAndOverride<boolean>(
       IS_OPTIONAL_KEY,

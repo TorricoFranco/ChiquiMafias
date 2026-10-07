@@ -26,20 +26,22 @@ export class StandingCron {
     private readonly http: ApiFootballHttp,
     private readonly redis: RedisService,
     private readonly standings: StandingsService,
-  ) { }
+  ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async fetchStandings() {
-    await this.syncStandings();
+    await this.syncStandings()
   }
 
   @OnEvent('match.finished')
-  async handleMatchFinished(payload: { leagueId: number, season: number }) {
-    this.logger.log(`Evento recibido: Partido terminado. Actualizando Standings de liga ${payload.leagueId}`);
+  async handleMatchFinished(payload: { leagueId: number; season: number }) {
+    this.logger.log(
+      `Evento recibido: Partido terminado. Actualizando Standings de liga ${payload.leagueId}`,
+    )
 
     setTimeout(async () => {
-      await this.syncStandings();
-    }, 60000); 
+      await this.syncStandings()
+    }, 60000)
   }
 
   private async syncStandings() {
@@ -58,8 +60,6 @@ export class StandingCron {
       if (!leagueDb) return
 
       const allStandings = res.data.response[0].league.standings
-
-
 
       for (const standingsArray of allStandings) {
         for (const s of standingsArray) {

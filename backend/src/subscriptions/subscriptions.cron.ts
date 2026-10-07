@@ -11,7 +11,7 @@ export class SubscriptionsCronService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatGateway: ChatGateway,
-  ) { }
+  ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
   async handleSubscriptionLifecycle() {

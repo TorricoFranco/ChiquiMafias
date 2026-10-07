@@ -10,7 +10,7 @@ export class VoteService {
   constructor(
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   async castVote(pollId: string, userId: string, optionId: number) {
     const cooldownKey = `limit:vote:${userId}`

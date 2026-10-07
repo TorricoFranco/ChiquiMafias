@@ -26,4 +26,4 @@ import { SubscriptionRewardsService } from './Subscription-rewards.service'
     SubscriptionRewardsService,
   ],
 })
-export class SubscriptionsModule { }
+export class SubscriptionsModule {}

@@ -16,7 +16,7 @@ export class StatsSyncCron {
     private readonly prisma: PrismaService,
     private readonly http: ApiFootballHttp,
     private readonly redisService: RedisService,
-  ) { }
+  ) {}
 
   @Cron('*/3 * * * *') // 3 min
   async fetchStats() {

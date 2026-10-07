@@ -7,4 +7,4 @@ import { EmailListener } from './email.listener'
   providers: [EmailService, EmailListener],
   exports: [EmailService],
 })
-export class EmailModule { }
+export class EmailModule {}

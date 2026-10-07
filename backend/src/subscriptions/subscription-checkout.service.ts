@@ -47,7 +47,7 @@ export class SubscriptionCheckoutService {
     private readonly redis: RedisService,
     private readonly configService: ConfigService<EnvironmentVariables>,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   // private getMercadoPagoConfig() {
   //   const frontendUrl = this.configService.get<string>('FRONTEND_URL', {
@@ -230,10 +230,14 @@ export class SubscriptionCheckoutService {
         return { status: 'ignored', message: 'Evento no aplicable' }
       }
 
-
       if (payload.type === 'payment') {
-        this.logger.log(`[Webhook] Ignorando evento 'payment' aislado. Se espera el evento de suscripción.`);
-        return { status: 'ignored', message: 'Evento payment ignorado en flujo de suscripciones' }
+        this.logger.log(
+          `[Webhook] Ignorando evento 'payment' aislado. Se espera el evento de suscripción.`,
+        )
+        return {
+          status: 'ignored',
+          message: 'Evento payment ignorado en flujo de suscripciones',
+        }
       }
 
       const paymentId = payload.data?.id
@@ -286,7 +290,6 @@ export class SubscriptionCheckoutService {
             message: 'Suscripción no encontrada o ya procesada.',
           }
         }
-
       }
 
       const isAlreadyProcessed = await this.prisma.processedPayment.findUnique({
@@ -359,15 +362,17 @@ export class SubscriptionCheckoutService {
           throw e
         }
 
-        const now = new Date();
-        const nextBillingDate = new Date(now.getTime() + (SUBSCRIPTION_CYCLE_DAYS * 24 * 60 * 60 * 1000));
+        const now = new Date()
+        const nextBillingDate = new Date(
+          now.getTime() + SUBSCRIPTION_CYCLE_DAYS * 24 * 60 * 60 * 1000,
+        )
 
         const updatedSubscription = await tx.userSubscription.update({
           where: { id: subscription.id },
           data: {
             status: SubscriptionStatus.ACTIVE,
             startsAt: now,
-            endsAt: nextBillingDate
+            endsAt: nextBillingDate,
           },
         })
 
@@ -400,12 +405,11 @@ export class SubscriptionCheckoutService {
           })
 
           if (oldSub && oldSub.status === SubscriptionStatus.ACTIVE) {
-
             const { daysRemaining, bonusCoins, coinsPerDay } =
               this.pricingService.calculateUpgradeBonus(
                 oldSub.endsAt,
                 oldSub.tier,
-                subscription.tier
+                subscription.tier,
               )
 
             if (bonusCoins > 0) {
@@ -426,7 +430,7 @@ export class SubscriptionCheckoutService {
 
               await this.redis.redis.set(
                 `wallet:${subscription.userId}:balance`,
-                updatedWallet.balance
+                updatedWallet.balance,
               )
             }
 
@@ -451,10 +455,14 @@ export class SubscriptionCheckoutService {
         const giftData = await this.subscriptionRewardsService.grantRewards(
           subscription.userId,
           subscription.tier,
-          tx
-        );
+          tx,
+        )
 
-        return { subscription: updatedSubscription, user: updatedUser, giftData }
+        return {
+          subscription: updatedSubscription,
+          user: updatedUser,
+          giftData,
+        }
       })
 
       // Dar de baja el debito automático viejo en Mercado Pago
@@ -480,13 +488,13 @@ export class SubscriptionCheckoutService {
         `[Webhook OK] Proceso completado para suscripción ${subscription.id}`,
       )
 
-      const giftData = SUBSCRIPTION_GIFTS[subscription.tier];
+      const giftData = SUBSCRIPTION_GIFTS[subscription.tier]
 
       this.eventEmitter.emit('subscription.purchased', {
         userId: subscription.userId,
         tier: subscription.tier,
-        giftData: giftData
-      });
+        giftData: giftData,
+      })
 
       return {
         status: 'success',
@@ -617,7 +625,7 @@ export class SubscriptionCheckoutService {
         this.pricingService.calculateUpgradeBonus(
           currentSubscription.endsAt,
           currentSubscription.tier,
-          newTier
+          newTier,
         )
 
       const checkoutResult = await this.startCheckout(userId, newTier, true)

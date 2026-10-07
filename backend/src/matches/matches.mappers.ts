@@ -97,35 +97,33 @@ export class MatchesMappers {
       { homeWins: 0, awayWins: 0, draws: 0 },
     )
 
-    const lastMatches = finishedMatches
-      .slice(0, 5)
-      .map((m) => ({
-        fixture: {
-          id: m.fixture.id,
-          date: m.fixture.date,
-          venue: {
-            name: m.fixture.venue.name,
-            city: m.fixture.venue.city,
-          },
-          status: { short: m.fixture.status.short },
+    const lastMatches = finishedMatches.slice(0, 5).map((m) => ({
+      fixture: {
+        id: m.fixture.id,
+        date: m.fixture.date,
+        venue: {
+          name: m.fixture.venue.name,
+          city: m.fixture.venue.city,
         },
-        teams: {
-          home: {
-            id: m.teams.home.id,
-            name: m.teams.home.name,
-            logo: m.teams.home.logo,
-          },
-          away: {
-            id: m.teams.away.id,
-            name: m.teams.away.name,
-            logo: m.teams.away.logo,
-          },
+        status: { short: m.fixture.status.short },
+      },
+      teams: {
+        home: {
+          id: m.teams.home.id,
+          name: m.teams.home.name,
+          logo: m.teams.home.logo,
         },
-        goals: {
-          home: m.goals.home ?? 0,
-          away: m.goals.away ?? 0,
+        away: {
+          id: m.teams.away.id,
+          name: m.teams.away.name,
+          logo: m.teams.away.logo,
         },
-      }))
+      },
+      goals: {
+        home: m.goals.home ?? 0,
+        away: m.goals.away ?? 0,
+      },
+    }))
 
     return {
       ...stats,
@@ -135,12 +133,15 @@ export class MatchesMappers {
   }
 
   static formatMiniTable(
-    standings: {
-      apertura?: { tournament: string; groups: Record<string, any[]> };
-      clausura?: { tournament: string; groups: Record<string, any[]> };
-      annual?: any[];
-      averages?: any[];
-    } | null | undefined,
+    standings:
+      | {
+          apertura?: { tournament: string; groups: Record<string, any[]> }
+          clausura?: { tournament: string; groups: Record<string, any[]> }
+          annual?: any[]
+          averages?: any[]
+        }
+      | null
+      | undefined,
     homeId: string,
     awayId: string,
   ) {
@@ -150,35 +151,44 @@ export class MatchesMappers {
         tournament: { home: [], away: [] },
         annual: { home: [], away: [] },
         averages: { home: [], away: [] },
-      };
+      }
     }
 
     const isClausuraActive = Boolean(
       standings.clausura?.groups &&
-      Object.values(standings.clausura.groups).some((group) =>
-        Array.isArray(group) && group.some((team) => team.played > 0),
+      Object.values(standings.clausura.groups).some(
+        (group) =>
+          Array.isArray(group) && group.some((team) => team.played > 0),
       ),
-    );
+    )
 
     const activeTournamentKey: 'clausura' | 'apertura' = isClausuraActive
       ? 'clausura'
-      : 'apertura';
+      : 'apertura'
 
-    const currentTournament = standings[activeTournamentKey];
+    const currentTournament = standings[activeTournamentKey]
 
     const tournamentTables: any[][] = currentTournament?.groups
-      ? Object.values(currentTournament.groups).map(group =>
-        Array.isArray(group) ? group.map((t, i) => ({ ...t, position: t.position ?? i + 1 })) : []
-      )
-      : [];
+      ? Object.values(currentTournament.groups).map((group) =>
+          Array.isArray(group)
+            ? group.map((t, i) => ({ ...t, position: t.position ?? i + 1 }))
+            : [],
+        )
+      : []
 
     const annualTable = Array.isArray(standings.annual)
-      ? standings.annual.map((t, i) => ({ ...t, position: t.position ?? i + 1 }))
-      : [];
+      ? standings.annual.map((t, i) => ({
+          ...t,
+          position: t.position ?? i + 1,
+        }))
+      : []
 
     const averagesTable = Array.isArray(standings.averages)
-      ? standings.averages.map((t, i) => ({ ...t, position: t.position ?? i + 1 }))
-      : [];
+      ? standings.averages.map((t, i) => ({
+          ...t,
+          position: t.position ?? i + 1,
+        }))
+      : []
 
     return {
       activeTournament: activeTournamentKey,
@@ -187,66 +197,77 @@ export class MatchesMappers {
         away: this.extractNeighborhoodDynamic(tournamentTables, awayId),
       },
       annual: {
-        home: annualTable.length ? this.getNeighborhood(annualTable, homeId, 1, 'Annual Home') : [],
-        away: annualTable.length ? this.getNeighborhood(annualTable, awayId, 1, 'Annual Away') : [],
+        home: annualTable.length
+          ? this.getNeighborhood(annualTable, homeId, 1, 'Annual Home')
+          : [],
+        away: annualTable.length
+          ? this.getNeighborhood(annualTable, awayId, 1, 'Annual Away')
+          : [],
       },
       averages: {
-        home: averagesTable.length ? this.getNeighborhood(averagesTable, homeId, 1, 'Averages Home') : [],
-        away: averagesTable.length ? this.getNeighborhood(averagesTable, awayId, 1, 'Averages Away') : [],
+        home: averagesTable.length
+          ? this.getNeighborhood(averagesTable, homeId, 1, 'Averages Home')
+          : [],
+        away: averagesTable.length
+          ? this.getNeighborhood(averagesTable, awayId, 1, 'Averages Away')
+          : [],
       },
-    };
+    }
   }
 
   static getNeighborhood(
     table: any[],
     targetId: string | number,
     margin = 1,
-    context = 'Desconocido'
+    context = 'Desconocido',
   ): any[] {
-    if (!Array.isArray(table)) return [];
+    if (!Array.isArray(table)) return []
 
-    const index = table.findIndex(
-      (item) => {
-        const currentId = String(item.teamId ?? item.team_id ?? item.id ?? item.team?.id);
-        return currentId === String(targetId);
-      }
-    );
+    const index = table.findIndex((item) => {
+      const currentId = String(
+        item.teamId ?? item.team_id ?? item.id ?? item.team?.id,
+      )
+      return currentId === String(targetId)
+    })
 
-    if (index === -1) return [];
+    if (index === -1) return []
 
-    let start = index - margin;
-    let end = index + margin;
+    let start = index - margin
+    let end = index + margin
 
     if (start < 0) {
-      const diff = 0 - start;
-      start = 0;
-      end += diff;
+      const diff = 0 - start
+      start = 0
+      end += diff
     }
 
     if (end >= table.length) {
-      const diff = end - (table.length - 1);
-      end = table.length - 1;
-      start -= diff;
+      const diff = end - (table.length - 1)
+      end = table.length - 1
+      start -= diff
 
-      if (start < 0) start = 0;
+      if (start < 0) start = 0
     }
 
-    return table.slice(start, end + 1);
+    return table.slice(start, end + 1)
   }
 
   static extractNeighborhoodDynamic(
     tables: any[][],
     targetId: string | number,
   ): any[] {
-    if (!Array.isArray(tables)) return [];
+    if (!Array.isArray(tables)) return []
 
     for (const table of tables) {
-      if (!Array.isArray(table)) continue;
-      const neighborhood = this.getNeighborhood(table, targetId, 1, 'Tournament');
-      if (neighborhood.length > 0) return neighborhood;
+      if (!Array.isArray(table)) continue
+      const neighborhood = this.getNeighborhood(
+        table,
+        targetId,
+        1,
+        'Tournament',
+      )
+      if (neighborhood.length > 0) return neighborhood
     }
-    return [];
+    return []
   }
-
-
 }

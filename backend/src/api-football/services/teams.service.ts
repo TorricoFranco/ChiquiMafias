@@ -16,7 +16,7 @@ export class ApiFootbalTeamsService {
   constructor(
     private http: ApiFootballHttp,
     private prisma: PrismaService,
-  ) { }
+  ) {}
 
   // INSERT TEAMS, VENUES AND LEAGUE_TEAMS
   async getTeamsByLeague(season: number, leagueApiId: number) {

@@ -67,8 +67,6 @@ export class BetsProcessor extends WorkerHost {
           })
         })
 
-
-
         this.logger.debug(
           `Apuesta ${betId} y transacciones guardadas en Postgres exitosamente.`,
         )

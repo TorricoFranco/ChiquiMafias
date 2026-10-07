@@ -8,7 +8,6 @@ import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter'
 import { Interval } from '@nestjs/schedule'
 import { CHAT_RATE_LIMITS, DEFAULT_RATE_LIMIT } from './constants/chat-rules'
 
-
 @Injectable()
 export class ChatService {
   private clients = new Map<string, ChatClient>()
@@ -18,7 +17,7 @@ export class ChatService {
     private readonly redisService: RedisService,
     private readonly prismaService: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   @OnEvent('report.resolved')
   async handleReportResolved(payload: any) {
@@ -28,23 +27,31 @@ export class ChatService {
     }
   }
 
-
   @Interval(1000)
   async processMegaphoneQueue() {
-    const activeMegaphone = await this.redisService.redis.get('chat:megaphone:active');
+    const activeMegaphone = await this.redisService.redis.get(
+      'chat:megaphone:active',
+    )
 
     if (activeMegaphone) {
-      return;
+      return
     }
 
-    const nextMegaphone = await this.redisService.redis.lpop('chat:megaphone:queue');
+    const nextMegaphone = await this.redisService.redis.lpop(
+      'chat:megaphone:queue',
+    )
 
     if (nextMegaphone) {
-      await this.redisService.redis.set('chat:megaphone:active', nextMegaphone, 'EX', 15);
+      await this.redisService.redis.set(
+        'chat:megaphone:active',
+        nextMegaphone,
+        'EX',
+        15,
+      )
 
-      const payload = JSON.parse(nextMegaphone);
+      const payload = JSON.parse(nextMegaphone)
 
-      this.eventEmitter.emit('megaphone.show', payload);
+      this.eventEmitter.emit('megaphone.show', payload)
     }
   }
 
@@ -57,7 +64,7 @@ export class ChatService {
       badgeUrl: clientData.badgeUrl,
       tier: clientData.tier || 'NONE',
       role: clientData.role || 'USER',
-    });
+    })
   }
 
   onClientDisconnected(socketId: string) {
@@ -96,42 +103,43 @@ export class ChatService {
   }
 
   checkMessageRate(userId: string, tier: string = 'NONE') {
-    const now = Date.now();
-    
-    const limits = CHAT_RATE_LIMITS[tier] ?? DEFAULT_RATE_LIMIT;
-    const { windowMs, maxMessages, penalties } = limits;
+    const now = Date.now()
 
-    const state = this.rateMap.get(userId) ?? { timestamps: [], strikes: 0 };
+    const limits = CHAT_RATE_LIMITS[tier] ?? DEFAULT_RATE_LIMIT
+    const { windowMs, maxMessages, penalties } = limits
+
+    const state = this.rateMap.get(userId) ?? { timestamps: [], strikes: 0 }
 
     if (state.blockedUntil && now < state.blockedUntil) {
       return {
         allowed: false,
         retryIn: Math.ceil((state.blockedUntil - now) / 1000),
-      };
+      }
     }
 
-    state.timestamps = state.timestamps.filter((t) => now - t < windowMs);
+    state.timestamps = state.timestamps.filter((t) => now - t < windowMs)
 
     if (state.timestamps.length >= maxMessages) {
-      state.strikes += 1;
-      const penaltySeconds = penalties[state.strikes - 1] ?? penalties[penalties.length - 1] ?? 300; 
-      
-      state.blockedUntil = now + penaltySeconds * 1000;
-      state.timestamps = [];
-      this.rateMap.set(userId, state);
+      state.strikes += 1
+      const penaltySeconds =
+        penalties[state.strikes - 1] ?? penalties[penalties.length - 1] ?? 300
+
+      state.blockedUntil = now + penaltySeconds * 1000
+      state.timestamps = []
+      this.rateMap.set(userId, state)
 
       return {
         allowed: false,
         retryIn: penaltySeconds,
         strike: state.strikes,
-      };
+      }
     }
 
-    state.timestamps.push(now);
-    this.rateMap.set(userId, state);
-    
-    return { allowed: true };
-}
+    state.timestamps.push(now)
+    this.rateMap.set(userId, state)
+
+    return { allowed: true }
+  }
 
   async deleteGlobalMessage(messageId: string): Promise<boolean> {
     const globalKey = 'chat:global:history'
@@ -269,7 +277,12 @@ export class ChatService {
       }
     }
 
-    return { finalStickerId, finalNameColor, finalChatBubble, isMegaphoneActive }
+    return {
+      finalStickerId,
+      finalNameColor,
+      finalChatBubble,
+      isMegaphoneActive,
+    }
   }
 
   async executeMute(userId: string, durationSeconds: number) {

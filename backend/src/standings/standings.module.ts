@@ -7,4 +7,4 @@ import { StandingsService } from './standings.service'
   providers: [StandingsService],
   exports: [StandingsService],
 })
-export class StandingsModule { }
+export class StandingsModule {}

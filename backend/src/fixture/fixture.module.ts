@@ -8,4 +8,4 @@ import { FixtureLeagueGateway } from './fixture.gateway'
   controllers: [FixtureController],
   providers: [FixtureService, FixtureLeagueGateway],
 })
-export class FixtureModule { }
+export class FixtureModule {}

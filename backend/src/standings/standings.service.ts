@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 
 import { FullStandingsResponseDto } from './dto/response/full-standings.dto'
@@ -17,10 +17,9 @@ export class StandingsService {
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
-  ) { }
+  ) {}
 
   async getStandings(season: number): Promise<FullStandingsResponseDto> {
-
     const leagueDb = await this.prisma.leagues.findFirst({
       where: { api_league_id: 128 },
     })
@@ -33,7 +32,6 @@ export class StandingsService {
 
     const cached = await this.redis.redis.get(cacheKey)
     if (cached) return JSON.parse(cached) as FullStandingsResponseDto
-
 
     const result = await this.calculateFullStandings(leagueDb.id, season)
 
@@ -90,29 +88,29 @@ export class StandingsService {
       cacheKey,
       JSON.stringify(fullStandings),
       'EX',
-      3600
+      3600,
     )
 
     return fullStandings
   }
 
-
-
-
   private calculateAnnualTable(allStats: TeamStatsWithTeam[]): StandingRow[] {
-    const teamMap = new Map<string, {
-      teamId: string
-      teamName: string
-      teamLogo: string | null
-      points: number
-      played: number
-      won: number
-      draw: number
-      lost: number
-      goalsFor: number
-      goalsAgainst: number
-      goalDiff: number
-    }>()
+    const teamMap = new Map<
+      string,
+      {
+        teamId: string
+        teamName: string
+        teamLogo: string | null
+        points: number
+        played: number
+        won: number
+        draw: number
+        lost: number
+        goalsFor: number
+        goalsAgainst: number
+        goalDiff: number
+      }
+    >()
 
     for (const stat of allStats) {
       const existing = teamMap.get(stat.team_id) || {
@@ -143,10 +141,11 @@ export class StandingsService {
 
     const annualArray = Array.from(teamMap.values())
 
-    annualArray.sort((a, b) =>
-      b.points - a.points ||
-      b.goalDiff - a.goalDiff ||
-      b.goalsFor - a.goalsFor
+    annualArray.sort(
+      (a, b) =>
+        b.points - a.points ||
+        b.goalDiff - a.goalDiff ||
+        b.goalsFor - a.goalsFor,
     )
 
     return annualArray.map((row, index) => ({
@@ -168,7 +167,10 @@ export class StandingsService {
   }
 
   private calculateAverageStandings(allStats: TeamStatsWithTeam[]) {
-    const teamTotals = new Map<string, { points: number; played: number; team: any }>()
+    const teamTotals = new Map<
+      string,
+      { points: number; played: number; team: any }
+    >()
 
     for (const stat of allStats) {
       const current = teamTotals.get(stat.team_id) || {
@@ -181,40 +183,42 @@ export class StandingsService {
       teamTotals.set(stat.team_id, current)
     }
 
-    const averageTable = Array.from(teamTotals.entries()).map(([teamId, totals]) => {
-      const normalizedDbName = totals.team.name.trim().toLowerCase()
-      const legacy = legacyData.find(
-        (l) => l.team_name.trim().toLowerCase() === normalizedDbName,
-      )
+    const averageTable = Array.from(teamTotals.entries()).map(
+      ([teamId, totals]) => {
+        const normalizedDbName = totals.team.name.trim().toLowerCase()
+        const legacy = legacyData.find(
+          (l) => l.team_name.trim().toLowerCase() === normalizedDbName,
+        )
 
-      const pts24 = legacy ? legacy.points_2024 : 0
-      const pj24 = legacy ? legacy.played_2024 : 0
+        const pts24 = legacy ? legacy.points_2024 : 0
+        const pj24 = legacy ? legacy.played_2024 : 0
 
-      const pts25 = legacy ? legacy.points_2025 : 0
-      const pj25 = legacy ? legacy.played_2025 : 0
+        const pts25 = legacy ? legacy.points_2025 : 0
+        const pj25 = legacy ? legacy.played_2025 : 0
 
-      const pts26 = totals.points
-      const pj26 = totals.played
+        const pts26 = totals.points
+        const pj26 = totals.played
 
-      const totalPoints = pts24 + pts25 + pts26
-      const totalPlayed = pj24 + pj25 + pj26
+        const totalPoints = pts24 + pts25 + pts26
+        const totalPlayed = pj24 + pj25 + pj26
 
-      return {
-        teamId: teamId,
-        teamName: totals.team.name,
-        teamLogo: totals.team.logo_url,
-        description: null,
-        stats2024: { pts: pts24, pj: pj24 },
-        stats2025: { pts: pts25, pj: pj25 },
-        stats2026: { pts: pts26, pj: pj26 },
-        totalPoints: totalPoints,
-        totalPlayed: totalPlayed,
-        coefficient:
-          totalPlayed > 0
-            ? parseFloat((totalPoints / totalPlayed).toFixed(3))
-            : 0,
-      }
-    })
+        return {
+          teamId: teamId,
+          teamName: totals.team.name,
+          teamLogo: totals.team.logo_url,
+          description: null,
+          stats2024: { pts: pts24, pj: pj24 },
+          stats2025: { pts: pts25, pj: pj25 },
+          stats2026: { pts: pts26, pj: pj26 },
+          totalPoints: totalPoints,
+          totalPlayed: totalPlayed,
+          coefficient:
+            totalPlayed > 0
+              ? parseFloat((totalPoints / totalPlayed).toFixed(3))
+              : 0,
+        }
+      },
+    )
 
     return averageTable.sort(
       (a, b) => b.coefficient - a.coefficient || b.totalPoints - a.totalPoints,
@@ -254,8 +258,6 @@ export class StandingsService {
       description: r.description,
     }))
   }
-
-
 
   // ESTA SE USA EN E APERTURA PORQUE LOS HIJS DEMIL PUTA DE LA API DEVUEVLVEN LAS TBLAS QUE SE LES CANTA EL ORTO  Y EN EL CLAUSURA SE TINE QUE CAULCUALR A MANOPLA
   private async getAnnualTable(leagueId: string, season: number) {
@@ -328,5 +330,3 @@ export class StandingsService {
     )
   }
 }
-
-

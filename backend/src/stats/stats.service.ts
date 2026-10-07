@@ -1,27 +1,26 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { publicUserSelect } from 'src/prisma/constants/publicUserSelect';
-
+import { Injectable, BadRequestException } from '@nestjs/common'
+import { PrismaService } from 'src/prisma/prisma.service'
+import { publicUserSelect } from 'src/prisma/constants/publicUserSelect'
 
 @Injectable()
 export class StatsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async getUserStats(userId: string) {
     if (!userId) {
-      throw new BadRequestException('El ID de usuario es requerido');
+      throw new BadRequestException('El ID de usuario es requerido')
     }
 
     const stats = await this.prisma.userStats.findUnique({
       where: { userId },
       include: {
         user: {
-          select: publicUserSelect, 
-        }
-      }
-    });
+          select: publicUserSelect,
+        },
+      },
+    })
 
-    if (stats) return stats;
+    if (stats) return stats
 
     return {
       totalBetsPlaced: 0,
@@ -31,7 +30,7 @@ export class StatsService {
       highestMultiplier: 0,
       currentWinStreak: 0,
       longestWinStreak: 0,
-    };
+    }
   }
 
   async getTopEarners(limit: number = 10) {
@@ -39,9 +38,9 @@ export class StatsService {
       take: limit,
       orderBy: { totalCoinsWon: 'desc' },
       include: {
-        user: { select: publicUserSelect } 
-      }
-    });
+        user: { select: publicUserSelect },
+      },
+    })
   }
 
   async getTopStreaks(limit: number = 10) {
@@ -49,9 +48,9 @@ export class StatsService {
       take: limit,
       orderBy: { longestWinStreak: 'desc' },
       include: {
-        user: { select: publicUserSelect }
-      }
-    });
+        user: { select: publicUserSelect },
+      },
+    })
   }
 
   async getHighestMultipliers(limit: number = 10) {
@@ -59,9 +58,9 @@ export class StatsService {
       take: limit,
       orderBy: { highestMultiplier: 'desc' },
       include: {
-        user: { select: publicUserSelect }
-      }
-    });
+        user: { select: publicUserSelect },
+      },
+    })
   }
 
   async getMostActive(limit: number = 10) {
@@ -69,9 +68,9 @@ export class StatsService {
       take: limit,
       orderBy: { totalBetsPlaced: 'desc' },
       include: {
-        user: { select: publicUserSelect }
-      }
-    });
+        user: { select: publicUserSelect },
+      },
+    })
   }
 
   async getTopStakers(limit: number = 10) {
@@ -79,9 +78,9 @@ export class StatsService {
       take: limit,
       orderBy: { totalCoinsStaked: 'desc' },
       include: {
-        user: { select: publicUserSelect }
-      }
-    });
+        user: { select: publicUserSelect },
+      },
+    })
   }
 
   async getGlobalPlatformStats() {
@@ -92,15 +91,15 @@ export class StatsService {
         totalCoinsWon: true,
       },
       _count: {
-        userId: true
-      }
-    });
+        userId: true,
+      },
+    })
 
     return {
       totalUsers: aggregates._count.userId,
       totalBets: aggregates._sum.totalBetsPlaced || 0,
       totalVolumeStaked: aggregates._sum.totalCoinsStaked || 0,
       totalVolumeWon: aggregates._sum.totalCoinsWon || 0,
-    };
+    }
   }
 }

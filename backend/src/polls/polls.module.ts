@@ -12,4 +12,4 @@ import { AuthModule } from 'src/auth/auth.module'
   controllers: [PollsController],
   imports: [AuthModule, WalletModule],
 })
-export class PollsModule { }
+export class PollsModule {}

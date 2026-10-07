@@ -30,7 +30,6 @@ export class UserEntity implements User {
     balance: number
   } | null
 
-
   @ApiProperty({ type: () => Object, nullable: true })
   team?: FootballTeam | null
 

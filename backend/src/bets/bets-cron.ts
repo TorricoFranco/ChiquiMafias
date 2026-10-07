@@ -17,7 +17,7 @@ export class BetsCronService {
     private readonly betsService: BetsService,
     private readonly betsGateway: BetsGateway,
     private readonly redisService: RedisService,
-  ) { }
+  ) {}
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async handleMarketAutoCreation() {
@@ -71,16 +71,20 @@ export class BetsCronService {
               metadata: {
                 homeTeam: {
                   name: match.home_team.name,
-                  short: match.home_team.short_code || match.home_team.name.substring(0, 3).toUpperCase(),
+                  short:
+                    match.home_team.short_code ||
+                    match.home_team.name.substring(0, 3).toUpperCase(),
                   api_team_id: match.home_team.api_team_id,
-                  logoUrl: `${match.home_team.api_team_id}`
+                  logoUrl: `${match.home_team.api_team_id}`,
                 },
                 awayTeam: {
                   name: match.away_team.name,
-                  short: match.away_team.short_code || match.away_team.name.substring(0, 3).toUpperCase(),
+                  short:
+                    match.away_team.short_code ||
+                    match.away_team.name.substring(0, 3).toUpperCase(),
                   api_team_id: match.away_team.api_team_id,
-                  logoUrl: `${match.away_team.api_team_id}`
-                }
+                  logoUrl: `${match.away_team.api_team_id}`,
+                },
               },
               options: {
                 create: [
@@ -126,7 +130,9 @@ export class BetsCronService {
           `[AUTO-MARKET] Mercado creado exitosamente [ID API: ${match.api_fixture_id}]`,
         )
 
-        this.betsGateway.emitMarketCreated(calculateMarketOdds(newMarketCreated))
+        this.betsGateway.emitMarketCreated(
+          calculateMarketOdds(newMarketCreated),
+        )
       } catch (error: any) {
         this.logger.error(
           `Error al crear mercado automático para el partido ID: ${match.id}`,

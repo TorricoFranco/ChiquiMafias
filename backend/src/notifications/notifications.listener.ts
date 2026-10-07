@@ -12,7 +12,7 @@ export class NotificationsListener {
     private readonly notificationsService: NotificationsService,
     private readonly chatGateway: ChatGateway,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @OnEvent('bet.settled')
   async handleBetSettled(payload: {

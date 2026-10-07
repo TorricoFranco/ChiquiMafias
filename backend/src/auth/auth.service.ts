@@ -18,7 +18,6 @@ import {
 } from './interfaces/active-user.interface'
 import { UserEntity } from 'src/users/entities/user.entity'
 
-
 @Injectable()
 export class AuthService {
   private client: OAuth2Client
@@ -36,7 +35,9 @@ export class AuthService {
     })
     this.client = new OAuth2Client(googleClientId)
   }
-  private async enrichUserWithCosmetics(user: User & { team?: FootballTeam | null }): Promise<UserEntity> {
+  private async enrichUserWithCosmetics(
+    user: User & { team?: FootballTeam | null },
+  ): Promise<UserEntity> {
     let [color, banner, bubble] = await this.redisService.redis.mget(
       `user:cosmetics:${user.id}:color`,
       `user:cosmetics:${user.id}:banner`,
@@ -45,21 +46,45 @@ export class AuthService {
 
     // 2. Si hay "Cache Miss" (no está en Redis) pero el usuario TIENE un cosmético activo en BD, lo buscamos y lo guardamos.
     if (!color && user.activeNameColorId) {
-      const item = await this.prisma.storeItem.findUnique({ where: { id: user.activeNameColorId } })
+      const item = await this.prisma.storeItem.findUnique({
+        where: { id: user.activeNameColorId },
+      })
       color = item?.assetId || null
-      if (color) await this.redisService.redis.set(`user:cosmetics:${user.id}:color`, color, 'EX', 86400)
+      if (color)
+        await this.redisService.redis.set(
+          `user:cosmetics:${user.id}:color`,
+          color,
+          'EX',
+          86400,
+        )
     }
 
     if (!banner && user.activeBannerId) {
-      const item = await this.prisma.storeItem.findUnique({ where: { id: user.activeBannerId } })
+      const item = await this.prisma.storeItem.findUnique({
+        where: { id: user.activeBannerId },
+      })
       banner = item?.assetId || null
-      if (banner) await this.redisService.redis.set(`user:cosmetics:${user.id}:banner`, banner, 'EX', 86400)
+      if (banner)
+        await this.redisService.redis.set(
+          `user:cosmetics:${user.id}:banner`,
+          banner,
+          'EX',
+          86400,
+        )
     }
 
     if (!bubble && user.activeChatBubbleId) {
-      const item = await this.prisma.storeItem.findUnique({ where: { id: user.activeChatBubbleId } })
+      const item = await this.prisma.storeItem.findUnique({
+        where: { id: user.activeChatBubbleId },
+      })
       bubble = item?.assetId || null
-      if (bubble) await this.redisService.redis.set(`user:cosmetics:${user.id}:chat_bubble`, bubble, 'EX', 86400)
+      if (bubble)
+        await this.redisService.redis.set(
+          `user:cosmetics:${user.id}:chat_bubble`,
+          bubble,
+          'EX',
+          86400,
+        )
     }
 
     return new UserEntity({

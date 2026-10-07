@@ -32,7 +32,8 @@ import { OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets'
 @UseFilters(AllWsExceptionFilter)
 @WebSocketGateway()
 export class MatchesGateway
-  implements OnGatewayConnection, OnApplicationBootstrap {
+  implements OnGatewayConnection, OnApplicationBootstrap
+{
   @WebSocketServer() server: Server
 
   private readonly logger = new Logger(MatchesGateway.name)
@@ -41,7 +42,7 @@ export class MatchesGateway
     private readonly redisService: RedisService,
     private readonly chatService: ChatService,
     private readonly authService: AuthService,
-  ) { }
+  ) {}
 
   async handleConnection(socket: Socket) {
     try {
@@ -95,12 +96,18 @@ export class MatchesGateway
                 minute: lastEvent.time?.elapsed,
               })
 
-              const teamName = lastEvent.team?.name || 'el equipo';
-              const playerName = lastEvent.player?.name || 'un jugadorazo';
+              const teamName = lastEvent.team?.name || 'el equipo'
+              const playerName = lastEvent.player?.name || 'un jugadorazo'
 
-              this.sendBotGoalMessage(update.matchId, teamName, playerName).catch(err => {
-                this.logger.error(`Error enviando mensaje de bot para el gol: ${err.message}`);
-              });
+              this.sendBotGoalMessage(
+                update.matchId,
+                teamName,
+                playerName,
+              ).catch((err) => {
+                this.logger.error(
+                  `Error enviando mensaje de bot para el gol: ${err.message}`,
+                )
+              })
             }
             break
 
@@ -160,18 +167,20 @@ export class MatchesGateway
     const { matchId, message, stickerId, useMegaphone } = body
     const user = client.data.user
 
-    const matchStatus = await this.redisService.redis.get(`match:${matchId}:status`)
+    const matchStatus = await this.redisService.redis.get(
+      `match:${matchId}:status`,
+    )
 
     const activeStatuses = ['1H', '2H', 'HT', 'ET', 'PEN']
 
     if (!matchStatus || !activeStatuses.includes(matchStatus)) {
       throw new WsException({
         code: 'MATCH_INACTIVE',
-        message: 'El partido no está activo, la tribuna está cerrada 🛑'
+        message: 'El partido no está activo, la tribuna está cerrada 🛑',
       })
     }
 
-    const userTier = user.tier || 'NONE';
+    const userTier = user.tier || 'NONE'
     const rate = this.chatService.checkMessageRate(user.id, userTier)
 
     if (!rate.allowed) {
@@ -182,12 +191,16 @@ export class MatchesGateway
       })
     }
 
-    const { finalStickerId, finalNameColor, finalChatBubble, isMegaphoneActive } =
-      await this.chatService.processMessageAssets(
-        user.id,
-        body.stickerId,
-        body.useMegaphone,
-      )
+    const {
+      finalStickerId,
+      finalNameColor,
+      finalChatBubble,
+      isMegaphoneActive,
+    } = await this.chatService.processMessageAssets(
+      user.id,
+      body.stickerId,
+      body.useMegaphone,
+    )
     const profile = this.chatService.getProfileBySocketId(client.id)
 
     const messagePayload = {
@@ -214,21 +227,26 @@ export class MatchesGateway
     )
     await this.redisService.redis.ltrim(matchKey, -50, -1)
 
-    await this.redisService.redis.zincrby('leaderboard:chat-messages', 1, user.id);
+    await this.redisService.redis.zincrby(
+      'leaderboard:chat-messages',
+      1,
+      user.id,
+    )
 
     if (isMegaphoneActive) {
-      const megaphoneQueueKey = `chat:match:${matchId}:megaphone:queue`;
+      const megaphoneQueueKey = `chat:match:${matchId}:megaphone:queue`
       await this.redisService.redis.rpush(
         megaphoneQueueKey,
-        JSON.stringify(messagePayload)
-      );
+        JSON.stringify(messagePayload),
+      )
 
-      const queuePosition = await this.redisService.redis.llen(megaphoneQueueKey);
+      const queuePosition =
+        await this.redisService.redis.llen(megaphoneQueueKey)
 
       this.server.to(`user:${user.id}`).emit('megaphone_queued', {
         position: queuePosition,
         message: 'Tu megáfono está en cola para este partido',
-      });
+      })
     }
 
     // 8. Emisión del mensaje
@@ -263,9 +281,12 @@ export class MatchesGateway
     return { status: 'ok', message: 'Mensaje de partido eliminado' }
   }
 
-
   // Agregá este método al final de tu clase MatchesGateway
-  private async sendBotGoalMessage(matchId: string, teamName: string, playerName: string) {
+  private async sendBotGoalMessage(
+    matchId: string,
+    teamName: string,
+    playerName: string,
+  ) {
     // Array de frases random con la jerga que pediste
     const templates = [
       `¡GOOOLASOOO de ${playerName}! ⚽🔥`,
@@ -273,11 +294,11 @@ export class MatchesGateway
       `¡Apareció ${playerName} para gritar el gol! Agarrate Agarrate 😱`,
       `¡GOL de la ${teamName.toLowerCase()}neta! 🚙💨`,
       `¡Grito sagrado de ${playerName}! Explotó la tribuna 🏟️🔊`,
-      `Definió como los dioses... ¡Gooool de ${teamName}! 🏆`
-    ];
+      `Definió como los dioses... ¡Gooool de ${teamName}! 🏆`,
+    ]
 
-    const randomIndex = Math.floor(Math.random() * templates.length);
-    const botText = templates[randomIndex];
+    const randomIndex = Math.floor(Math.random() * templates.length)
+    const botText = templates[randomIndex]
 
     const messagePayload = {
       messageId: randomUUID(),
@@ -294,16 +315,16 @@ export class MatchesGateway
       chatBubbleId: null,
       isMegaphone: false,
       timestamp: Date.now(),
-    };
+    }
 
-    const matchKey = `chat:match:${matchId}:history`;
+    const matchKey = `chat:match:${matchId}:history`
 
     await this.redisService.redis.rpush(
       matchKey,
-      JSON.stringify(messagePayload)
-    );
-    await this.redisService.redis.ltrim(matchKey, -50, -1);
+      JSON.stringify(messagePayload),
+    )
+    await this.redisService.redis.ltrim(matchKey, -50, -1)
 
-    this.server.to(`match_${matchId}`).emit('on-message', messagePayload);
+    this.server.to(`match_${matchId}`).emit('on-message', messagePayload)
   }
 }

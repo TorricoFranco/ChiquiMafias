@@ -7,7 +7,7 @@ export class PrematchTrackerService {
   private readonly logger = new Logger(PrematchTrackerService.name)
   private readonly MINUTES_BEFORE = 30
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
   async trackUpcomingMatches() {
