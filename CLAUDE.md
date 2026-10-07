@@ -14,7 +14,6 @@ Plataforma de fútbol argentino: datos en vivo, chat, encuestas, apuestas virtua
 | `discord-bot/` | Express 5 + discord.js 14 (backoffice de soporte y moderación) | activo | `discord-bot/CLAUDE.md` |
 | `frontend/` | Next.js anterior | **LEGACY: no editar**, solo consultar como referencia | — |
 
-El `CLAUDE.md` de cada carpeta se carga solo cuando trabajás ahí. Lanzá `claude` desde esta raíz.
 
 ## Levantar el entorno
 
@@ -49,7 +48,8 @@ Producción: `docker-compose.yml`.
   - `.github/workflows/frontend.yml`: `new_frontend` (lint y typecheck de `e2e/`, build y Playwright mockeado), en push/PR a `develop` y `main` cuando cambia `new_frontend/`.
 - Ramas desde `develop`: `feat/…`, `fix/…`, `refactor/…`, `perf/…`, `security/…`, `test/…`, `chore/…`.
 - Commits convencionales en inglés: `tipo(scope): mensaje`, por ejemplo `fix(bets): …` o `test(webhook): …`.
-- No commitear, pushear ni crear ramas sin que te lo pidan.
+- **Al terminar un fix o feature con los tests en verde, correr automáticamente la skill `/finalizar-feature`** (crea o reusa la rama, commitea, pushea y abre la PR contra `develop`), sin esperar que se pida cada vez. La skill igual pide confirmación puntual antes de commitear (muestra rama + mensaje propuestos) — esa confirmación no se saltea nunca.
+- **`main` es 100% manual**: nunca hacer checkout, commit, push ni merge contra `main`, ni abrir PR contra `main`, salvo que se pida explícitamente en el prompt de esa tarea puntual. Ninguna aprobación genérica anterior habilita tocar `main`.
 
 ## Reglas que siempre aplican
 
@@ -63,7 +63,7 @@ Producción: `docker-compose.yml`.
 
 - Skills: `/nest-module <nombre>`, `/frontend-feature <dominio>`, `/verificar`. `nestjs-best-practices` se activa sola en `backend/src`.
 - Subagentes: `backend-reviewer` (dinero, concurrencia, auth), `frontend-reviewer` (new_frontend: sesión, flujos con monedas, sockets, Next 16, impacto en e2e) y `contract-checker` (backend ↔ new_frontend y backend ↔ discord-bot).
-- Reglas por zona en `.claude/rules/`: dinero y concurrencia, Prisma y UI. Se cargan solas según el archivo que se toque.
+- Reglas por zona en `.claude/rules/`. Backend: API y auth, servicios, tiempo real, crons y colas, tests, dinero y concurrencia, y Prisma. Frontend: UI y tests e2e (Playwright). Se cargan solas según el archivo que se toque.
 - Permisos compartidos en `.claude/settings.json`; los personales van en `.claude/settings.local.json` (no se commitea).
 
 ## Documentación existente
