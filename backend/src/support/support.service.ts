@@ -9,6 +9,7 @@ import { CreateReportDto } from './dto/create-report.dto'
 import { CreateTicketDto } from './dto/create-ticket.dto'
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto'
 import { SystemRole } from 'src/auth/enums/roles.enum'
+import { assertCanSanction } from 'src/auth/utils/assert-can-sanction'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { ReportResolvedPayload } from './interfaces/report-resolved.interface'
 import {
@@ -18,13 +19,12 @@ import {
   ReportStatus,
 } from '@prisma/client'
 
-
 @Injectable()
 export class SupportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   async getSupportStats() {
     const [openTickets, pendingReports] = await Promise.all([
@@ -34,12 +34,12 @@ export class SupportService {
       this.prisma.report.count({
         where: { status: ReportStatus.PENDING },
       }),
-    ]);
+    ])
 
     return {
       openTickets,
       pendingReports,
-    };
+    }
   }
 
   async createReport(reporterId: string, dto: CreateReportDto) {
@@ -56,13 +56,23 @@ export class SupportService {
     }
 
     if (dto.commentId) {
-      const comment = await this.prisma.comment.findUnique({ where: { id: dto.commentId } });
-      if (!comment) throw new NotFoundException('El comentario que intentas reportar no existe.');
+      const comment = await this.prisma.comment.findUnique({
+        where: { id: dto.commentId },
+      })
+      if (!comment)
+        throw new NotFoundException(
+          'El comentario que intentas reportar no existe.',
+        )
     }
 
     if (dto.pollId) {
-      const poll = await this.prisma.poll.findUnique({ where: { id: dto.pollId } });
-      if (!poll) throw new NotFoundException('La encuesta que intentas reportar no existe.');
+      const poll = await this.prisma.poll.findUnique({
+        where: { id: dto.pollId },
+      })
+      if (!poll)
+        throw new NotFoundException(
+          'La encuesta que intentas reportar no existe.',
+        )
     }
 
     const report = await this.prisma.report.create({
@@ -81,7 +91,6 @@ export class SupportService {
     return report
   }
 
-
   async resolveReport(
     reportId: string,
     adminIdentifier: string,
@@ -99,13 +108,47 @@ export class SupportService {
 
     const isFromWebAdmin = adminIdentifier.length === 36
 
-    const resolvedReport = await this.prisma.report.update({
-      where: { id: reportId },
-      data: {
-        status: 'RESOLVED',
-        resolvedById: isFromWebAdmin ? adminIdentifier : null,
-      },
+    // WARN no exige jerarquía: así se pueden cerrar reportes contra staff.
+    const requiresHierarchy = action !== 'WARN'
+
+    if (isFromWebAdmin) {
+      if (adminIdentifier === report.reportedId) {
+        throw new ForbiddenException(
+          'No podés resolver un reporte contra vos mismo.',
+        )
+      }
+      if (requiresHierarchy) {
+        await assertCanSanction(this.prisma, adminIdentifier, report.reportedId)
+      }
+    } else if (requiresHierarchy) {
+      // Desde Discord no sabemos qué usuario de la app actúa: solo puede
+      // sancionar a USERs. Al staff se lo sanciona desde el panel web.
+      const reported = await this.prisma.user.findUnique({
+        where: { id: report.reportedId },
+        select: { role: true },
+      })
+      if (reported?.role !== SystemRole.USER) {
+        throw new ForbiddenException(
+          'Las sanciones a miembros del staff se resuelven desde el panel web.',
+        )
+      }
+    }
+
+    // Update condicional: si dos resoluciones llegan juntas (web + Discord o
+    // doble click), solo una pasa y se emite un único report.resolved.
+    const resolvedById = isFromWebAdmin ? adminIdentifier : null
+    const { count } = await this.prisma.report.updateMany({
+      where: { id: reportId, status: { not: 'RESOLVED' } },
+      data: { status: 'RESOLVED', resolvedById },
     })
+
+    if (count === 0) throw new BadRequestException('El reporte ya fue resuelto')
+
+    const resolvedReport = {
+      ...report,
+      status: 'RESOLVED' as const,
+      resolvedById,
+    }
 
     this.eventEmitter.emit('report.resolved', {
       reportId: resolvedReport.id,
@@ -113,22 +156,21 @@ export class SupportService {
       action,
       durationHours,
       reason,
-    } as ReportResolvedPayload)
+    })
 
     return resolvedReport
   }
-
 
   async getReports(
     page: number = 1,
     limit: number = 10,
     status?: ReportStatus,
   ) {
-    const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit
 
-    const whereCondition: any = {};
+    const whereCondition: any = {}
     if (status) {
-      whereCondition.status = status;
+      whereCondition.status = status
     }
 
     const [reports, total] = await Promise.all([
@@ -174,7 +216,7 @@ export class SupportService {
         },
       }),
       this.prisma.report.count({ where: whereCondition }),
-    ]);
+    ])
 
     return {
       data: reports,
@@ -184,10 +226,8 @@ export class SupportService {
         limit,
         lastPage: Math.ceil(total / limit),
       },
-    };
+    }
   }
-
-
 
   async createTicket(userId: string, dto: CreateTicketDto, isBanned = false) {
     const ticket = await this.prisma.$transaction(async (tx) => {
@@ -392,7 +432,6 @@ export class SupportService {
     }
   }
 
-
   async getMyTickets(userId: string, isBanned = false) {
     return await this.prisma.ticket.findMany({
       where: {
@@ -446,13 +485,13 @@ export class SupportService {
               select: {
                 id: true,
                 username: true,
-                role: true
-              }
-            }
+                role: true,
+              },
+            },
           },
         },
       },
-    });
+    })
 
     if (!ticket) throw new NotFoundException('Ticket no encontrado')
     return ticket

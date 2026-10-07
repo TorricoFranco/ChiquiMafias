@@ -4,7 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  ForbiddenException
+  ForbiddenException,
 } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { Prisma } from '@prisma/client'
@@ -16,6 +16,7 @@ import { OnEvent } from '@nestjs/event-emitter/dist/decorators/on-event.decorato
 import { UserEntity } from './entities/user.entity'
 import { GetUsersQueryDto } from './dto/get-users-query.dto'
 import { ROLE_HIERARCHY } from 'src/auth/enums/roles.enum'
+import { assertCanSanction } from 'src/auth/utils/assert-can-sanction'
 import type { ActiveUser } from 'src/auth/interfaces/active-user.interface'
 
 export interface PaginatedUsersResponse {
@@ -35,7 +36,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly chatService: ChatService,
     private readonly redisService: RedisService,
-  ) { }
+  ) {}
 
   @OnEvent('report.resolved')
   async handleReportResolved(payload: {
@@ -44,10 +45,10 @@ export class UsersService {
   }) {
     switch (payload.action) {
       case 'BAN':
-        await this.banUser(payload.targetUserId)
+        await this.applyBan(payload.targetUserId)
         break
       case 'UNBAN':
-        await this.unbanUser(payload.targetUserId)
+        await this.applyUnban(payload.targetUserId)
         break
     }
   }
@@ -58,12 +59,12 @@ export class UsersService {
 
     const where: Prisma.UserWhereInput = search
       ? {
-        OR: [
-          { username: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { name: { contains: search, mode: 'insensitive' } },
-        ],
-      }
+          OR: [
+            { username: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search, mode: 'insensitive' } },
+          ],
+        }
       : {}
 
     const [users, total] = await Promise.all([
@@ -95,33 +96,53 @@ export class UsersService {
     }
   }
 
-  async updateRole(currentUser: ActiveUser, targetUserId: string, newRole: SystemRole): Promise<UserEntity> {
+  async updateRole(
+    currentUser: ActiveUser,
+    targetUserId: string,
+    newRole: SystemRole,
+  ): Promise<UserEntity> {
     // REGLA 1: No se puede cambiar el rol a uno mismo
-    const currentUserId = currentUser.id || (currentUser as any).sub;
+    const currentUserId = currentUser.id || (currentUser as any).sub
     if (currentUserId === targetUserId) {
-      throw new ForbiddenException('No podés modificar tu propio rol, pa.');
+      throw new ForbiddenException('No podés modificar tu propio rol, pa.')
     }
 
-    const targetUser = await this.prisma.user.findUnique({
-      where: { id: targetUserId },
-    })
+    // El rol del actor sale de la DB y no del JWT: un moderador degradado
+    // no conserva el poder hasta que venza su token.
+    const [actor, targetUser] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: currentUserId as string },
+        select: { role: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: targetUserId },
+      }),
+    ])
 
     if (!targetUser) {
-      throw new NotFoundException('El usuario objetivo no existe.');
+      throw new NotFoundException('El usuario objetivo no existe.')
     }
 
-    const currentUserPower = ROLE_HIERARCHY.indexOf(currentUser.role as SystemRole);
-    const targetUserPower = ROLE_HIERARCHY.indexOf(targetUser.role as SystemRole);
-    const newRolePower = ROLE_HIERARCHY.indexOf(newRole);
+    if (!actor) {
+      throw new ForbiddenException('No tenés permisos para modificar roles.')
+    }
+
+    const currentUserPower = ROLE_HIERARCHY.indexOf(actor.role)
+    const targetUserPower = ROLE_HIERARCHY.indexOf(targetUser.role)
+    const newRolePower = ROLE_HIERARCHY.indexOf(newRole)
 
     // REGLA 2: No se puede modificar a alguien con igual o mayor jerarquia
     if (targetUserPower >= currentUserPower) {
-      throw new ForbiddenException('No tenés permisos para modificar a un usuario de igual o mayor jerarquía.');
+      throw new ForbiddenException(
+        'No tenés permisos para modificar a un usuario de igual o mayor jerarquía.',
+      )
     }
 
     // REGLA 3: No se puede dar un rol mayor al que se tiene
     if (newRolePower > currentUserPower) {
-      throw new ForbiddenException(`No se puede asignar un rol superior al tuyo (${currentUser.role}).`);
+      throw new ForbiddenException(
+        `No se puede asignar un rol superior al tuyo (${actor.role}).`,
+      )
     }
 
     const updatedUser = await this.prisma.user.update({
@@ -226,7 +247,19 @@ export class UsersService {
     return updatedUser
   }
 
-  async banUser(userId: string) {
+  async banUser(actor: ActiveUser, userId: string) {
+    await assertCanSanction(this.prisma, actor.id, userId)
+    return this.applyBan(userId)
+  }
+
+  async unbanUser(actor: ActiveUser, userId: string) {
+    await assertCanSanction(this.prisma, actor.id, userId)
+    return this.applyUnban(userId)
+  }
+
+  // Sin chequeo de jerarquía: lo usa report.resolved, que ya lo validó en
+  // SupportService.resolveReport (o viene del bot de Discord).
+  private async applyBan(userId: string) {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { status: 'BANNED' },
@@ -240,7 +273,7 @@ export class UsersService {
     }
   }
 
-  async unbanUser(userId: string) {
+  private async applyUnban(userId: string) {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { status: 'ACTIVE' },
@@ -278,25 +311,25 @@ export class UsersService {
             longestWinStreak: true,
             highestMultiplier: true,
             totalBetsWon: true,
-          }
-        }
+          },
+        },
       },
-    });
+    })
 
     if (!profile) {
-      throw new NotFoundException('Usuario no encontrado');
+      throw new NotFoundException('Usuario no encontrado')
     }
 
     let bannerAssetId: string | null = await this.redisService.redis.get(
       `user:cosmetics:${userId}:banner`,
-    );
+    )
 
     if (!bannerAssetId && profile.activeBannerId) {
       const bannerItem = await this.prisma.storeItem.findUnique({
         where: { id: profile.activeBannerId },
         select: { assetId: true },
-      });
-      bannerAssetId = bannerItem?.assetId || null;
+      })
+      bannerAssetId = bannerItem?.assetId || null
 
       if (bannerAssetId) {
         await this.redisService.redis.set(
@@ -304,16 +337,16 @@ export class UsersService {
           bannerAssetId,
           'EX',
           86400,
-        );
+        )
       }
     }
 
     const score = await this.redisService.redis.zscore(
       'leaderboard:chat-messages',
       userId,
-    );
+    )
 
-    const messagesCount = score ? parseInt(score, 10) : 0;
+    const messagesCount = score ? parseInt(score, 10) : 0
 
     return {
       id: profile.id,
@@ -330,10 +363,9 @@ export class UsersService {
         longestWinStreak: 0,
         highestMultiplier: 0,
         totalBetsWon: 0,
-      }
-    };
+      },
+    }
   }
-
 
   async getAllUsersBalances(): Promise<UserBalanceResponse[]> {
     return this.prisma.wallet.findMany({
