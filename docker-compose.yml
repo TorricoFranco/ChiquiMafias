@@ -63,29 +63,31 @@ services:
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       NODE_ENV: ${NODE_ENV}
+      # Fijo: pisa cualquier valor del .env. dev-login y test-events nunca en prod.
+      ENABLE_DEV_TOOLS: "false"
 
 
-  frontend:
-    container_name: football_frontend
-    build:
-      context: ./frontend
-      args:
-        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-        - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
-        - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
-        - API_INTERNAL_URL=${API_INTERNAL_URL}
-        
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-      - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
-      - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
-      - API_INTERNAL_URL=${API_INTERNAL_URL}
-    depends_on:
-      - backend
-
+#   frontend:
+#     container_name: football_frontend
+#     build:
+#       context: ./frontend
+#       args:
+#         - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+#         - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+#         - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+#         - API_INTERNAL_URL=${API_INTERNAL_URL}
+#         
+#     restart: unless-stopped
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+#       - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+#       - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+#       - API_INTERNAL_URL=${API_INTERNAL_URL}
+#     depends_on:
+#       - backend
+# 
   new_frontend: 
     container_name: football_new_frontend
     build:

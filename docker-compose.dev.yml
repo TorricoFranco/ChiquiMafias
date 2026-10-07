@@ -76,33 +76,33 @@ services:
       DOCKER_HOST: 'unix:///var/run/docker.sock'
       NODE_ENV: ${NODE_ENV}
 
-  frontend:
-    container_name: football_frontend
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-      args:
-        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-        - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
-        - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
-        - API_INTERNAL_URL=${API_INTERNAL_URL}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env.dev
-    environment:
-      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-      - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
-      - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
-      - API_INTERNAL_URL=${API_INTERNAL_URL}
-      - CHOKIDAR_USEPOLLING=true
-    depends_on:
-      - backend
-
+#   frontend:
+#     container_name: football_frontend
+#     build:
+#       context: ./frontend
+#       dockerfile: Dockerfile.dev
+#       args:
+#         - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+#         - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+#         - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+#         - API_INTERNAL_URL=${API_INTERNAL_URL}
+#     volumes:
+#       - ./frontend:/app
+#       - /app/node_modules
+#       - /app/.next
+#     ports:
+#       - "3000:3000"
+#     env_file:
+#       - .env.dev
+#     environment:
+#       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+#       - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
+#       - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+#       - API_INTERNAL_URL=${API_INTERNAL_URL}
+#       - CHOKIDAR_USEPOLLING=true
+#     depends_on:
+#       - backend
+# 
   new_frontend:
     container_name: football_new_frontend
     build:
@@ -137,8 +137,6 @@ services:
     command:
       - "http"
       - "backend:3007"
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     ports:
       - "4040:4040"
     env_file:
