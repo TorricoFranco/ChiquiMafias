@@ -36,7 +36,10 @@ export const ApprovePollModal: React.FC<ApprovePollModalProps> = ({ poll, onClos
                     <div className="bg-[#131313] p-3 rounded-xl border border-[#353534]">
                         <span className="text-[10px] text-[#909378] uppercase font-bold">Pregunta:</span>
                         <p className="font-bold text-xs text-[#e5e2e1] mt-0.5">{poll.title}</p>
-                        <span className="text-[10px] text-[#d2f000] mt-1 block">Por: @{poll.user?.username}</span>
+                        <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] text-[#d2f000]">Por: @{poll.user?.username}</span>
+                            <span className="text-[10px] font-mono font-bold text-[#c6c9ab]">Ícono: {poll.icon || 'FOOTBALL'}</span>
+                        </div>
                     </div>
 
                     <div className="flex flex-col gap-1">

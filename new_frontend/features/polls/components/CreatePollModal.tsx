@@ -15,6 +15,7 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [options, setOptions] = useState(["", ""]);
+    const [icon, setIcon] = useState("FOOTBALL");
 
     const { data: inventory, isLoading: isLoadingInventory } = useUserInventory();
     const { mutate: proposePoll, isPending } = useProposePoll();
@@ -57,7 +58,8 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
             {
                 title: title.trim(),
                 description: cleanDescription,
-                options: validOptions
+                options: validOptions,
+                icon
             },
             {
                 onSuccess: () => {
@@ -66,6 +68,7 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                     setTitle("");
                     setDescription("");
                     setOptions(["", ""]);
+                    setIcon("FOOTBALL");
                 },
                 onError: (error: any) => {
                     console.error("Error del backend al proponer:", error);
@@ -144,6 +147,22 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                                 className="w-full bg-[#131313] border border-[#353534] rounded-lg p-3 text-sm text-[#e5e2e1] focus:outline-none focus:border-[#d2f000] transition-colors min-h-[80px] resize-none"
                                 maxLength={250}
                             />
+                        </div>
+
+                        {/* Ícono temático */}
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="propose-poll-icon" className="text-sm font-bold text-[#c6c9ab]">Ícono temático</label>
+                            <select
+                                id="propose-poll-icon"
+                                value={icon}
+                                onChange={(e) => setIcon(e.target.value)}
+                                className="w-full bg-[#131313] border border-[#353534] rounded-lg p-3 text-sm text-[#e5e2e1] focus:outline-none focus:border-[#d2f000] transition-colors"
+                            >
+                                <option value="FOOTBALL">⚽ FOOTBALL</option>
+                                <option value="TROPHY">🏆 TROPHY</option>
+                                <option value="FIRE">🔥 FIRE</option>
+                                <option value="USER">👤 USER</option>
+                            </select>
                         </div>
 
                         {/* Opciones */}

@@ -129,7 +129,7 @@ test.describe("Encuestas de la tribuna", () => {
 
     await expect(page.getByText("¡Encuesta enviada a moderación!")).toBeVisible();
     await expect(modal).toBeHidden();
-    expect(api.lastRequest("POST", "/polls/propose")?.body).toEqual({ title: "¿Vuelve Riquelme a jugar?", options: ["Sí", "No"] });
+    expect(api.lastRequest("POST", "/polls/propose")?.body).toEqual({ title: "¿Vuelve Riquelme a jugar?", options: ["Sí", "No"], icon: "FOOTBALL" });
   });
 
   test("sin tickets no se puede proponer una encuesta", async ({ app, page, session }) => {
