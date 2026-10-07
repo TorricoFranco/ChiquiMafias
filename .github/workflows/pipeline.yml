@@ -59,6 +59,7 @@ jobs:
           MERCADO_PAGO_API_URL: "https://api.mercadopago.com"
           MERCADO_PAGO_ACCESS_TOKEN: "dummy_mp_token"
           MERCADO_PAGO_WEBHOOK_URL: "http://localhost/webhook"
+          MERCADO_PAGO_WEBHOOK_SECRET: "dummy_webhook_secret"
           CLOUDINARY_CLOUD_NAME: "dummy_cloud"
           CLOUDINARY_API_KEY: "dummy_key"
           CLOUDINARY_API_SECRET: "dummy_secret"
@@ -68,6 +69,8 @@ jobs:
           FRONTEND_SUCCESS_URL: "http://localhost:3000/success"
           FRONTEND_FAILURE_URL: "http://localhost:3000/failure"
           FRONTEND_PENDING_URL: "http://localhost:3000/pending"
+          FRONTEND_URL: "http://localhost:3005"
+          CLIENT_URL: "http://localhost:3005"
           
           TESTCONTAINERS_RYUK_DISABLED: 'true'
 
