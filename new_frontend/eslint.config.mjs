@@ -1,10 +1,22 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import playwright from "eslint-plugin-playwright";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    ...playwright.configs["flat/recommended"],
+    files: ["e2e/**/*.ts"],
+  },
+  {
+    files: ["e2e/**/*.ts"],
+    rules: {
+      // El `use` de los fixtures de Playwright no es el hook de React.
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -12,6 +24,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Salidas de Playwright:
+    "playwright-report/**",
+    "test-results/**",
+    "blob-report/**",
+    "playwright/.auth/**",
   ]),
 ]);
 

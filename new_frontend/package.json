@@ -6,7 +6,16 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:e2e": "cross-env E2E_DEV_SERVER=1 NEXT_PUBLIC_API_URL=http://localhost:3007 NEXT_PUBLIC_GOOGLE_CLIENT_ID=e2e-google-client-id next dev --webpack -p 3100",
+    "build:e2e": "cross-env NEXT_PUBLIC_API_URL=http://localhost:3007 NEXT_PUBLIC_GOOGLE_CLIENT_ID=e2e-google-client-id next build --webpack",
+    "start:e2e": "next start -p 3100",
+    "test:e2e": "playwright test --project=mocked-desktop --project=mocked-mobile",
+    "test:e2e:fullstack": "playwright test --project=fullstack",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report",
+    "typecheck:e2e": "tsc -p e2e"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.1",
@@ -24,14 +33,18 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/google.accounts": "^0.0.18",
     "@types/js-cookie": "^3.0.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
+    "eslint-plugin-playwright": "^2.12.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
