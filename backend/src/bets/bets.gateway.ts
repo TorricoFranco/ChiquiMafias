@@ -3,10 +3,10 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  OnGatewayConnection,
+  OnGatewayInit,
 } from '@nestjs/websockets'
 import { UseFilters, Logger, UseGuards } from '@nestjs/common'
-import { Server, Socket } from 'socket.io'
+import { Namespace, Server, Socket } from 'socket.io'
 import { WsJwtGuard } from '../auth/guards/ws-jwt.guard'
 import { AuthService } from '../auth/auth.service'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
@@ -16,46 +16,49 @@ import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 })
 @UseFilters(AllWsExceptionFilter)
 @UseGuards(WsJwtGuard)
-export class BetsGateway implements OnGatewayConnection {
+export class BetsGateway implements OnGatewayInit {
   private readonly logger = new Logger(BetsGateway.name)
 
   @WebSocketServer()
   public server: Server
 
   private readonly DASHBOARD_ROOM = 'bets_dashboard'
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
-  async handleConnection(client: Socket) {
-    try {
-      const token =
-        client.handshake.auth?.token ||
-        client.handshake.headers['authorization']
+  // La auth va en un middleware y no en handleConnection: así el cliente
+  // recibe `connect` con el usuario ya cargado y ningún mensaje (por ejemplo
+  // join_dashboard) llega antes de terminar de autenticar. Si se rechaza,
+  // el cliente recibe connect_error y no reintenta solo.
+  afterInit(namespace: Namespace) {
+    namespace.use((socket, next) => {
+      this.authenticate(socket)
+        .then(() => next())
+        .catch((error: Error) => next(error))
+    })
+  }
 
-      if (!token) {
-        this.logger.warn(
-          `Intento de conexión a apuestas sin token: ${client.id}`,
-        )
-        client.disconnect()
-        return
-      }
+  private async authenticate(socket: Socket) {
+    const token =
+      (socket.handshake.auth?.token as string | undefined) ||
+      socket.handshake.headers['authorization']
 
-      const user = await this.authService.verifyToken(token)
-      if (!user) {
-        this.logger.warn(
-          `Usuario no válido intentando conectar a apuestas: ${client.id}`,
-        )
-        client.disconnect()
-        return
-      }
-
-      client.data.user = user
-      this.logger.log(`Cliente autenticado en apuestas: ${user.id}`)
-    } catch (error) {
-      this.logger.error(
-        `Error de autenticación en BetsGateway: ${error.message}`,
-      )
-      client.disconnect()
+    if (!token) {
+      this.logger.warn(`Intento de conexión a apuestas sin token: ${socket.id}`)
+      throw new Error('No autorizado')
     }
+
+    // authenticateSocket rechaza usuarios BANNED (verifyToken no)
+    const user = await this.authService.authenticateSocket(token)
+    if (!user) {
+      this.logger.warn(
+        `Usuario no válido intentando conectar a apuestas: ${socket.id}`,
+      )
+      throw new Error('No autorizado')
+    }
+
+    const socketData = socket.data as { user?: typeof user }
+    socketData.user = user
+    this.logger.log(`Cliente autenticado en apuestas: ${user.id}`)
   }
 
   @SubscribeMessage('join_dashboard')
