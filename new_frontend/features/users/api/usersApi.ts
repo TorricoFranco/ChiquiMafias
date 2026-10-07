@@ -25,12 +25,18 @@ export const adminUsersApi = {
 
     banUser: async (userId: string): Promise<void> => {
         const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}/ban`, { method: 'PATCH' });
-        if (!res.ok) throw new Error('Error al banear usuario');
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Error al banear usuario');
+        }
     },
 
     unbanUser: async (userId: string): Promise<void> => {
         const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}/unban`, { method: 'PATCH' });
-        if (!res.ok) throw new Error('Error al desbanear usuario');
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Error al desbanear usuario');
+        }
     },
 
     updateRole: async (data: { userId: string; role: SystemRole }): Promise<void> => {
@@ -50,7 +56,10 @@ export const adminUsersApi = {
             method: 'POST',
             body: JSON.stringify(data),
         });
-        if (!res.ok) throw new Error('Error al silenciar usuario');
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Error al silenciar usuario');
+        }
     },
 
     unmuteUser: async (userId: string): Promise<void> => {
@@ -58,7 +67,10 @@ export const adminUsersApi = {
             method: 'POST',
             body: JSON.stringify({ userId }),
         });
-        if (!res.ok) throw new Error('Error al desmutear usuario');
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Error al desmutear usuario');
+        }
     },
 
 

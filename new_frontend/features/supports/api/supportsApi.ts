@@ -88,7 +88,10 @@ export const supportApi = {
             method: 'POST',
             body: JSON.stringify(data),
         });
-        if (!res.ok) throw new Error('Error al resolver el reporte');
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Error al resolver el reporte');
+        }
         return res.json();
     },
 
