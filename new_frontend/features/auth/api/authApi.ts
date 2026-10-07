@@ -18,13 +18,6 @@ export const authApi = {
         return res.json();
     },
 
-    refresh: async () => {
-        return await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
-            method: "POST",
-            credentials: "include",
-        });
-    },
-
     logout: async () => {
         return await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
             method: "POST",
