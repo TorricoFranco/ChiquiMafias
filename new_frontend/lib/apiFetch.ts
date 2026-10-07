@@ -1,18 +1,82 @@
 import { useUserStore } from "@/store/useUserStore";
 import Cookies from "js-cookie";
 
-let isRefreshing = false;
-// `null` = el refresh falló: cada request en cola se resuelve con su 401 original.
-let refreshSubscribers: ((token: string | null) => void)[] = [];
+// Un solo refresh en vuelo por pestaña: el backend rota el refresh token, así que dos pedidos en paralelo
+// con la misma cookie hacen que el segundo dé 401 y cierre la sesión.
+let refreshPromise: Promise<string | null> | null = null;
 
-const subscribeTokenRefresh = (cb: (token: string | null) => void) => {
-    refreshSubscribers.push(cb);
+// Solo mira `exp` (sin validar la firma) para decidir si vale la pena reusar el token de otra pestaña.
+const isTokenFresh = (token: string) => {
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        return typeof payload.exp === "number" && payload.exp * 1000 > Date.now() + 30_000;
+    } catch {
+        return false;
+    }
 };
 
-const onRefreshed = (token: string | null) => {
-    refreshSubscribers.forEach((cb) => cb(token));
-    refreshSubscribers = [];
+// Serializa el refresh entre pestañas cuando el navegador lo soporta.
+const withRefreshLock = async (fn: () => Promise<string | null>): Promise<string | null> =>
+    typeof navigator !== "undefined" && navigator.locks
+        ? await navigator.locks.request("chiquimafias-auth-refresh", fn)
+        : fn();
+
+const requestNewToken = async (failedToken: string | null): Promise<string | null> => {
+    // Otra pestaña pudo renovar mientras esperábamos el lock: la cookie `accessToken` es compartida.
+    const sharedToken = Cookies.get("accessToken");
+    if (sharedToken && sharedToken !== failedToken && isTokenFresh(sharedToken)) {
+        useUserStore.getState().setUserInfo({ accessToken: sharedToken });
+        return sharedToken;
+    }
+
+    try {
+        const refreshRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+            method: "POST",
+            credentials: "include",
+        });
+
+        if (!refreshRes.ok) {
+            await useUserStore.getState().logout();
+            return null;
+        }
+
+        const data = await refreshRes.json();
+        const newAccessToken: string = data.access_token;
+
+        useUserStore.getState().setUserInfo({ accessToken: newAccessToken });
+        Cookies.set("accessToken", newAccessToken, {
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            expires: 7
+        });
+
+        // El refresh no rechaza a un usuario baneado (conserva el token para apelar): mostramos la apelación.
+        if (data.user?.status === "BANNED") {
+            useUserStore.getState().setIsBanned(true);
+        }
+
+        return newAccessToken;
+    } catch {
+        await useUserStore.getState().logout();
+        return null;
+    }
 };
+
+/**
+ * Renueva el access token con la cookie de refresh. Las llamadas concurrentes comparten el mismo pedido.
+ * Devuelve `null` si la sesión no se pudo renovar (y en ese caso ya cerró la sesión local).
+ */
+export function refreshAccessToken(failedToken: string | null = useUserStore.getState().accessToken): Promise<string | null> {
+    // En el servidor no hay cookie de refresh que mandar.
+    if (typeof window === "undefined") return Promise.resolve(null);
+
+    if (!refreshPromise) {
+        refreshPromise = withRefreshLock(() => requestNewToken(failedToken)).finally(() => {
+            refreshPromise = null;
+        });
+    }
+    return refreshPromise;
+}
 
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
     let accessToken = null;
@@ -51,69 +115,15 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 
     // Sin access token no hay sesión que renovar: un visitante no dispara refresh ni logout.
     if (response.status === 401 && accessToken && !url.includes("/auth/refresh") && !url.includes("/auth/google")) {
+        const newAccessToken = await refreshAccessToken(accessToken);
+        // Sin token nuevo, la request se resuelve con su 401 original.
+        if (!newAccessToken) return response;
 
-        if (isRefreshing) {
-            return new Promise((resolve) => {
-                subscribeTokenRefresh(async (newToken) => {
-                    if (!newToken) {
-                        resolve(response);
-                        return;
-                    }
-                    const retryHeaders = new Headers(options.headers);
-                    retryHeaders.set("Authorization", `Bearer ${newToken}`);
-                    options.headers = retryHeaders;
-                    resolve(await fetch(url, options));
-                });
-            });
-        }
+        const retryHeaders = new Headers(options.headers);
+        retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
+        options.headers = retryHeaders;
 
-        isRefreshing = true;
-
-        try {
-            const refreshRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
-                method: "POST",
-                credentials: "include",
-            });
-
-            if (refreshRes.ok) {
-                const data = await refreshRes.json();
-
-                const newAccessToken = data.access_token;
-
-                if (typeof window !== "undefined") {
-                    useUserStore.getState().setUserInfo({ accessToken: newAccessToken });
-
-                    Cookies.set("accessToken", newAccessToken, {
-                        secure: process.env.NODE_ENV === "production",
-                        sameSite: "lax",
-                        expires: 7
-                    });
-                }
-
-                isRefreshing = false;
-                onRefreshed(newAccessToken);
-
-                const retryHeaders = new Headers(options.headers);
-                retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
-                options.headers = retryHeaders;
-
-                return await fetch(url, options);
-            } else {
-                isRefreshing = false;
-                onRefreshed(null);
-                if (typeof window !== "undefined") {
-                    await useUserStore.getState().logout();
-                }
-                return response;
-            }
-        } catch (error) {
-            isRefreshing = false;
-            onRefreshed(null);
-            if (typeof window !== "undefined") {
-                await useUserStore.getState().logout();
-            }
-            return response;
-        }
+        return await fetch(url, options);
     }
 
     return response;

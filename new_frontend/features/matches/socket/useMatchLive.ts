@@ -9,7 +9,9 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
   useEffect(() => {
     if (!socket || !matchId) return;
 
-    socket.emit('join_match', { matchId });
+    // Al reconectar, el socket ya no está en la sala: hay que volver a unirse.
+    const joinMatch = () => socket.emit('join_match', { matchId });
+    if (socket.connected) joinMatch();
 
     const queryKey = ['matchDetail', leagueId, season, matchId];
 
@@ -67,23 +69,25 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
       queryClient.invalidateQueries({ queryKey });
     };
 
+    const handleMatchDataUpdate = (payload: { type?: string }) => {
+      if (payload.type === 'MATCH_ENDED') handleForceUpdate();
+    };
+
+    socket.on('connect', joinMatch);
     socket.on('match_live_update', handleMatchLiveUpdate);
     socket.on('timeline_updated', handleTimelineEventsUpdate);
     socket.on('stats_updated', handleStatsUpdate);
     socket.on('lineups_updated', handleForceUpdate);
-    
-
-    socket.on('match_data_update', (payload) => {
-        if(payload.type === 'MATCH_ENDED') handleForceUpdate();
-    });
+    socket.on('match_data_update', handleMatchDataUpdate);
 
     return () => {
       socket.emit('leave_match', { matchId });
+      socket.off('connect', joinMatch);
       socket.off('match_live_update', handleMatchLiveUpdate);
       socket.off('timeline_updated', handleTimelineEventsUpdate);
       socket.off('stats_updated', handleStatsUpdate);
       socket.off('lineups_updated', handleForceUpdate);
-      socket.off('match_data_update');
+      socket.off('match_data_update', handleMatchDataUpdate);
     };
   }, [socket, leagueId, season, matchId, queryClient]);
 };

@@ -84,6 +84,27 @@ test.describe("Detalle de partido", () => {
     await expect(page.getByText("1T 23'")).toBeVisible();
   });
 
+  test("si el backend corta el socket por token vencido, renueva la sesión y vuelve a la sala del partido", { tag: "@p0" }, async ({ page, api, session, socket }) => {
+    session.loginAs("USER");
+    const match = buildMatchDetails({ metadata: { status: "1H" }, score: { home: 0, away: 0, elapsed: 10 } });
+    mockMatch(api, match);
+    const handshakeTokens: unknown[] = [];
+    socket.onConnect((auth) => handshakeTokens.push((auth as { token?: unknown } | undefined)?.token));
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await expect(scoreboard(page)).toHaveAccessibleName("Marcador: Boca Juniors 0, River Plate 0");
+    await socket.waitForEmit("join_match");
+    const joinsBefore = socket.emitted("join_match").length;
+
+    session.expireAccessToken();
+    await socket.disconnectAll();
+
+    await expect.poll(() => handshakeTokens).toContain(session.token);
+    await expect.poll(() => socket.emitted("join_match").length).toBeGreaterThan(joinsBefore);
+    await socket.emit("match_live_update", { matchId: match.metadata.id, type: "SCORE_UPDATED", h: 1, a: 0, status: "1H", elapsed: 31 });
+    await expect(scoreboard(page)).toHaveAccessibleName("Marcador: Boca Juniors 1, River Plate 0");
+  });
+
   test("si el detalle no carga se puede reintentar", async ({ page, api }) => {
     const match = buildMatchDetails();
     let available = false;

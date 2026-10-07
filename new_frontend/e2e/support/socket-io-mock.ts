@@ -90,6 +90,18 @@ export class SocketMock {
     this.rejected.set(nsp, message);
   }
 
+  /**
+   * Simula el `socket.disconnect()` del backend (por ejemplo, en `handleConnection` con el token vencido).
+   * Ante una desconexión del servidor, socket.io-client no reintenta solo.
+   */
+  async disconnectAll({ nsp = "/", timeout = 10_000 } = {}) {
+    await this.waitForConnection({ nsp, timeout });
+    for (const connection of this.connectionsIn(nsp)) {
+      connection.namespaces.delete(nsp);
+      connection.ws.send(`41${prefix(nsp)}`);
+    }
+  }
+
   /** Emite a todas las conexiones del namespace; espera a que haya al menos una. */
   async emit(event: string, data?: unknown, { nsp = "/", timeout = 10_000 } = {}) {
     await this.waitForConnection({ nsp, timeout });

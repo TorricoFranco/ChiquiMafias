@@ -17,7 +17,7 @@ paths:
 - `e2e/support/`:
   - `api-mock.ts`: `api.on(method, path, body)`, `api.handle(...)` para respuestas dinámicas, y `api.lastRequest`, `api.requests` y `api.waitFor` para asserts.
   - `session.ts`: `loginAs(role, overrides, { balance })`, `loginAsBanned`, `expireAccessToken`, `banAfterRefresh`.
-  - `socket-io-mock.ts`: `emit`, `onEmit` (acks), `onConnect`, `waitForEmit`, `waitForConnection`.
+  - `socket-io-mock.ts`: `emit`, `onEmit` (acks), `onConnect`, `waitForEmit`, `waitForConnection`, `disconnectAll` (el backend corta el socket).
   - `defaults.ts`: respuestas vacías de lo que pide el layout en cada carga.
   - `public-routes.ts`: copia de las rutas `@Public` y `@AllowBannedForAppeal` del backend. Si el backend cambia un guard, actualizala.
 - `e2e/factories/`: `build<X>(overrides)` tipados con `@/features/<dominio>/types`. Nunca armes respuestas a mano en el spec.
