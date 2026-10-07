@@ -1,2 +1,2 @@
-- [Patrones de bug recurrentes](recurring-bug-patterns.md) — refresh fuera del lock, off sin handler, joins sin re-join, io() propio, Fast Refresh
-- [Decisiones de auth/sockets confirmadas](auth-socket-confirmed-decisions.md) — refresh de BANNED=200, kick en handleConnection, orden AuthProvider>SocketProvider
+- [Patrones de bug recurrentes](recurring-bug-patterns.md) — refresh fuera del lock, off sin handler, joins sin re-join, io() propio, Fast Refresh, e2e rojo por StrictMode
+- [Decisiones de auth/sockets confirmadas](auth-socket-confirmed-decisions.md) — refresh de BANNED=200, kick en handleConnection, providers, access token stateless, rotación bcrypt

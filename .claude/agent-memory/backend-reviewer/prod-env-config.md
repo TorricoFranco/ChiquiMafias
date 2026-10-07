@@ -11,3 +11,5 @@ En la review del 2026-10-05 el autor asumió que dejar `ENABLE_DEV_TOOLS` fuera 
 
 **Why:** los flags que solo deben existir en dev (ENABLE_DEV_TOOLS) dependen en realidad del contenido del `.env` de prod, que no se puede leer desde el repo.
 **How to apply:** para garantizar un valor en prod, ponelo fijo en `environment:` (pisa env_file) o validalo en Joi con `.when('NODE_ENV', ...)`. No des por bueno "no está en el compose". Relacionado: [[dev-tools-design]].
+
+Actualización 2026-10-06: `docker-compose.yml` ya fija `ENABLE_DEV_TOOLS: "false"` en `environment:` del backend (pisa el env_file), y Joi rechaza `true` con `NODE_ENV=production`. dev-login queda cerrado en prod por dos lados. Ojo: `NODE_ENV` sigue interpolado (`${NODE_ENV}`), y los scripts que se corren desde el host (p. ej. `seed:e2e`) cargan `backend/.env` vía Prisma, así que un guard por `NODE_ENV` en un script no prueba a qué DB apunta.
