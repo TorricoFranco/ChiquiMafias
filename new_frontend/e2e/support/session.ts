@@ -1,8 +1,12 @@
+import type { Page } from "@playwright/test";
 import type { Role } from "@/types/user";
 import { buildAuthUser, type AuthUser } from "../factories/user";
 import type { ApiMock } from "./api-mock";
 
 type SessionState = "anonymous" | "authenticated";
+
+/** Nombre del lock de `withRefreshLock` en `lib/apiFetch.ts`. */
+const REFRESH_LOCK = "chiquimafias-auth-refresh";
 
 /**
  * Sesión del backend simulada. La app restaura la sesión con POST /auth/refresh al montar,
@@ -58,6 +62,52 @@ export class MockSession {
   /** Invalida el access token vigente: la próxima request protegida da 401 y /auth/refresh entrega uno nuevo. */
   expireAccessToken() {
     this.tokenVersion += 1;
+  }
+
+  /**
+   * Rota el refresh token sin período de gracia: un /auth/refresh que se cruza con otro en vuelo responde 401.
+   * (El backend real falla un refresh más tarde, cuando la cookie y el hash quedan desfasados; el efecto es el mismo.)
+   *
+   * Para que el cruce no dependa del timing, el primer refresh queda retenido hasta que otra pestaña intente renovar:
+   * o llega su POST (sin lock, se pisan) o su pedido queda en cola en `navigator.locks` (con lock, espera su turno).
+   * Devuelve cuántos cruces hubo, para que el test verifique que de verdad hubo concurrencia.
+   */
+  rotateRefreshWithoutGrace(tabs: { api: ApiMock; page: Page }[], { timeout = 15_000 } = {}) {
+    const rotation = { crossings: 0 };
+    let inFlight = false;
+
+    const queuedInLock = async () => {
+      for (const { page } of tabs) {
+        const queued = await page
+          .evaluate(
+            async (name) => ((await navigator.locks.query()).pending ?? []).some((lock) => lock.name === name),
+            REFRESH_LOCK,
+          )
+          .catch(() => false);
+        if (queued) return true;
+      }
+      return false;
+    };
+
+    for (const { api } of tabs) {
+      api.handle("POST", "/auth/refresh", async () => {
+        if (inFlight) rotation.crossings += 1;
+        if (this.state === "anonymous" || inFlight) {
+          return { status: 401, body: { statusCode: 401, message: "Refresh token inválido" } };
+        }
+
+        inFlight = true;
+        const deadline = Date.now() + timeout;
+        while (rotation.crossings === 0 && Date.now() < deadline) {
+          if (await queuedInLock()) rotation.crossings += 1;
+          else await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        inFlight = false;
+
+        return { body: { access_token: this.token, user: this.user } };
+      });
+    }
+    return rotation;
   }
 
   isAuthorized(authorization: string | undefined) {

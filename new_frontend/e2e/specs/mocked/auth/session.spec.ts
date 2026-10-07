@@ -3,6 +3,10 @@ import { buildCheckIn } from "../../../factories/stats";
 import { buildStreakTimeline } from "../../../factories/streak";
 import { buildTeam } from "../../../factories/teams";
 import { GOOGLE_BUTTON_NAME } from "../../../support/third-party";
+import { ApiMock } from "../../../support/api-mock";
+import { installDefaults } from "../../../support/defaults";
+import { SocketMock } from "../../../support/socket-io-mock";
+import { AppShell } from "../../../pages/app-shell";
 
 test.describe("Sesión", () => {
   test("un visitante ve el botón de login y abre el modal", { tag: ["@p0", "@mobile"] }, async ({ app, page }) => {
@@ -89,6 +93,35 @@ test.describe("Sesión", () => {
 
     await expect(page.getByRole("dialog", { name: "Racha diaria" }).getByRole("button", { name: "Premio Reclamado" })).toBeVisible();
     expect(api.lastRequest("GET", "/subscriptions/streak/timeline")?.headers.authorization).toBe(`Bearer ${session.token}`);
+  });
+
+  test("dos pestañas que restauran la sesión a la vez no se cierran la sesión entre sí", { tag: "@p0" }, async ({ app, page, context, api, session }) => {
+    session.loginAs("USER", { username: "hincha_de_dos_pestanas" });
+    const tabB = await context.newPage();
+    const tabBErrors: string[] = [];
+    tabB.on("pageerror", (error) => tabBErrors.push(error.message));
+    const apiB = new ApiMock(tabB);
+    await apiB.install();
+    session.install(apiB);
+    installDefaults(apiB, session);
+    await new SocketMock(tabB).install();
+    const rotation = session.rotateRefreshWithoutGrace([
+      { api, page },
+      { api: apiB, page: tabB },
+    ]);
+
+    const appB = new AppShell(tabB);
+    await Promise.all([app.open(), appB.open()]);
+
+    await expect(app.header.getByText("hincha_de_dos_pestanas")).toBeVisible();
+    await expect(appB.header.getByText("hincha_de_dos_pestanas")).toBeVisible();
+    expect(rotation.crossings, "las dos pestañas intentaron renovar a la vez").toBeGreaterThan(0);
+    expect(api.requests("POST", "/auth/refresh"), "la pestaña A renovó una sola vez").toHaveLength(1);
+    expect(apiB.requests("POST", "/auth/refresh"), "la pestaña B renovó una sola vez").toHaveLength(1);
+    expect(api.requests("POST", "/auth/logout"), "la pestaña A no cerró la sesión").toHaveLength(0);
+    expect(apiB.requests("POST", "/auth/logout"), "la pestaña B no cerró la sesión").toHaveLength(0);
+    expect(tabBErrors, "errores no capturados en la pestaña B").toEqual([]);
+    apiB.assertNoUnhandled();
   });
 });
 
