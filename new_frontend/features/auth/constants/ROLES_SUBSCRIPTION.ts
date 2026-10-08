@@ -28,7 +28,7 @@ export const TIER_UI_CONFIG: Record<string, TierUiConfig> = {
     textColor: '#000000',
   },
   [SubscriptionTier.TIER_2]: {
-    badge: 'PLATEÍSTA PRO',
+    badge: 'PLATEÍSTA',
     badgeColor: '#d2f000',
     textColor: '#000000',
   },

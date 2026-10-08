@@ -17,7 +17,7 @@ import { AddCoinsModal } from './AdminAddCoinsModal';
 
 const SUBSCRIPTION_TRANSLATIONS: Partial<Record<SubscriptionTier, string>> = {
     [SubscriptionTier.TIER_1]: 'Popular',
-    [SubscriptionTier.TIER_2]: 'Plateísta Pro',
+    [SubscriptionTier.TIER_2]: 'Plateísta',
     [SubscriptionTier.TIER_3]: 'Palco VIP',
 };
 
