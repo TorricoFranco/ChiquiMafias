@@ -4,6 +4,7 @@ export interface EnvironmentVariables {
   HOST: string
 
   CLIENT_URL: string
+  ENABLE_DEV_TOOLS: boolean
   DATABASE_URL: string
 
   ID_LEAGUE_ARG: number

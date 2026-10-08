@@ -7,6 +7,14 @@ export const envValidationSchema = Joi.object({
   PORT: Joi.number().port().default(3007),
   HOST: Joi.string().default('0.0.0.0'),
   CLIENT_URL: Joi.string().uri().required(),
+  ENABLE_DEV_TOOLS: Joi.boolean()
+    .default(false)
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.boolean().valid(false).messages({
+        'any.only': 'ENABLE_DEV_TOOLS no puede estar activo en producción',
+      }),
+    }),
 
   ID_LEAGUE_ARG: Joi.number().required(),
   DATABASE_URL: Joi.string().required(),

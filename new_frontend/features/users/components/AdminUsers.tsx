@@ -72,12 +72,14 @@ export const AdminUsers: React.FC = () => {
   const handleBanUser = (userId: string) => {
     banUserMutation.mutate(userId, {
       onSuccess: () => showToast('Usuario baneado de la plataforma'),
+      onError: (error: any) => toast.error(error.message || 'No se pudo banear al usuario'),
     });
   };
 
   const handleUnbanUser = (userId: string) => {
     unbanUserMutation.mutate(userId, {
       onSuccess: () => showToast('Baneo revocado. Usuario activo nuevamente'),
+      onError: (error: any) => toast.error(error.message || 'No se pudo desbanear al usuario'),
     });
   };
 
@@ -96,12 +98,14 @@ export const AdminUsers: React.FC = () => {
   const handleTimeoutUser = (userId: string, durationMinutes: number) => {
     timeoutUserMutation.mutate({ userId, durationMinutes }, {
       onSuccess: () => showToast(`Usuario silenciado en el chat por ${durationMinutes} minutos`),
+      onError: (error: any) => toast.error(error.message || 'No se pudo silenciar al usuario'),
     });
   };
 
   const handleUnmuteUser = (userId: string) => {
     unmuteUserMutation.mutate(userId, {
       onSuccess: () => showToast('Silencio de chat revocado'),
+      onError: (error: any) => toast.error(error.message || 'No se pudo revocar el silencio'),
     });
   };
 

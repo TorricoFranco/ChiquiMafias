@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { AdminReport } from '../../types';
 import { ReportFilters } from './admin/ReportFilters';
 import { ReportCard } from './admin/ReportCard';
@@ -48,6 +49,9 @@ export const AdminReports: React.FC = () => {
             {
                 onSuccess: () => {
                     setResolveModalReport(null);
+                },
+                onError: (error: any) => {
+                    toast.error(error.message || 'No se pudo resolver el reporte');
                 },
             }
         );

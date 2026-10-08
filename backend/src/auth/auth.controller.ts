@@ -5,6 +5,7 @@ import {
   Res,
   Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common'
 import { AuthService } from './auth.service'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
@@ -13,7 +14,8 @@ import * as express from 'express'
 import { Public } from './decorators/auth.decorator'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
-import { Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler'
+import { DevToolsGuard } from './guards/dev-tools.guard'
 
 @ApiTags('Auth (Autenticación)')
 @Controller('auth')
@@ -21,11 +23,11 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService<EnvironmentVariables>,
-  ) { }
+  ) {}
 
   private get cookieOptions() {
     // const isProduction = this.configService.get('NODE_ENV', { infer: true }) === 'production';
-    const isProduction = false;
+    const isProduction = false
 
     const options = {
       httpOnly: true,
@@ -92,9 +94,10 @@ export class AuthController {
     return { status: 'ok', message: 'Sesión cerrada limpiamente, sese' }
   }
 
-  // AAAAAAAAAAAAAAAAA
+  // Solo para desarrollo: sin ENABLE_DEV_TOOLS=true (o en producción) responde 404.
   @Post('dev-login')
   @Public()
+  @UseGuards(DevToolsGuard)
   @ApiOperation({ summary: '[DEV] Login solo con email' })
   async devLogin(
     @Body('email') email: string,
