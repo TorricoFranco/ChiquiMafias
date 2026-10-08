@@ -141,10 +141,18 @@ problemas comunes están en **[docs/SETUP.md](docs/SETUP.md)**.
 
 ## Desarrollo asistido por IA
 
-El proyecto se desarrolla con [Claude Code](https://claude.com/claude-code). En
-`.claude/` están las reglas por zona del código, las skills (scaffolding de módulos,
-verificación y cierre de PRs) y subagentes revisores especializados en dinero y
-concurrencia, en el frontend y en el contrato entre apps.
+No es "le pedí a una IA que lo haga": el proyecto se desarrolla con [Claude Code](https://claude.com/claude-code) y un **flujo de trabajo versionado en el repo** (`.claude/`) para que la IA sea predecible, barata y esté bajo control.
+
+| Práctica | Cómo se aplica acá |
+|---|---|
+| 🧭 **Contexto por app** | Un `CLAUDE.md` en la raíz y uno por app (backend, frontend, bot): comandos, convenciones y trampas conocidas. La IA no tiene que redescubrir el proyecto en cada sesión. |
+| 💸 **Cuidado de tokens** | 9 *rules* con `paths`: solo se cargan al tocar su zona (p. ej. las reglas de dinero únicamente en `wallet/`, `bets/` o `webhook/`). Contexto mínimo, respuestas más precisas. |
+| 🛠️ **Skills propias** | `/nest-module`, `/frontend-feature`, `/verificar` y `/finalizar-feature` automatizan scaffolding, verificación (build + lint + tests) y cierre de PRs con la convención del equipo. |
+| 🕵️ **Subagentes revisores** | `backend-reviewer` (dinero, concurrencia, auth), `frontend-reviewer` y `contract-checker` (detecta desfases entre backend, frontend y bot). Son de solo lectura y **recuerdan los bugs recurrentes** entre sesiones. |
+| 🔒 **Permisos y guardrails** | Lista `allow / ask / deny`: lint, build y unit tests corren solos; `git push`, migraciones y e2e piden confirmación; `.env`, `force push`, `migrate reset` y el frontend legacy están **bloqueados**. |
+| ✅ **Humano en el loop** | Nada se da por listo sin verificar. Los cambios en dinero requieren plan previo y revisión; `main` es 100 % manual y cada commit se confirma antes de crearse. |
+
+El resultado es un historial de PRs chicas con commits convencionales, tests en verde y cambios sensibles revisados dos veces: por un agente especializado y por una persona.
 
 ## Licencia
 
