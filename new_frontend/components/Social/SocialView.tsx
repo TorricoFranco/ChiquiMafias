@@ -24,7 +24,6 @@ export const SocialView = () => {
 
   return (
     <div className="flex flex-1 overflow-hidden h-full">
-      {/* En pantallas chicas las secciones están en el menú del header (MobileMenu). */}
       <div className="hidden lg:block h-full w-[240px] flex-shrink-0">
         <SidebarNav />
       </div>

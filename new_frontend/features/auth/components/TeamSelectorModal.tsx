@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Search, Trophy, Shield, X } from "lucide-react";
 import { FootballTeamUserProfile } from "@/features/teams/types";
@@ -14,6 +14,15 @@ interface Props {
 export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: Props) {
     const [search, setSearch] = useState("");
     const [activeTab, setActiveTab] = useState<"ALL" | "LIGA_PROF" | "NACIONAL_B">("LIGA_PROF");
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [isOpen, onClose]);
 
     if (!isOpen) return null;
 
