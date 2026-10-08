@@ -21,6 +21,7 @@ export function installDefaults(api: ApiMock, session: MockSession) {
   api.on("GET", "/polls/rewards/pending", { count: 0, potentialCoins: 0 });
   api.on("GET", "/store", []);
   api.on("GET", "/coin-shop/packs", []);
+  api.on("GET", "/teams", []);
 
   api.on("GET", "/fixtures/seasons/:season/calendar", (req) => buildCalendar({}, req.params.season));
   api.on("GET", "/fixtures/live-scores", []);
