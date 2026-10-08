@@ -1,31 +1,24 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { LEGAL_LINKS } from "@/components/legal/LegalPage";
 
 export const Footer: React.FC = () => {
   return (
     // En pantallas chicas ese lugar es de la MobileNav; si no, tapa el ticket de apuestas.
     <footer className="h-12 bg-[#201f1f] border-t border-[#454932] hidden lg:flex items-center justify-between px-4 z-50 flex-shrink-0 text-xs">
-      <div className="flex items-center gap-6">
-        <a
-          href="#"
-          className="text-[10px] text-[#c6c9ab] hover:text-[#d2f000] transition-colors"
-        >
-          Términos y Condiciones
-        </a>
-        <a
-          href="#"
-          className="text-[10px] text-[#c6c9ab] hover:text-[#d2f000] transition-colors"
-        >
-          Política de Privacidad
-        </a>
-        <a
-          href="#"
-          className="text-[10px] text-[#c6c9ab] hover:text-[#d2f000] transition-colors"
-        >
-          Contacto / Soporte
-        </a>
-      </div>
+      <nav aria-label="Documentos legales" className="flex items-center gap-6">
+        {LEGAL_LINKS.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="text-[10px] text-[#c6c9ab] hover:text-[#d2f000] transition-colors focus-visible:outline-2 focus-visible:outline-[#d2f000]"
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
 
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-bold text-[#c6c9ab]">

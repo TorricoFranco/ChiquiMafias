@@ -28,12 +28,11 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "ESTADIO DIGITAL - Chiqui Mafias",
-  description: "Plataforma interactiva de fútbol en vivo, chat y apuestas deportivas",
-  keywords: ["fútbol argentino", "en vivo", "apuestas", "chat", "estadísticas", "liga profesional"],
+  description: "Plataforma interactiva de fútbol en vivo, chat y pronósticos con monedas virtuales",
+  keywords: ["fútbol argentino", "en vivo", "pronósticos", "chat", "estadísticas", "liga profesional"],
   openGraph: {
     title: "ESTADIO DIGITAL - Chiqui Mafias",
-    description: "Plataforma interactiva de fútbol en vivo, chat y apuestas deportivas",
-    url: "https://tudominio.com", // Cambia esto por tu dominio real
+    description: "Plataforma interactiva de fútbol en vivo, chat y pronósticos con monedas virtuales",
     siteName: "Estadio Digital",
     images: [
       {
@@ -49,7 +48,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "ESTADIO DIGITAL",
-    description: "Fútbol en vivo, chat y apuestas deportivas.",
+    description: "Fútbol en vivo, chat y pronósticos con monedas virtuales.",
     images: ["/og-image.jpg"],
   },
 };
