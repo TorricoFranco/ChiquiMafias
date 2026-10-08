@@ -18,6 +18,7 @@ import {
   GRACE_PERIOD_HOURS,
   MERCADO_PAGO_CONSTANTS,
   UPGRADE_LINK_TTL_SECONDS,
+  getTierDisplayName,
 } from './constants/subscription.constants'
 
 import { SUBSCRIPTION_GIFTS } from './constants/subscription-rewards.constant'
@@ -124,7 +125,9 @@ export class SubscriptionCheckoutService {
         }
 
         if (existingActive.tier === tier) {
-          throw new ConflictException(`Ya estás suscripto al plan ${tier}.`)
+          throw new ConflictException(
+            `Ya estás suscripto al plan ${getTierDisplayName(tier)}.`,
+          )
         }
       }
 
@@ -139,10 +142,11 @@ export class SubscriptionCheckoutService {
         now.getTime() + SUBSCRIPTION_CYCLE_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString()
 
-      // Cambiamos dinámicamente el título en Mercado Pagox
+      // Título que ve el usuario en el link de Mercado Pago
+      const tierName = getTierDisplayName(tier)
       const reasonText = isUpgrade
-        ? `Upgrade a ${tier} - ERS Chiquimafías`
-        : `Suscripción ${tier} - ERS Chiquimafías`
+        ? `Upgrade a ${tierName} - ChiquiMafias`
+        : `Suscripción: ${tierName} - ChiquiMafias`
 
       const mpPayload: MercadoPagoPreapprovalPayload = {
         reason: reasonText,
@@ -806,7 +810,7 @@ export class SubscriptionCheckoutService {
         external_reference: checkoutResult.external_reference,
         new_tier: newTier,
         bonus_coins: estimatedBonusCoins,
-        message: `Solicitud de upgrade a ${newTier} generada. Las ${estimatedBonusCoins} Chiqui-coins se acreditarán automáticamente cuando completes el pago.`,
+        message: `Solicitud de upgrade a ${getTierDisplayName(newTier)} generada. Las ${estimatedBonusCoins} Chiqui-coins se acreditarán automáticamente cuando completes el pago.`,
       }
     } catch (error) {
       this.logger.error(`[Upgrade Error] ${error.message}`, error.stack)

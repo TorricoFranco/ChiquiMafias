@@ -1,3 +1,18 @@
+import { SubscriptionTier } from '@prisma/client'
+
+/**
+ * NOMBRES DE PLANES
+ * El enum de Prisma (TIER_1..3) es interno; esto es lo que ve el usuario.
+ */
+export const SUBSCRIPTION_TIER_NAMES: Record<SubscriptionTier, string> = {
+  [SubscriptionTier.TIER_1]: 'Popular',
+  [SubscriptionTier.TIER_2]: 'Plateísta',
+  [SubscriptionTier.TIER_3]: 'Palco VIP',
+}
+
+export const getTierDisplayName = (tier: SubscriptionTier): string =>
+  SUBSCRIPTION_TIER_NAMES[tier] ?? tier
+
 /**
  * DESCUENTOS Y PROMOCIONES
  */
