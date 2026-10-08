@@ -1,98 +1,67 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# ChiquiMafias — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST + WebSockets de [ChiquiMafias](../README.md): datos de fútbol en vivo, chat,
+encuestas, apuestas pari-mutuel, economía de monedas y suscripciones con Mercado Pago.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+**NestJS 11 · Prisma 6 + PostgreSQL 15 · Redis 7 · BullMQ · Socket.IO**
 
-## Description
+- Arquitectura, patrones y flujos: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md#backend)
+- Instalación y variables de entorno: [docs/SETUP.md](../docs/SETUP.md)
+- Referencia de endpoints: Swagger en <http://localhost:3007/api> con el server corriendo
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Scripts
 
 ```bash
-$ npm install
+npm run start:dev    # desarrollo con watch (puerto 3007)
+npm run build        # compila a dist/
+npm run start:prod   # node dist/main
+npm run lint         # eslint --fix
+npm run format       # prettier
+
+npm run test:unit    # unit tests (jest src/), seguros de correr siempre
+npm run test:e2e     # e2e: ⚠️ borran las tablas de la base de DATABASE_URL
+npm run test:cov     # coverage
+npm run seed:e2e     # usuarios de prueba e2e-*@chiquimafias.test
 ```
 
-## Compile and run the project
+> `npm test` corre unit **y** e2e. Para los e2e usá siempre una base descartable,
+> nunca la de desarrollo.
+
+## Prisma
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npx prisma generate         # después de cada install o cambio del schema
+npx prisma migrate deploy   # aplica las migraciones (base nueva, CI y producción)
+npx prisma studio           # explorar y editar datos
 ```
 
-## Run tests
+El schema está en [`prisma/schema.prisma`](prisma/schema.prisma) y las migraciones en
+`prisma/migrations/`.
 
-```bash
-# unit tests
-$ npm run test
+## Estructura
 
-# e2e tests
-$ npm run test:e2e
+Cada dominio vive en `src/<dominio>/` con su module, controller y service, y según el
+caso un gateway (Socket.IO), un processor (BullMQ), crons y specs.
 
-# test coverage
-$ npm run test:cov
-```
+| Grupo | Módulos |
+|---|---|
+| Auth y usuarios | `auth`, `users` |
+| Dinero | `wallet`, `bets`, `coin-shop`, `store`, `inventory`, `subscriptions`, `webhook` |
+| Comunidad | `chat`, `polls`, `notifications`, `support`, `streaks`, `stats` |
+| Datos deportivos | `api-football` (crons), `matches`, `fixture`, `standings`, `teams` |
+| Integraciones | `mercado-pago`, `discord`, `cloudinary`, `email` |
+| Infraestructura | `prisma`, `redis`, `config`, `adapters`, `filters`, `pipes` |
 
-## Deployment
+Puntos a tener en cuenta:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- **Sin prefijo global**: las rutas son `/bets/markets`, no `/api/bets/markets`.
+- **Toda ruta requiere JWT** salvo las marcadas con `@Public()`. Hay tres guards
+  globales: throttling, JWT y estado del usuario (ban).
+- **`ValidationPipe` estricto**: un campo que no está en el DTO devuelve 400.
+- **Variables validadas con Joi** al arrancar (`src/config/env.validation.ts`).
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## CI
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+[`.github/workflows/pipeline.yml`](../.github/workflows/pipeline.yml), en cada push o PR a
+`main`: Node 24 con Postgres 15 y Redis 7 como servicios, `prisma migrate deploy`,
+build, `test:unit` y `test:e2e`.

@@ -101,7 +101,7 @@ Tres `APP_GUARD` en `src/app.module.ts`, en este orden:
 
 ## Referencias existentes (no duplicar)
 
-- `README.md` de la **raíz** — visión de producto, diagramas, flujos (auth, bets, webhooks), setup. (`backend/README.md` es el boilerplate de Nest.)
+- `docs/ARCHITECTURE.md` (raíz) — patrones, módulos centrales, crons y flujos (auth, bets, webhooks). `docs/SETUP.md` — instalación y variables. `backend/README.md` — resumen público de la app.
 - `.claude/skills/nestjs-best-practices/` — skill de NestJS (40 reglas en `rules/*.md`); se activa sola al tocar `backend/src`.
 - `.claude/rules/backend-*.md` — se cargan solas según el archivo que se toque:
   - `backend-api.md`: controllers, DTOs y auth.

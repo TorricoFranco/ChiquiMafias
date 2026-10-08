@@ -68,5 +68,8 @@ Producción: `docker-compose.yml`.
 
 ## Documentación existente
 
-- `README.md` — arquitectura del backend, diagramas y flujos (auth, apuestas, webhooks).
+- `README.md` — presentación pública del proyecto: funcionalidades, stack, quickstart y capturas (`docs/screenshots/`).
+- `docs/ARCHITECTURE.md` — arquitectura de las tres apps, patrones, módulos centrales, crons y flujos (auth, apuestas, webhooks).
+- `docs/SETUP.md` — instalación, variables de entorno, servicios externos y problemas comunes.
+- `backend/README.md`, `new_frontend/README.md`, `discord-bot/README.md` — resumen de cada app.
 - `new_frontend/DESIGN.md` — sistema de diseño "Estadio Digital".
