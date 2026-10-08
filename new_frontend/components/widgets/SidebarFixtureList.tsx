@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { MatchScorecard } from "../widgets/MatchScorecard";
 import { SidebarMatchCard } from "../widgets/SidebarMatchCard";
 import { useCalendarWithLive } from "@/features/fixture/hooks/useCalendarWithLive";
+import { LiveMatchesCarousel } from "./LiveMatchesCarousel";
 
 interface SidebarFixtureListProps {
     season?: string;
@@ -113,27 +113,7 @@ export const SidebarFixtureList = ({
     return (
         <div className="w-full max-w-4xl mx-auto space-y-5 p-2 md:p-4">
             {/* PARTIDOS EN VIVO */}
-            {liveMatches.length > 0 && (
-                <div className="bg-[#1e1414] border border-red-900/40 rounded-xl p-4 overflow-hidden w-full">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
-                            <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
-                            EN VIVO
-                        </h3>
-                        <span className="text-[10px] font-bold text-[#d2f000]">{liveMatches.length} En Curso</span>
-                    </div>
-
-                    {/* CONTENEDOR CARRUSEL */}
-                    <div className="flex overflow-x-auto gap-3 pb-2 snap-x scrollbar-none scroll-smooth">
-                        {liveMatches.map((match: any) => (
-                            <div key={match.id} className="min-w-[85%] md:min-w-[280px] snap-center flex-shrink-0">
-                                <MatchScorecard match={match} />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
+            <LiveMatchesCarousel matches={liveMatches} />
             {/* SELECTOR DE FECHAS (Flechas + Tira deslizable de días) */}
             <div className="flex items-center gap-2 bg-[#201f1f] rounded-xl p-2 border border-[#454932]">
                 <button
@@ -156,8 +136,8 @@ export const SidebarFixtureList = ({
                                 key={dayKey}
                                 onClick={() => setSelectedDayIndex(idx)}
                                 className={`flex flex-col items-center justify-center min-w-[64px] px-2.5 py-1.5 rounded-lg transition-all flex-shrink-0 border ${isSelected
-                                        ? "bg-[#d2f000] text-black font-extrabold border-[#d2f000] shadow-sm scale-105"
-                                        : "bg-[#252525] text-[#c6c9ab] hover:text-white hover:bg-[#30302f] border-[#353534]"
+                                    ? "bg-[#d2f000] text-black font-extrabold border-[#d2f000] shadow-sm scale-105"
+                                    : "bg-[#252525] text-[#c6c9ab] hover:text-white hover:bg-[#30302f] border-[#353534]"
                                     }`}
                             >
                                 <span className={`text-[9px] font-bold ${isSelected ? "text-black/80" : "text-[#8c8e76]"}`}>
