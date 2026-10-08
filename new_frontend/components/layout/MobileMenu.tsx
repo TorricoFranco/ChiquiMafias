@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect } from "react";
+import Link from "next/link";
 import { X } from "lucide-react";
+import { LEGAL_LINKS } from "@/components/legal/LegalPage";
 import { useUIStore } from "@/store/useUIStore";
 import { SidebarNav } from "@/components/Social/SidebarNav";
 
@@ -79,6 +81,19 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ activeMainTab, onMainTab
         <div className="min-h-0 flex-1">
           <SidebarNav onNavigate={() => goTo("social")} />
         </div>
+
+        <nav aria-label="Documentos legales" className="flex flex-shrink-0 flex-col gap-1 border-t border-[#353534] p-4">
+          {LEGAL_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={close}
+              className="rounded-lg px-2 py-1.5 text-xs text-[#909378] transition-colors hover:text-[#D2F000] focus-visible:outline-2 focus-visible:outline-[#D2F000]"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
       </div>
     </div>
   );
