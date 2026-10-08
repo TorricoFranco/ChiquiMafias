@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { SubscriptionsService } from './subscriptions.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { SubscriptionPricingService } from './domain/subscription-pricing.service'
-import { BadRequestException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
 import { SubscriptionTier, SubscriptionStatus } from '@prisma/client'
 
 describe('SubscriptionsService (Unit Tests)', () => {
@@ -50,48 +50,45 @@ describe('SubscriptionsService (Unit Tests)', () => {
     jest.clearAllMocks()
   })
 
-  describe('updatePlanPrice', () => {
-    const targetTier = SubscriptionTier.TIER_2
-    const newPrice = 5000
+  describe('updatePlan', () => {
+    const planId = 'plan-123'
+    const dto = { basePriceARS: 5000, storeDiscountPercentage: 10 }
 
-    it('✅ Success: Debe actualizar el precio del plan y retornarlo con el mensaje de éxito', async () => {
+    it('✅ Success: Debe actualizar el plan por id con los campos del DTO y retornarlo', async () => {
       const existingPlan = {
-        id: 'plan-123',
-        tier: targetTier,
+        id: planId,
+        tier: SubscriptionTier.TIER_2,
         basePriceARS: 3000,
         name: 'Plan Intermedio',
       }
-      const expectedPlan = { ...existingPlan, basePriceARS: newPrice }
+      const expectedPlan = { ...existingPlan, ...dto }
 
       mockPrismaService.subscriptionPlan.findUnique.mockResolvedValue(
         existingPlan,
       )
       mockPrismaService.subscriptionPlan.update.mockResolvedValue(expectedPlan)
 
-      const result = await service.updatePlanPrice(targetTier, newPrice)
+      const result = await service.updatePlan(planId, dto)
 
-      expect(prisma.subscriptionPlan.findUnique).toHaveBeenCalledWith({
-        where: { tier: targetTier },
+      expect(
+        mockPrismaService.subscriptionPlan.findUnique,
+      ).toHaveBeenCalledWith({
+        where: { id: planId },
       })
-      expect(prisma.subscriptionPlan.update).toHaveBeenCalledWith({
-        where: { tier: targetTier },
-        data: { basePriceARS: newPrice },
+      expect(mockPrismaService.subscriptionPlan.update).toHaveBeenCalledWith({
+        where: { id: planId },
+        data: dto,
       })
-
-      // Adaptado a tu estructura de retorno real
-      expect(result).toEqual({
-        message: `Precio del plan ${targetTier} actualizado con éxito.`,
-        plan: expectedPlan,
-      })
+      expect(result).toEqual(expectedPlan)
     })
 
-    it('❌ Fail: Debe lanzar BadRequestException si el tier no existe en la DB', async () => {
-      // Forzamos a que no encuentre el plan en la primera validación
+    it('❌ Fail: Debe lanzar NotFoundException si el plan no existe, sin actualizar', async () => {
       mockPrismaService.subscriptionPlan.findUnique.mockResolvedValue(null)
 
-      await expect(
-        service.updatePlanPrice(targetTier, newPrice),
-      ).rejects.toThrow(BadRequestException)
+      await expect(service.updatePlan(planId, dto)).rejects.toThrow(
+        NotFoundException,
+      )
+      expect(mockPrismaService.subscriptionPlan.update).not.toHaveBeenCalled()
     })
   })
 
