@@ -244,7 +244,8 @@ export class UsersService {
       badgeUrl: updatedUser.team?.badgeUrl || null,
     })
 
-    return updatedUser
+    // UserEntity aplica @Exclude a googleId y hashedRefreshToken.
+    return new UserEntity(updatedUser)
   }
 
   async banUser(actor: ActiveUser, userId: string) {
