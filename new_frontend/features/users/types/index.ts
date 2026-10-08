@@ -18,6 +18,8 @@ export interface UserEntity {
   email: string;
   username: string | null;
   isFirstLogin: boolean;
+  termsAcceptedAt: string | null;
+  termsVersion: string | null;
   status: UserStatus;
   mutedUntil: string | null;
   role: SystemRole;

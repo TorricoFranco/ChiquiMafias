@@ -11,6 +11,8 @@ export function buildAdminUser(overrides: Partial<UserEntity> = {}): UserEntity 
     email: `${id}@chiquimafias.test`,
     username: "juancito",
     isFirstLogin: false,
+    termsAcceptedAt: "2026-01-15T12:00:00.000Z",
+    termsVersion: "2026-10",
     status: "ACTIVE",
     mutedUntil: null,
     role: "USER",

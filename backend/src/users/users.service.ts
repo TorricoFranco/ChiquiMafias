@@ -16,6 +16,7 @@ import { OnEvent } from '@nestjs/event-emitter/dist/decorators/on-event.decorato
 import { UserEntity } from './entities/user.entity'
 import { GetUsersQueryDto } from './dto/get-users-query.dto'
 import { ROLE_HIERARCHY } from 'src/auth/enums/roles.enum'
+import { CURRENT_TERMS_VERSION } from './terms.constants'
 import { assertCanSanction } from 'src/auth/utils/assert-can-sanction'
 import type { ActiveUser } from 'src/auth/interfaces/active-user.interface'
 
@@ -154,6 +155,21 @@ export class UsersService {
     return new UserEntity(updatedUser)
   }
   async completeProfile(userId: string, dto: CompleteProfileDto) {
+    // Solo se completa una vez: después el perfil se edita con update-profile y
+    // la fecha de aceptación de términos no se vuelve a escribir.
+    const current = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isFirstLogin: true },
+    })
+
+    if (!current) {
+      throw new NotFoundException('Usuario no encontrado')
+    }
+
+    if (!current.isFirstLogin) {
+      throw new ConflictException('El perfil ya fue completado')
+    }
+
     const usernameExists = await this.prisma.user.findFirst({
       where: {
         username: {
@@ -181,6 +197,8 @@ export class UsersService {
         username: dto.username,
         teamId: dto.teamId,
         isFirstLogin: false,
+        termsAcceptedAt: new Date(),
+        termsVersion: CURRENT_TERMS_VERSION,
       },
       include: { team: true },
     })
@@ -192,6 +210,33 @@ export class UsersService {
     })
 
     return new UserEntity(updatedUser)
+  }
+
+  // Para usuarios que ya existían antes de que se pidiera la aceptación.
+  async acceptTerms(userId: string) {
+    const current = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { termsAcceptedAt: true, termsVersion: true },
+    })
+
+    // Si ya aceptó la versión vigente se conserva la fecha original.
+    if (
+      current?.termsAcceptedAt &&
+      current.termsVersion === CURRENT_TERMS_VERSION
+    ) {
+      return current
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        termsAcceptedAt: new Date(),
+        termsVersion: CURRENT_TERMS_VERSION,
+      },
+      select: { termsAcceptedAt: true, termsVersion: true },
+    })
+
+    return user
   }
 
   async updateProfile(userId: string, dto: Partial<CompleteProfileDto>) {

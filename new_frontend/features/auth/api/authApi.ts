@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/apiFetch";
-import { CompleteProfileDto } from "../types";
+import { AcceptTermsResponse, CompleteProfileDto } from "../types";
 
 export const authApi = {
     completeProfile: async (dto: CompleteProfileDto) => {
@@ -15,6 +15,16 @@ export const authApi = {
             throw new Error(errorData.message || "El nombre de usuario ya existe o hubo un error.");
         }
 
+        return res.json();
+    },
+
+    acceptTerms: async (): Promise<AcceptTermsResponse> => {
+        const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/users/accept-terms`, {
+            method: "POST",
+            body: JSON.stringify({ acceptTerms: true }),
+        });
+
+        if (!res.ok) throw new Error("No se pudo registrar la aceptación");
         return res.json();
     },
 

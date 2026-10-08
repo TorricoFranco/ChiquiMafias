@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { ForbiddenException } from '@nestjs/common'
+import { ConflictException, ForbiddenException } from '@nestjs/common'
 import { SystemRole } from '@prisma/client'
 import { UsersService } from './users.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ChatService } from '../chat/chat.service'
 import { RedisService } from '../redis/redis.service'
+import { CURRENT_TERMS_VERSION } from './terms.constants'
 import type { ActiveUser } from '../auth/interfaces/active-user.interface'
 
 describe('UsersService (ban / unban)', () => {
@@ -104,5 +105,115 @@ describe('UsersService (ban / unban)', () => {
       where: { id: 'admin-1' },
       data: { status: 'BANNED' },
     })
+  })
+})
+
+describe('UsersService (aceptación de términos)', () => {
+  let service: UsersService
+
+  const mockPrisma = {
+    user: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn(),
+    },
+    footballTeam: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'team-1' }),
+    },
+  }
+
+  const mockChatService = { updateActiveUserProfile: jest.fn() }
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: ChatService, useValue: mockChatService },
+        { provide: RedisService, useValue: {} },
+      ],
+    }).compile()
+
+    service = module.get<UsersService>(UsersService)
+
+    jest.clearAllMocks()
+    mockPrisma.user.findFirst.mockResolvedValue(null)
+    mockPrisma.user.findUnique.mockResolvedValue({ isFirstLogin: true })
+    mockPrisma.footballTeam.findUnique.mockResolvedValue({ id: 'team-1' })
+    mockPrisma.user.update.mockResolvedValue({
+      id: 'user-1',
+      username: 'messi_10',
+      team: null,
+    })
+  })
+
+  it('completeProfile: Debe registrar la aceptación y la versión de los términos', async () => {
+    await service.completeProfile('user-1', {
+      username: 'messi_10',
+      teamId: 'team-1',
+      acceptTerms: true,
+    })
+
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'user-1' },
+        data: expect.objectContaining({
+          isFirstLogin: false,
+          termsAcceptedAt: expect.any(Date),
+          termsVersion: CURRENT_TERMS_VERSION,
+        }),
+      }),
+    )
+  })
+
+  it('completeProfile: No debe pisar la aceptación si el perfil ya fue completado', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ isFirstLogin: false })
+
+    await expect(
+      service.completeProfile('user-1', {
+        username: 'otro_nombre',
+        teamId: 'team-1',
+        acceptTerms: true,
+      }),
+    ).rejects.toThrow(ConflictException)
+
+    expect(mockPrisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it('acceptTerms: No debe sobrescribir la fecha si ya aceptó la versión vigente', async () => {
+    const stored = {
+      termsAcceptedAt: new Date('2026-10-01T10:00:00.000Z'),
+      termsVersion: CURRENT_TERMS_VERSION,
+    }
+    mockPrisma.user.findUnique.mockResolvedValue(stored)
+
+    const result = await service.acceptTerms('user-1')
+
+    expect(result).toEqual(stored)
+    expect(mockPrisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it('acceptTerms: Debe guardar fecha y versión solo del usuario logueado', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      termsAcceptedAt: null,
+      termsVersion: null,
+    })
+    const accepted = {
+      termsAcceptedAt: new Date(),
+      termsVersion: CURRENT_TERMS_VERSION,
+    }
+    mockPrisma.user.update.mockResolvedValue(accepted)
+
+    const result = await service.acceptTerms('user-1')
+
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        termsAcceptedAt: expect.any(Date),
+        termsVersion: CURRENT_TERMS_VERSION,
+      },
+      select: { termsAcceptedAt: true, termsVersion: true },
+    })
+    expect(result).toEqual(accepted)
   })
 })

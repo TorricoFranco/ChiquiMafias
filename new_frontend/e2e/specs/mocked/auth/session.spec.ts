@@ -47,6 +47,7 @@ test.describe("Sesión", () => {
       ...session.user,
       username: "academia1903",
       isFirstLogin: false,
+      termsAcceptedAt: "2026-10-08T12:00:00.000Z",
       team: { id: racing.id, name: racing.name, slug: "racing-club", badgeUrl: racing.badgeUrl },
     }));
     await app.open();
@@ -61,6 +62,12 @@ test.describe("Sesión", () => {
     await onboarding.getByLabel("Nombre de Usuario").fill("academia1903");
     await onboarding.getByRole("button", { name: /Seleccioná tu club/ }).click();
     await page.getByRole("dialog", { name: "Elegí tu Club" }).getByRole("button", { name: "Racing Club" }).click();
+
+    await onboarding.getByRole("button", { name: "Empezar a chatear" }).click();
+    await expect(onboarding.getByText("Tenés que aceptar los Términos y confirmar que sos mayor de 18 años.")).toBeVisible();
+    expect(api.lastRequest("PUT", "/users/complete-profile")).toBeUndefined();
+
+    await onboarding.getByRole("checkbox", { name: /Soy mayor de 18 años/ }).check();
     await onboarding.getByRole("button", { name: "Empezar a chatear" }).click();
 
     await expect(onboarding).toBeHidden();
@@ -68,7 +75,46 @@ test.describe("Sesión", () => {
     expect(api.lastRequest("PUT", "/users/complete-profile")?.body).toEqual({
       username: "academia1903",
       teamId: racing.id,
+      acceptTerms: true,
     });
+  });
+
+  test("un usuario existente sin aceptación debe aceptar los términos para seguir", { tag: "@p0" }, async ({ app, page, session, api }) => {
+    session.loginAs("USER", { username: "veterano", termsAcceptedAt: null });
+    api.on("POST", "/users/accept-terms", () => ({
+      termsAcceptedAt: "2026-10-08T12:00:00.000Z",
+      termsVersion: "2026-10",
+    }));
+    await app.open();
+
+    const gate = page.getByRole("dialog", { name: "Actualizamos nuestros términos" });
+    await expect(gate).toBeVisible();
+
+    await gate.getByRole("button", { name: "Aceptar y continuar" }).click();
+    await expect(gate.getByText("Tenés que aceptar los Términos y confirmar que sos mayor de 18 años.")).toBeVisible();
+
+    await gate.getByRole("checkbox", { name: /Soy mayor de 18 años/ }).check();
+    await gate.getByRole("button", { name: "Aceptar y continuar" }).click();
+
+    await expect(gate).toBeHidden();
+    expect(api.lastRequest("POST", "/users/accept-terms")?.body).toEqual({ acceptTerms: true });
+  });
+
+  test("un usuario que aceptó una versión vieja de los términos vuelve a aceptar", { tag: "@p0" }, async ({ app, page, session, api }) => {
+    session.loginAs("USER", { termsAcceptedAt: "2025-01-10T12:00:00.000Z", termsVersion: "2025-01" });
+    api.on("POST", "/users/accept-terms", () => ({
+      termsAcceptedAt: "2026-10-08T12:00:00.000Z",
+      termsVersion: "2026-10",
+    }));
+    await app.open();
+
+    const gate = page.getByRole("dialog", { name: "Actualizamos nuestros términos" });
+    await expect(gate).toBeVisible();
+
+    await gate.getByRole("checkbox", { name: /Soy mayor de 18 años/ }).check();
+    await gate.getByRole("button", { name: "Aceptar y continuar" }).click();
+
+    await expect(gate).toBeHidden();
   });
 
   test("cerrar sesión desde Ajustes vuelve al modo visitante", { tag: ["@p0", "@mobile"] }, async ({ app, page, session, api }) => {

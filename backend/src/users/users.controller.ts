@@ -5,6 +5,7 @@ import {
   Param,
   Body,
   Put,
+  Post,
   UseGuards,
   Query,
   Req,
@@ -19,6 +20,7 @@ import {
 import { UsersService } from './users.service'
 import { CompleteProfileDto } from './dto/complete-profile.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
+import { AcceptTermsDto } from './dto/accept-terms.dto'
 import { ChatService } from 'src/chat/chat.service'
 import { ChatClient } from 'src/chat/interfaces/ChatClient'
 import { SystemRole } from 'src/auth/enums/roles.enum'
@@ -100,6 +102,22 @@ export class UsersController {
     @Body() dto: CompleteProfileDto,
   ) {
     return this.usersService.completeProfile(userId, dto)
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Aceptar Términos y Política de Privacidad (usuarios existentes sin aceptación)',
+  })
+  @ApiResponse({ status: 201, description: 'Aceptación registrada.' })
+  @Post('accept-terms')
+  async acceptTerms(
+    @GetUser('id') userId: string,
+    // Solo se declara para que el ValidationPipe exija `acceptTerms: true`.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    @Body() _dto: AcceptTermsDto,
+  ) {
+    return this.usersService.acceptTerms(userId)
   }
 
   @ApiBearerAuth()

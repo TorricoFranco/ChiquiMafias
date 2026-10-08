@@ -44,6 +44,8 @@ export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps)
                                 username: data.user.username,
                                 role: data.user.role,
                                 isFirstLogin: data.user.isFirstLogin,
+                                termsAcceptedAt: data.user.termsAcceptedAt ?? null,
+                                termsVersion: data.user.termsVersion ?? null,
                                 accessToken: data.access_token,
                                 team: data.user.team,
                             });

@@ -14,6 +14,8 @@ export interface User {
     email: string;
     username: string | null;
     isFirstLogin: boolean;
+    termsAcceptedAt: string | null;
+    termsVersion: string | null;
     role: Role;
     tier: SubscriptionTier;
     teamId: string | null;
@@ -31,6 +33,8 @@ export interface UserState {
     role: Role | null;
     tier: SubscriptionTier;
     isFirstLogin: boolean;
+    termsAcceptedAt: string | null;
+    termsVersion: string | null;
     accessToken: string | null;
     balance: number;
     currentStreak: number;
