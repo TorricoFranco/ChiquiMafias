@@ -159,8 +159,10 @@ GRACE_PERIOD (48h tolerancia)
 ### Decisión: Bonus Coins vs. Crédito de Período
 
 ```typescript
-// ✅ ELEGIDO: Bonus coins
-const bonusCoins = daysRemaining × COINS_PER_DAY_UPGRADE
+// ✅ ELEGIDO: Bonus coins (los días no usados del plan viejo, devueltos en monedas)
+const coinsPerDay = round(oldPlan.basePriceARS / 30 / COIN_VALUE_ARS) // COIN_VALUE_ARS = 0.5
+const bonusCoins = daysRemaining × coinsPerDay
+// Se paga una sola vez: la suscripción vieja pasa ACTIVE → EXPIRED con updateMany condicional
 
 // ❌ ALTERNATIVA: Extender período
 // Problema: Complica billing, difícil de explicar

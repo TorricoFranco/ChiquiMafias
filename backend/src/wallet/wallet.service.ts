@@ -9,9 +9,9 @@ import { RedisService } from '../redis/redis.service'
 import { ChatGateway } from '../chat/chat.gateway'
 
 import { WalletOperation } from './interfaces/wallet-operation.interface'
+import { MAX_COIN_BALANCE } from './constants/wallet.constants'
 import { Prisma, Wallet, TransactionType } from '@prisma/client'
-import { EventEmitter2 } from '@nestjs/event-emitter';
-
+import { EventEmitter2 } from '@nestjs/event-emitter'
 
 @Injectable()
 export class WalletService {
@@ -22,90 +22,45 @@ export class WalletService {
     private readonly chatGateway: ChatGateway,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   /**
-   * Agrega monedas de forma atómica y registra la transacción
+   * Agrega monedas de forma atómica y registra la transacción.
+   * Con `txClient` corre dentro de la transacción de quien llama y no toca Redis:
+   * quien llama sincroniza con `syncBalanceCache` después del commit.
    */
-  async addCoins(operation: WalletOperation): Promise<Wallet> {
-    const { userId, amount, type, description, referenceId } = operation
-    const MAX_COIN_BALANCE = 50000
+  async addCoins(
+    operation: WalletOperation,
+    txClient?: Prisma.TransactionClient,
+  ): Promise<Wallet> {
+    const { userId, amount, type, description } = operation
 
     if (amount <= 0) {
       throw new BadRequestException('El monto a agregar debe ser mayor a cero')
     }
 
+    if (txClient) {
+      const { wallet } = await this.creditInTx(txClient, operation)
+      return wallet
+    }
+
     try {
-      const updatedWallet = await this.prisma.$transaction(async (tx) => {
-        let wallet = await tx.wallet.findUnique({
-          where: { userId },
-        })
-
-        let newBalance: number
-        let realAmountAdded: number
-
-        if (!wallet) {
-          newBalance = Math.min(1000 + amount, MAX_COIN_BALANCE)
-          realAmountAdded = newBalance - 1000
-
-          wallet = await tx.wallet.create({
-            data: {
-              userId,
-              balance: newBalance,
-            },
-          })
-        } else {
-          newBalance = Math.min(wallet.balance + amount, MAX_COIN_BALANCE)
-          realAmountAdded = newBalance - wallet.balance
-
-          wallet = await tx.wallet.update({
-            where: { userId },
-            data: { balance: newBalance },
-          })
-        }
-
-        if (realAmountAdded > 0) {
-          await tx.coinTransaction.create({
-            data: {
-              walletId: wallet.id,
-              amount: realAmountAdded,
-              type: type,
-              description: description,
-              referenceId: referenceId || null,
-            },
-          })
-        }
-
-        this.logger.log(
-          `[WALLET DB OK] +${realAmountAdded} coins a User:${userId} por ${type}. Balance final: ${newBalance}`,
-        )
-        return wallet
-      })
-
-      const redisClient = this.redisService.redis
-
-      await redisClient.set(
-        `wallet:${operation.userId}:balance`,
-        updatedWallet.balance,
+      const { wallet, amountAdded } = await this.prisma.$transaction((tx) =>
+        this.creditInTx(tx, operation),
       )
 
-      this.logger.log(
-        `[WALLET SYNC OK] Balance de User:${operation.userId} actualizado a ${updatedWallet.balance} en Redis`,
-      )
+      await this.syncBalanceCache(userId, wallet.balance)
 
       if (type === TransactionType.ADMIN_GIFT) {
-        const amountGift = operation.amount;
-
         this.eventEmitter.emit('wallet.admin_gift', {
-          userId: updatedWallet.userId,
-          amount: amountGift,
+          userId: wallet.userId,
+          amount: amountAdded,
           description: description,
-          newBalance: updatedWallet.balance,
-        });
+          newBalance: wallet.balance,
+        })
       }
 
-
-      return updatedWallet
+      return wallet
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -126,16 +81,132 @@ export class WalletService {
     }
   }
 
+  private async creditInTx(
+    tx: Prisma.TransactionClient,
+    operation: WalletOperation,
+  ): Promise<{ wallet: Wallet; amountAdded: number }> {
+    const {
+      userId,
+      amount,
+      type,
+      description,
+      referenceId,
+      enforceCap = true,
+    } = operation
+
+    // Lock de fila: un débito o crédito concurrente espera al commit en vez de pisar el saldo
+    const [locked] = await tx.$queryRaw<{ balance: number }[]>`
+      SELECT balance FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`
+
+    // Una wallet nueva arranca con las 1000 monedas de regalo
+    const previousBalance = locked ? locked.balance : 1000
+    const cappedBalance = enforceCap
+      ? Math.min(previousBalance + amount, MAX_COIN_BALANCE)
+      : previousBalance + amount
+    // Lo acreditado sin tope y los pagos de apuestas pueden dejar el saldo
+    // arriba del tope: el recorte nunca lo baja.
+    const newBalance = Math.max(previousBalance, cappedBalance)
+    const amountAdded = newBalance - previousBalance
+
+    const wallet = locked
+      ? await tx.wallet.update({
+          where: { userId },
+          data: { balance: newBalance },
+        })
+      : await tx.wallet.create({ data: { userId, balance: newBalance } })
+
+    if (amountAdded > 0) {
+      await tx.coinTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: amountAdded,
+          type: type,
+          description: description,
+          referenceId: referenceId || null,
+        },
+      })
+    }
+
+    this.logger.log(
+      `[WALLET DB OK] +${amountAdded} coins a User:${userId} por ${type}. Balance final: ${newBalance}`,
+    )
+    return { wallet, amountAdded }
+  }
+
   /**
-   * Resta monedas verificando saldo a nivel Base de Datos para evitar Race Conditions
+   * Descuenta hasta donde alcance el saldo: para reversas de pagos (reembolsos y
+   * contracargos), donde el usuario pudo haber gastado parte de lo acreditado.
+   * Corre en la transacción de quien llama y no toca Redis.
+   */
+  async debitUpTo(
+    operation: WalletOperation,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ debited: number; shortfall: number }> {
+    const { userId, amount, type, description, referenceId } = operation
+
+    if (amount <= 0) {
+      throw new BadRequestException(
+        'El monto a descontar debe ser mayor a cero',
+      )
+    }
+
+    const [locked] = await tx.$queryRaw<{ id: string; balance: number }[]>`
+      SELECT id, balance FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`
+
+    const debited = locked ? Math.min(locked.balance, amount) : 0
+
+    if (debited > 0) {
+      await tx.wallet.update({
+        where: { userId },
+        data: { balance: { decrement: debited } },
+      })
+      await tx.coinTransaction.create({
+        data: {
+          walletId: locked.id,
+          amount: -debited,
+          type: type,
+          description: description,
+          referenceId: referenceId || null,
+        },
+      })
+    }
+
+    this.logger.log(
+      `[WALLET DB OK] -${debited} de ${amount} coins a User:${userId} por ${type}`,
+    )
+    return { debited, shortfall: amount - debited }
+  }
+
+  /**
+   * Alinea la key de Redis con el saldo confirmado en la DB. Llamarlo después del commit.
+   */
+  async syncBalanceCache(userId: string, balance?: number): Promise<void> {
+    let value = balance
+    if (value === undefined) {
+      const wallet = await this.prisma.wallet.findUnique({
+        where: { userId },
+        select: { balance: true },
+      })
+      if (!wallet) return
+      value = wallet.balance
+    }
+
+    await this.redisService.redis.set(`wallet:${userId}:balance`, value)
+
+    this.logger.log(
+      `[WALLET SYNC OK] Balance de User:${userId} actualizado a ${value} en Redis`,
+    )
+  }
+
+  /**
+   * Resta monedas verificando saldo a nivel Base de Datos para evitar Race Conditions.
+   * Con `txClient` no toca Redis: quien llama sincroniza con `syncBalanceCache` después del commit.
    */
   async subtractCoins(
     operation: WalletOperation,
     txClient?: Prisma.TransactionClient,
   ): Promise<Wallet> {
     const { userId, amount, type, description, referenceId } = operation
-
-    const client = txClient || this.prisma
 
     if (amount <= 0) {
       throw new BadRequestException(
@@ -166,22 +237,15 @@ export class WalletService {
         return wallet
       }
 
-      let updatedWallet: Wallet
-
       if (txClient) {
-        updatedWallet = await executeOperation(txClient)
-      } else {
-        updatedWallet = await this.prisma.$transaction(async (newTx) =>
-          executeOperation(newTx),
-        )
+        return await executeOperation(txClient)
       }
 
-      const redisClient = this.redisService.redis
-      await redisClient.set(`wallet:${userId}:balance`, updatedWallet.balance)
-
-      this.logger.log(
-        `[WALLET SYNC OK] -${amount} coins descontadas a User:${userId} sincronizado en Redis`,
+      const updatedWallet = await this.prisma.$transaction((newTx) =>
+        executeOperation(newTx),
       )
+
+      await this.syncBalanceCache(userId, updatedWallet.balance)
 
       return updatedWallet
     } catch (prismaError) {

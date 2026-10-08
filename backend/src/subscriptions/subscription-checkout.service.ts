@@ -17,6 +17,7 @@ import {
   SUBSCRIPTION_CYCLE_DAYS,
   GRACE_PERIOD_HOURS,
   MERCADO_PAGO_CONSTANTS,
+  UPGRADE_LINK_TTL_SECONDS,
 } from './constants/subscription.constants'
 
 import { SUBSCRIPTION_GIFTS } from './constants/subscription-rewards.constant'
@@ -34,6 +35,14 @@ import { RedisService } from '../redis/redis.service'
 import { SubscriptionPricingService } from './domain/subscription-pricing.service'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { SubscriptionRewardsService } from './Subscription-rewards.service'
+import { WalletService } from '../wallet/wallet.service'
+
+// Lo que se usa de /preapproval, /authorized_payments y /v1/payments de Mercado Pago
+interface MpChargeDetails {
+  status?: string
+  external_reference?: string
+  payment?: { status?: string }
+}
 
 @Injectable()
 export class SubscriptionCheckoutService {
@@ -47,6 +56,7 @@ export class SubscriptionCheckoutService {
     private readonly redis: RedisService,
     private readonly configService: ConfigService<EnvironmentVariables>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly walletService: WalletService,
   ) {}
 
   // private getMercadoPagoConfig() {
@@ -253,10 +263,10 @@ export class SubscriptionCheckoutService {
         )
 
         const preapprovalDetails =
-          await this.mercadoPagoService.getPaymentDetails(
+          (await this.mercadoPagoService.getPaymentDetails(
             paymentId,
             payload.type,
-          )
+          )) as MpChargeDetails | null
 
         if (preapprovalDetails?.status === 'cancelled') {
           // suscripción en DB local
@@ -290,6 +300,17 @@ export class SubscriptionCheckoutService {
             message: 'Suscripción no encontrada o ya procesada.',
           }
         }
+
+        // La autorización del débito no es un cobro: el alta, los regalos y el bono
+        // salen con el primer cobro aprobado (subscription_authorized_payment).
+        this.logger.log(
+          `[Webhook MP] Preapproval ${paymentId} en estado ${preapprovalDetails?.status}: se espera el cobro para activar.`,
+        )
+        return {
+          status: 'ignored',
+          message:
+            'Autorización registrada: la suscripción se activa con el primer cobro.',
+        }
       }
 
       const isAlreadyProcessed = await this.prisma.processedPayment.findUnique({
@@ -303,34 +324,69 @@ export class SubscriptionCheckoutService {
         return { status: 'idempotent', message: 'Pago ya fue procesado' }
       }
 
-      const paymentDetails = await this.mercadoPagoService.getPaymentDetails(
+      const paymentDetails = (await this.mercadoPagoService.getPaymentDetails(
         paymentId,
         payload.type,
-      )
+      )) as MpChargeDetails | null
       if (!paymentDetails) {
         throw new InternalServerErrorException(
           'No se pudo obtener detalles del pago',
         )
       }
 
-      if (
-        paymentDetails.status !== 'approved' &&
-        paymentDetails.status !== 'authorized' &&
-        paymentDetails.status !== 'processed'
-      ) {
+      // Sin referencia no se puede saber de qué suscripción es: con un where en
+      // undefined, Prisma tocaría cualquier suscripción (o todas).
+      const externalRef = paymentDetails.external_reference
+      if (!externalRef) {
         this.logger.warn(
-          `[Webhook] Pago ${paymentId} no aprobado. Status: ${paymentDetails.status}`,
+          `[Webhook] Pago ${paymentId} (${payload.type}) sin external_reference. Ignorado.`,
         )
-        await this.handlePaymentFailure(paymentDetails.external_reference)
+        return {
+          status: 'ignored',
+          message: 'Pago sin referencia de suscripción',
+        }
+      }
+
+      // Un authorized_payment "processed" trae el resultado del cobro en payment.status.
+      // Los estados intermedios (scheduled, pending, in_process) no son ni cobro ni
+      // fallo: MP avisa la factura al crearla, a veces días antes del débito.
+      const chargeStatus = paymentDetails.status
+      const isAuthorizedPayment =
+        payload.type === 'subscription_authorized_payment'
+      const isApprovedCharge = isAuthorizedPayment
+        ? chargeStatus === 'processed' &&
+          (paymentDetails.payment?.status ?? 'approved') === 'approved'
+        : chargeStatus === 'approved'
+      const isFailedCharge = isAuthorizedPayment
+        ? chargeStatus === 'recycling' ||
+          chargeStatus === 'cancelled' ||
+          (chargeStatus === 'processed' && !isApprovedCharge)
+        : chargeStatus === 'rejected' || chargeStatus === 'cancelled'
+
+      if (isFailedCharge) {
+        this.logger.warn(
+          `[Webhook] Pago ${paymentId} no aprobado. Status: ${chargeStatus}`,
+        )
+        await this.handlePaymentFailure(externalRef)
         return {
           status: 'failed',
-          message: `Pago en estado ${paymentDetails.status}`,
+          message: `Pago en estado ${chargeStatus}`,
+        }
+      }
+
+      if (!isApprovedCharge) {
+        this.logger.log(
+          `[Webhook] Pago ${paymentId} en estado ${chargeStatus}: se espera el resultado del cobro.`,
+        )
+        return {
+          status: 'ignored',
+          message: `Pago en estado ${chargeStatus}`,
         }
       }
 
       //  Buscar la nueva suscripción (la que se acaba de pagar)
       const subscription = await this.prisma.userSubscription.findFirst({
-        where: { mpExternalRef: paymentDetails.external_reference },
+        where: { mpExternalRef: externalRef },
         include: {
           user: true,
         },
@@ -338,15 +394,16 @@ export class SubscriptionCheckoutService {
 
       if (!subscription) {
         throw new BadRequestException(
-          `No existe suscripción con external_reference ${paymentDetails.external_reference}`,
+          `No existe suscripción con external_reference ${externalRef}`,
         )
       }
 
       const upgradeOldSubId = await this.redis.redis.get(
-        `subscription:upgrade:${paymentDetails.external_reference}`,
+        `subscription:upgrade:${externalRef}`,
       )
 
-      let oldPreapprovalIdToCancel: string | null = null
+      // Débitos automáticos a dar de baja en MP afuera del bloque transaccional
+      const preapprovalsToCancel: string[] = []
 
       // TRANSACCIÓN ATÓMICA
       const result = await this.prisma.$transaction(async (tx) => {
@@ -367,138 +424,237 @@ export class SubscriptionCheckoutService {
           now.getTime() + SUBSCRIPTION_CYCLE_DAYS * 24 * 60 * 60 * 1000,
         )
 
-        const updatedSubscription = await tx.userSubscription.update({
-          where: { id: subscription.id },
+        // MP manda más de un evento por alta (preapproval autorizado + primer cobro) y uno
+        // por cada renovación: solo el que pasa la suscripción de PENDING a ACTIVE es el alta.
+        const activation = await tx.userSubscription.updateMany({
+          where: { id: subscription.id, status: SubscriptionStatus.PENDING },
           data: {
             status: SubscriptionStatus.ACTIVE,
             startsAt: now,
             endsAt: nextBillingDate,
           },
         })
+        const isFirstActivation = activation.count === 1
 
-        // Sincronizar el nuevo tier en el usuario
-        const updatedUser = await tx.user.update({
-          where: { id: subscription.userId },
-          data: { activeSubscriptionTier: subscription.tier },
-          include: { wallet: true },
-        })
+        let isActive = isFirstActivation
+        if (!isFirstActivation) {
+          // Una en GRACE_PERIOD o una EXPIRED con autoRenew (venció por falta de pago: el
+          // cron no toca autoRenew) siguen vivas en MP y se reactivan con un reintento,
+          // salvo que el usuario ya tenga otra ACTIVE. La vieja de un upgrade y las
+          // canceladas tienen autoRenew: false.
+          const otherActive = await tx.userSubscription.count({
+            where: {
+              userId: subscription.userId,
+              id: { not: subscription.id },
+              status: SubscriptionStatus.ACTIVE,
+            },
+          })
 
-        // Impactar ítems / beneficios de inventario
-        const dbPlan = await tx.subscriptionPlan.findUnique({
-          where: { tier: subscription.tier },
+          // Renovación (o segundo evento del alta): solo extiende el período, sin regalos
+          const renewal = await tx.userSubscription.updateMany({
+            where: {
+              id: subscription.id,
+              OR: [
+                { status: SubscriptionStatus.ACTIVE },
+                ...(otherActive === 0
+                  ? [
+                      { status: SubscriptionStatus.GRACE_PERIOD },
+                      { status: SubscriptionStatus.EXPIRED, autoRenew: true },
+                    ]
+                  : []),
+              ],
+            },
+            data: {
+              status: SubscriptionStatus.ACTIVE,
+              endsAt: nextBillingDate,
+            },
+          })
+          isActive = renewal.count === 1
+
+          if (!isActive) {
+            // Si no se reactiva, MP la seguiría cobrando cada mes: se da de baja
+            if (subscription.mpPreapprovalId) {
+              preapprovalsToCancel.push(subscription.mpPreapprovalId)
+            }
+            this.logger.error(
+              `[Webhook] Pago ${paymentId} sobre la suscripción ${subscription.id} en estado ${subscription.status}: no se reactiva y se cancela su débito en MP. Revisar si corresponde reintegro.`,
+            )
+          }
+        }
+
+        if (isActive) {
+          // Sincronizar el nuevo tier en el usuario
+          await tx.user.update({
+            where: { id: subscription.userId },
+            data: { activeSubscriptionTier: subscription.tier },
+          })
+        }
+
+        // La wallet se crea con el primer crédito: un usuario que nunca recibió
+        // monedas no tiene, y el registro del pago la necesita
+        const wallet = await tx.wallet.upsert({
+          where: { userId: subscription.userId },
+          update: {},
+          create: { userId: subscription.userId },
+          select: { id: true },
         })
 
         // Registrar transacción base de Mercado Pago
         await tx.coinTransaction.create({
           data: {
-            walletId: updatedUser.wallet?.id || '',
+            walletId: wallet.id,
             amount: 0,
             type: TransactionType.MERCADO_PAGO_BUY,
             description: `Suscripción ${subscription.tier} - Pago MP ${paymentId}`,
-            referenceId: paymentDetails.external_reference,
+            referenceId: externalRef,
           },
         })
 
-        if (upgradeOldSubId) {
-          const oldSub = await tx.userSubscription.findUnique({
-            where: { id: upgradeOldSubId },
+        if (isFirstActivation) {
+          // Una sola suscripción vigente por usuario: al activar la nueva se vencen y se dan
+          // de baja en MP las otras que MP todavía puede cobrar (la vieja de un upgrade,
+          // aunque su key de Redis haya vencido, una en GRACE_PERIOD que el usuario
+          // reemplazó, o una EXPIRED por falta de pago con el débito vivo)
+          const otherSubs = await tx.userSubscription.findMany({
+            where: {
+              userId: subscription.userId,
+              id: { not: subscription.id },
+              OR: [
+                {
+                  status: {
+                    in: [
+                      SubscriptionStatus.ACTIVE,
+                      SubscriptionStatus.GRACE_PERIOD,
+                    ],
+                  },
+                },
+                { status: SubscriptionStatus.EXPIRED, autoRenew: true },
+              ],
+            },
           })
 
-          if (oldSub && oldSub.status === SubscriptionStatus.ACTIVE) {
+          for (const oldSub of otherSubs) {
+            // Lock optimista: si dos altas vencen la misma suscripción, el bono se paga una vez
+            const expired = await tx.userSubscription.updateMany({
+              where: {
+                id: oldSub.id,
+                status: oldSub.status,
+                autoRenew: oldSub.autoRenew,
+              },
+              data: { status: SubscriptionStatus.EXPIRED, autoRenew: false },
+            })
+            if (expired.count === 0) continue
+
+            if (oldSub.mpPreapprovalId) {
+              preapprovalsToCancel.push(oldSub.mpPreapprovalId)
+            }
+
+            // El bono es solo para el upgrade pedido desde una suscripción al día
+            if (
+              oldSub.id !== upgradeOldSubId ||
+              oldSub.status !== SubscriptionStatus.ACTIVE
+            ) {
+              continue
+            }
+
+            const oldPlan = await tx.subscriptionPlan.findUnique({
+              where: { tier: oldSub.tier },
+            })
+
             const { daysRemaining, bonusCoins, coinsPerDay } =
               this.pricingService.calculateUpgradeBonus(
                 oldSub.endsAt,
-                oldSub.tier,
-                subscription.tier,
+                oldPlan?.basePriceARS ?? 0,
               )
 
             if (bonusCoins > 0) {
-              const updatedWallet = await tx.wallet.update({
-                where: { userId: subscription.userId },
-                data: { balance: { increment: bonusCoins } },
-              })
-
-              await tx.coinTransaction.create({
-                data: {
-                  walletId: updatedWallet.id,
+              // Devuelve en monedas lo que se pagó y no se usó: no se recorta al tope
+              await this.walletService.addCoins(
+                {
+                  userId: subscription.userId,
                   amount: bonusCoins,
                   type: TransactionType.ADMIN_GIFT,
                   description: `Bono de upgrade: ${daysRemaining} días restantes × ${coinsPerDay} coins`,
                   referenceId: oldSub.id,
+                  enforceCap: false,
                 },
-              })
-
-              await this.redis.redis.set(
-                `wallet:${subscription.userId}:balance`,
-                updatedWallet.balance,
+                tx,
               )
             }
-
-            // Pisamos el estado de la vieja a EXPIRED para que quede inactiva localmente
-            await tx.userSubscription.update({
-              where: { id: oldSub.id },
-              data: { status: SubscriptionStatus.EXPIRED, autoRenew: false },
-            })
-
-            // Guardamos el ID de MP para destruirlo afuera del bloque transaccional
-            if (oldSub.mpPreapprovalId) {
-              oldPreapprovalIdToCancel = oldSub.mpPreapprovalId
-            }
           }
+        }
 
-          // Limpiar la referencia de upgrade en Redis
-          await this.redis.redis.del(
-            `subscription:upgrade:${paymentDetails.external_reference}`,
+        if (isFirstActivation) {
+          await this.subscriptionRewardsService.grantRewards(
+            subscription.userId,
+            subscription.tier,
+            tx,
           )
         }
 
-        const giftData = await this.subscriptionRewardsService.grantRewards(
-          subscription.userId,
-          subscription.tier,
-          tx,
-        )
+        const updatedSubscription = await tx.userSubscription.findUnique({
+          where: { id: subscription.id },
+        })
 
         return {
           subscription: updatedSubscription,
-          user: updatedUser,
-          giftData,
+          isFirstActivation,
+          isActive,
         }
       })
 
-      // Dar de baja el debito automático viejo en Mercado Pago
-      if (oldPreapprovalIdToCancel) {
+      // Redis recién después del commit: si la transacción hace rollback no quedan
+      // saldos ni upgrades a medio aplicar
+      if (result.isFirstActivation) {
+        if (upgradeOldSubId) {
+          await this.redis.redis.del(`subscription:upgrade:${externalRef}`)
+        }
+        await this.walletService.syncBalanceCache(subscription.userId)
+      }
+
+      // Dar de baja los débitos automáticos que ya no corresponden en Mercado Pago
+      for (const preapprovalId of preapprovalsToCancel) {
         try {
           await this.mercadoPagoService.cancelPreapprovalInMercadoPago(
-            oldPreapprovalIdToCancel,
+            preapprovalId,
           )
           this.logger.log(
-            `[Webhook Upgrade] Suscripción MP anterior ${oldPreapprovalIdToCancel} cancelada con éxito.`,
+            `[Webhook] Suscripción MP ${preapprovalId} cancelada con éxito.`,
           )
         } catch (mpError) {
           // Si MP falla acá no pasa nada grave, el usuario ya tiene su estado perfecto en la DB local.
           // Queda registrado en logs para revisarlo manualmente si hiciera falta.
           this.logger.error(
-            `[Webhook Upgrade Warning] No se pudo cancelar en MP la suscripción vieja ${oldPreapprovalIdToCancel}. Requiere cancelación manual.`,
+            `[Webhook Warning] No se pudo cancelar en MP la suscripción ${preapprovalId}. Requiere cancelación manual.`,
             mpError.stack,
           )
         }
       }
 
       this.logger.log(
-        `[Webhook OK] Proceso completado para suscripción ${subscription.id}`,
+        `[Webhook OK] Proceso completado para suscripción ${subscription.id} (alta: ${result.isFirstActivation})`,
       )
 
-      const giftData = SUBSCRIPTION_GIFTS[subscription.tier]
+      if (result.isFirstActivation) {
+        const giftData = SUBSCRIPTION_GIFTS[subscription.tier]
 
-      this.eventEmitter.emit('subscription.purchased', {
-        userId: subscription.userId,
-        tier: subscription.tier,
-        giftData: giftData,
-      })
+        this.eventEmitter.emit('subscription.purchased', {
+          userId: subscription.userId,
+          tier: subscription.tier,
+          giftData: giftData,
+        })
+      }
+
+      let message = 'Pago registrado sin reactivar la suscripción.'
+      if (result.isFirstActivation) {
+        message = 'Pago procesado y beneficios aplicados correctamente.'
+      } else if (result.isActive) {
+        message = 'Pago procesado: período renovado.'
+      }
 
       return {
         status: 'success',
-        message: 'Pago procesado y beneficios aplicados correctamente.',
+        message,
         subscription: result.subscription,
       }
     } catch (error: any) {
@@ -621,20 +777,24 @@ export class SubscriptionCheckoutService {
         )
       }
 
+      const currentPlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { tier: currentSubscription.tier },
+      })
+
       const { bonusCoins: estimatedBonusCoins } =
         this.pricingService.calculateUpgradeBonus(
           currentSubscription.endsAt,
-          currentSubscription.tier,
-          newTier,
+          currentPlan?.basePriceARS ?? 0,
         )
 
       const checkoutResult = await this.startCheckout(userId, newTier, true)
 
+      // Se lee recién con el primer cobro aprobado, que MP puede reintentar durante días
       await this.redis.redis.set(
         `subscription:upgrade:${checkoutResult.external_reference}`,
         currentSubscription.id,
         'EX',
-        3600,
+        UPGRADE_LINK_TTL_SECONDS,
       )
 
       this.logger.log(
@@ -655,27 +815,31 @@ export class SubscriptionCheckoutService {
   }
 
   /**
-   * Manejar fallo de pago moviendo a GRACE_PERIOD
+   * Manejar fallo de pago moviendo a GRACE_PERIOD.
+   * Solo aplica a una suscripción ACTIVE (falló una renovación): una PENDING nunca
+   * tuvo beneficios, y si pasara a GRACE_PERIOD el alta posterior no la reconocería.
    */
   private async handlePaymentFailure(externalReference: string) {
-    const subscription = await this.prisma.userSubscription.findFirst({
-      where: { mpExternalRef: externalReference },
+    // Con undefined, Prisma ignora el filtro y pasaría todas las ACTIVE a GRACE_PERIOD
+    if (!externalReference) return
+
+    const graceEndDate = new Date()
+    graceEndDate.setHours(graceEndDate.getHours() + GRACE_PERIOD_HOURS)
+
+    const { count } = await this.prisma.userSubscription.updateMany({
+      where: {
+        mpExternalRef: externalReference,
+        status: SubscriptionStatus.ACTIVE,
+      },
+      data: {
+        status: SubscriptionStatus.GRACE_PERIOD,
+        endsAt: graceEndDate,
+      },
     })
 
-    if (subscription) {
-      const graceEndDate = new Date()
-      graceEndDate.setHours(graceEndDate.getHours() + GRACE_PERIOD_HOURS)
-
-      await this.prisma.userSubscription.update({
-        where: { id: subscription.id },
-        data: {
-          status: SubscriptionStatus.GRACE_PERIOD,
-          endsAt: graceEndDate,
-        },
-      })
-
+    if (count > 0) {
       this.logger.warn(
-        `[Payment Failure] Suscripción ${subscription.id} movida a GRACE_PERIOD`,
+        `[Payment Failure] Suscripción con ref ${externalReference} movida a GRACE_PERIOD`,
       )
     }
   }

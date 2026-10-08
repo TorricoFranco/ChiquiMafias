@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { WebhookService } from './webhook.service'
 import { SubscriptionCheckoutService } from 'src/subscriptions/subscription-checkout.service'
+import { CoinShopService } from 'src/coin-shop/coin-shop.service'
+import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service'
+import { MercadoPagoWebhookPayload } from 'src/subscriptions/interfaces/mercado-pago.interface'
 import { ConfigService } from '@nestjs/config'
 import {
   UnauthorizedException,
@@ -10,17 +13,34 @@ import * as crypto from 'crypto'
 
 describe('WebhookService', () => {
   let service: WebhookService
-  let mockCheckoutService: any
-  let mockConfigService: any
+  let mockCheckoutService: { processWebhook: jest.Mock }
+  let mockCoinShopService: { processPaymentWebhook: jest.Mock }
+  let mockMercadoPagoService: {
+    getPaymentDetails: jest.Mock
+    getMerchantOrderDetails: jest.Mock
+  }
+  let mockConfigService: { get: jest.Mock }
 
   const TEST_SECRET = 'super-secret-key'
-  const MOCK_PAYLOAD = { data: { id: '12345' } }
+  const MOCK_PAYLOAD = {
+    type: 'subscription_authorized_payment',
+    data: { id: '12345' },
+  } as MercadoPagoWebhookPayload
   const X_REQUEST_ID = 'req-abc-999'
   const TS = '1715623000'
 
   beforeEach(async () => {
     mockCheckoutService = {
       processWebhook: jest.fn().mockResolvedValue({ success: true }),
+    }
+
+    mockCoinShopService = {
+      processPaymentWebhook: jest.fn().mockResolvedValue(true),
+    }
+
+    mockMercadoPagoService = {
+      getPaymentDetails: jest.fn(),
+      getMerchantOrderDetails: jest.fn(),
     }
 
     mockConfigService = {
@@ -31,6 +51,8 @@ describe('WebhookService', () => {
       providers: [
         WebhookService,
         { provide: SubscriptionCheckoutService, useValue: mockCheckoutService },
+        { provide: CoinShopService, useValue: mockCoinShopService },
+        { provide: MercadoPagoService, useValue: mockMercadoPagoService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile()
@@ -82,6 +104,58 @@ describe('WebhookService', () => {
     expect(result).toEqual({ success: true })
     expect(mockCheckoutService.processWebhook).toHaveBeenCalledWith(
       MOCK_PAYLOAD,
+    )
+  })
+
+  it('debería mandar el pago de un pack de monedas al CoinShopService y no al checkout de suscripciones', async () => {
+    const payload = {
+      type: 'payment',
+      data: { id: '777' },
+    } as MercadoPagoWebhookPayload
+    const paymentDetails = {
+      status: 'approved',
+      external_reference: 'coin_order_abc',
+    }
+    mockMercadoPagoService.getPaymentDetails.mockResolvedValue(paymentDetails)
+    const signature = generateSignature(TS, '777', X_REQUEST_ID, TEST_SECRET)
+
+    const result = await service.processWebhook(
+      payload,
+      signature,
+      X_REQUEST_ID,
+    )
+
+    expect(result).toEqual({
+      status: 'success',
+      message: 'Orden de monedas procesada',
+    })
+    expect(mockCoinShopService.processPaymentWebhook).toHaveBeenCalledWith(
+      paymentDetails,
+    )
+    expect(mockCheckoutService.processWebhook).not.toHaveBeenCalled()
+  })
+
+  it('debería mandar a CoinShopService el reembolso de un pack que llega por merchant_order', async () => {
+    const payload = {
+      type: 'merchant_order',
+      data: { id: '888' },
+    } as MercadoPagoWebhookPayload
+    const refundedPayment = {
+      id: 9,
+      status: 'refunded',
+      external_reference: 'coin_order_abc',
+    }
+    mockMercadoPagoService.getMerchantOrderDetails.mockResolvedValue({
+      external_reference: 'coin_order_abc',
+      payments: [{ id: 9, status: 'refunded' }],
+    })
+    mockMercadoPagoService.getPaymentDetails.mockResolvedValue(refundedPayment)
+    const signature = generateSignature(TS, '888', X_REQUEST_ID, TEST_SECRET)
+
+    await service.processWebhook(payload, signature, X_REQUEST_ID)
+
+    expect(mockCoinShopService.processPaymentWebhook).toHaveBeenCalledWith(
+      refundedPayment,
     )
   })
 

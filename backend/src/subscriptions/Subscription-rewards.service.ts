@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { Prisma, TransactionType } from '@prisma/client'
 import { SUBSCRIPTION_GIFTS } from './constants/subscription-rewards.constant'
+import { WalletService } from '../wallet/wallet.service'
 
 interface AwardedItem {
   name: string
@@ -13,7 +15,17 @@ interface AwardedItem {
 export class SubscriptionRewardsService {
   private readonly logger = new Logger(SubscriptionRewardsService.name)
 
-  async grantRewards(userId: string, tier: string, tx: any) {
+  constructor(private readonly walletService: WalletService) {}
+
+  /**
+   * Entrega el regalo de alta del tier dentro de la transacción de quien llama.
+   * No toca Redis: quien llama sincroniza el saldo después del commit.
+   */
+  async grantRewards(
+    userId: string,
+    tier: string,
+    tx: Prisma.TransactionClient,
+  ) {
     const rewards = SUBSCRIPTION_GIFTS[tier]
     if (!rewards) return null
 
@@ -70,21 +82,19 @@ export class SubscriptionRewardsService {
     }
 
     if (totalCoinsToGive > 0) {
-      const wallet = await tx.wallet.update({
-        where: { userId },
-        data: { balance: { increment: totalCoinsToGive } },
-      })
-
       const baseCoins = rewards.coins || 0
 
-      await tx.coinTransaction.create({
-        data: {
-          walletId: wallet.id,
+      // Es parte de lo que se pagó: no se recorta al tope
+      await this.walletService.addCoins(
+        {
+          userId,
           amount: totalCoinsToGive,
-          type: 'SUBSCRIPTION_REWARD',
+          type: TransactionType.SUBSCRIPTION_REWARD,
           description: `Regalo por suscripción ${tier}${totalCoinsToGive > baseCoins ? ' (Incluye compensación por ítems repetidos)' : ''}`,
+          enforceCap: false,
         },
-      })
+        tx,
+      )
     }
 
     return {

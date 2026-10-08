@@ -8,11 +8,12 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import {
   WEEKEND_DISCOUNT_PERCENTAGE,
   MERCADO_PAGO_CONSTANTS,
-  UPGRADE_COINS_PER_DAY_MAP,
+  SUBSCRIPTION_CYCLE_DAYS,
   SUNDAY_VIP_UPGRADE_DISCOUNT_PERCENTAGE,
   SUNDAY_VIP_DISCOUNT_PERCENTAGE,
   PROMO_MESSAGES,
 } from '../constants/subscription.constants'
+import { COIN_VALUE_ARS } from 'src/wallet/constants/wallet.constants'
 import { SubscriptionPricingModel } from '../interfaces/mercado-pago.interface'
 
 import dayjs from 'dayjs'
@@ -87,6 +88,8 @@ export class SubscriptionPricingService {
         orderBy: { basePriceARS: 'asc' },
       })
 
+      const upgradeRules = this.buildUpgradeRules(activePlans)
+
       return activePlans.map((plan) => {
         const pricing = this.calculateCurrentPrice(plan, currentUserTier)
 
@@ -97,7 +100,7 @@ export class SubscriptionPricingService {
           benefits: plan.benefits,
           pricing,
           isCurrent: currentUserTier === plan.tier,
-          upgradeRules: UPGRADE_COINS_PER_DAY_MAP,
+          upgradeRules,
         }
       })
     } catch (error) {
@@ -121,12 +124,36 @@ export class SubscriptionPricingService {
   }
 
   /**
-   * CÁLCULO DE BONO DINÁMICO DE UPGRADE
+   * Monedas por día que vale un plan: su precio diario convertido a monedas.
+   */
+  getUpgradeCoinsPerDay(planPriceARS: number): number {
+    return Math.round(planPriceARS / SUBSCRIPTION_CYCLE_DAYS / COIN_VALUE_ARS)
+  }
+
+  /**
+   * Monedas por día del bono de cada upgrade posible (`TIER_X_TO_TIER_Y`).
+   * Dependen solo del plan de origen: se devuelven los días que no se usaron.
+   */
+  buildUpgradeRules(plans: SubscriptionPlan[]): Record<string, number> {
+    const rules: Record<string, number> = {}
+    for (const from of plans) {
+      for (const to of plans) {
+        if (this.getTierValue(to.tier) > this.getTierValue(from.tier)) {
+          rules[`${from.tier}_TO_${to.tier}`] = this.getUpgradeCoinsPerDay(
+            from.basePriceARS,
+          )
+        }
+      }
+    }
+    return rules
+  }
+
+  /**
+   * CÁLCULO DE BONO DE UPGRADE: los días restantes del plan viejo, devueltos en monedas
    */
   calculateUpgradeBonus(
     endsAt: Date,
-    currentTier: SubscriptionTier,
-    newTier: SubscriptionTier,
+    oldPlanPriceARS: number,
   ): {
     daysRemaining: number
     bonusCoins: number
@@ -139,8 +166,7 @@ export class SubscriptionPricingService {
       Math.ceil(msRemaining / (1000 * 60 * 60 * 24)),
     )
 
-    const transitionKey = `${currentTier}_TO_${newTier}`
-    const coinsPerDay = UPGRADE_COINS_PER_DAY_MAP[transitionKey] || 0
+    const coinsPerDay = this.getUpgradeCoinsPerDay(oldPlanPriceARS)
 
     return {
       daysRemaining,

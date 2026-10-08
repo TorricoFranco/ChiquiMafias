@@ -1,18 +1,17 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { WalletService } from '../wallet/wallet.service'
-import {
-  STREAK_CONFIG
-} from './constants/streak.constants'
+import { calculateStreakCoins } from './utils/streak-reward'
+import { STREAK_CONFIG } from './constants/streak.constants'
 import { StreakTimelineItem } from './interfaces/StrakeTimelineItem.interfaces'
-import { SPECIAL_GIFTS, TIER_MULTIPLIERS } from 'src/subscriptions/constants/subscription-rewards.constant';
+import { SPECIAL_GIFTS } from 'src/subscriptions/constants/subscription-rewards.constant'
 
 @Injectable()
 export class StreaksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletService: WalletService,
-  ) { }
+  ) {}
 
   async handleAutoCheckIn(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -22,44 +21,44 @@ export class StreaksService {
         lastCheckIn: true,
         streakRewardClaimed: true,
       },
-    });
+    })
 
-    if (!user) throw new BadRequestException('Usuario no encontrado');
+    if (!user) throw new BadRequestException('Usuario no encontrado')
 
-    const now = new Date();
+    const now = new Date()
     const todayStr = now.toLocaleDateString('en-CA', {
       timeZone: 'America/Argentina/Buenos_Aires',
-    });
+    })
 
-    let newStreak = 1;
-    let shouldIncrement = false;
+    let newStreak = 1
+    let shouldIncrement = false
 
     if (user.lastCheckIn) {
       const lastCheckInStr = user.lastCheckIn.toLocaleDateString('en-CA', {
         timeZone: 'America/Argentina/Buenos_Aires',
-      });
+      })
       const diffDays = Math.floor(
         (Date.parse(todayStr) - Date.parse(lastCheckInStr)) /
-        (1000 * 60 * 60 * 24),
-      );
+          (1000 * 60 * 60 * 24),
+      )
 
       if (diffDays === 0) {
         return {
           incremented: false,
           currentStreak: user.currentStreak,
           canClaimReward: !user.streakRewardClaimed,
-        };
+        }
       }
 
       if (diffDays === 1) {
-        newStreak = user.currentStreak + 1;
-        shouldIncrement = true;
+        newStreak = user.currentStreak + 1
+        shouldIncrement = true
       } else {
-        newStreak = 1;
-        shouldIncrement = true;
+        newStreak = 1
+        shouldIncrement = true
       }
     } else {
-      shouldIncrement = true;
+      shouldIncrement = true
     }
 
     if (shouldIncrement) {
@@ -70,57 +69,53 @@ export class StreaksService {
           lastCheckIn: now,
           streakRewardClaimed: false,
         },
-      });
+      })
     }
 
     return {
       incremented: shouldIncrement,
       currentStreak: newStreak,
       canClaimReward: true,
-    };
+    }
   }
 
   async claimDailyReward(userId: string, userTier: string = 'FREE') {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { currentStreak: true, streakRewardClaimed: true },
-    });
+    })
 
-    if (!user) throw new BadRequestException('Usuario no encontrado');
+    if (!user) throw new BadRequestException('Usuario no encontrado')
     if (user.streakRewardClaimed) {
-      throw new BadRequestException('Ya reclamaste el premio de hoy, campeón.');
+      throw new BadRequestException('Ya reclamaste el premio de hoy, campeón.')
     }
 
-    const streakDayForCalculation = Math.min(
-      user.currentStreak,
-      STREAK_CONFIG.MAX_GROWTH_DAY,
-    );
-    const baseReward = Math.floor(
-      STREAK_CONFIG.BASE_REWARD *
-      Math.pow(STREAK_CONFIG.GROWTH_RATE, streakDayForCalculation - 1),
-    );
+    const baseCoinReward = calculateStreakCoins(user.currentStreak, userTier)
 
-    const multiplier = TIER_MULTIPLIERS[userTier] || 1.0;
-    const baseCoinReward = Math.floor(baseReward * multiplier);
-
-    const giftsForDay = SPECIAL_GIFTS[user.currentStreak];
+    const giftsForDay = SPECIAL_GIFTS[user.currentStreak]
     const specialGiftDef = giftsForDay
       ? giftsForDay[userTier] || giftsForDay['FREE']
-      : null;
+      : null
 
-    let finalTotalCoins = baseCoinReward;
-    let cosmeticAwardedMessage: string | null = null;
+    let finalTotalCoins = baseCoinReward
+    let cosmeticAwardedMessage: string | null = null
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: userId },
+      // Update condicional: con dos claims simultáneos solo uno marca el premio y acredita
+      const claim = await tx.user.updateMany({
+        where: { id: userId, streakRewardClaimed: false },
         data: { streakRewardClaimed: true },
-      });
+      })
+      if (claim.count === 0) {
+        throw new BadRequestException(
+          'Ya reclamaste el premio de hoy, campeón.',
+        )
+      }
 
       if (specialGiftDef) {
         const storeItem = await tx.storeItem.findUnique({
           where: { assetId: specialGiftDef.assetId },
-        });
+        })
 
         if (storeItem) {
           const isPermanent = [
@@ -128,16 +123,22 @@ export class StreaksService {
             'BANNER',
             'CHAT_BUBBLE',
             'STICKER_PACK',
-          ].includes(storeItem.type);
+          ].includes(storeItem.type)
 
           const existingInventory = await tx.userInventory.findUnique({
             where: { userId_itemId: { userId, itemId: storeItem.id } },
-          });
+          })
 
           if (isPermanent && existingInventory) {
-            const compensationCoins = Math.floor(storeItem.price * 0.6);
-            finalTotalCoins += compensationCoins;
-            cosmeticAwardedMessage = `${storeItem.name} (Ya lo tenías. Compensación: +${compensationCoins} monedas)`;
+            // Con tope: si no, cortar la racha a propósito para repetir el regalo convendría
+            const compensationCoins = Math.min(
+              Math.floor(
+                storeItem.price * STREAK_CONFIG.GIFT_COMPENSATION_RATE,
+              ),
+              STREAK_CONFIG.MAX_GIFT_COMPENSATION,
+            )
+            finalTotalCoins += compensationCoins
+            cosmeticAwardedMessage = `${storeItem.name} (Ya lo tenías. Compensación: +${compensationCoins} monedas)`
           } else {
             await tx.userInventory.upsert({
               where: {
@@ -151,74 +152,69 @@ export class StreaksService {
                 itemId: storeItem.id,
                 quantity: 1,
               },
-            });
-            cosmeticAwardedMessage = storeItem.name;
+            })
+            cosmeticAwardedMessage = storeItem.name
           }
         }
       }
 
-      await this.walletService.addCoins({
-        userId,
-        amount: finalTotalCoins,
-        type: 'STREAK_REWARD',
-        description: `Premio diario por racha del Día ${user.currentStreak}`,
-      });
-    });
+      await this.walletService.addCoins(
+        {
+          userId,
+          amount: finalTotalCoins,
+          type: 'STREAK_REWARD',
+          description: `Premio diario por racha del Día ${user.currentStreak}`,
+        },
+        tx,
+      )
+    })
+
+    await this.walletService.syncBalanceCache(userId)
 
     return {
       status: 'success',
       coinsAwarded: finalTotalCoins,
       cosmeticAwarded: cosmeticAwardedMessage,
       currentStreak: user.currentStreak,
-    };
+    }
   }
 
   async getStreakTimeline(userId: string, userTier: string = 'FREE') {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { currentStreak: true, streakRewardClaimed: true },
-    });
+    })
 
-    if (!user) throw new BadRequestException('Usuario no encontrado');
+    if (!user) throw new BadRequestException('Usuario no encontrado')
 
-    const current = user.currentStreak || 1;
-    const claimedToday = user.streakRewardClaimed;
+    const current = user.currentStreak || 1
+    const claimedToday = user.streakRewardClaimed
 
-    const cycle = Math.floor((current - 1) / 30);
-    const startDay = cycle * 30 + 1; 
+    const cycle = Math.floor((current - 1) / 30)
+    const startDay = cycle * 30 + 1
 
-    const timeline: StreakTimelineItem[] = [];
-    const multiplier = TIER_MULTIPLIERS[userTier] || 1.0;
-    const assetIdsToFetch: string[] = [];
+    const timeline: StreakTimelineItem[] = []
+    const assetIdsToFetch: string[] = []
 
     for (let i = 0; i < 30; i++) {
-      const dayNum = startDay + i;
+      const dayNum = startDay + i
 
-      const streakDayForCalculation = Math.min(
-        dayNum,
-        STREAK_CONFIG.MAX_GROWTH_DAY,
-      );
+      const estimatedCoins = calculateStreakCoins(dayNum, userTier)
 
-      const baseReward = Math.floor(
-        STREAK_CONFIG.BASE_REWARD *
-        Math.pow(STREAK_CONFIG.GROWTH_RATE, streakDayForCalculation - 1),
-      );
-      const estimatedCoins = Math.floor(baseReward * multiplier);
-
-      const giftsForDay = SPECIAL_GIFTS[dayNum];
+      const giftsForDay = SPECIAL_GIFTS[dayNum]
       const specialGiftDef = giftsForDay
         ? giftsForDay[userTier] || giftsForDay['FREE']
-        : null;
+        : null
 
       if (specialGiftDef) {
-        assetIdsToFetch.push(specialGiftDef.assetId);
+        assetIdsToFetch.push(specialGiftDef.assetId)
       }
 
-      let status: 'completed' | 'current' | 'upcoming' = 'upcoming';
+      let status: 'completed' | 'current' | 'upcoming' = 'upcoming'
       if (dayNum < current) {
-        status = 'completed';
+        status = 'completed'
       } else if (dayNum === current) {
-        status = 'current';
+        status = 'current'
       }
 
       timeline.push({
@@ -229,25 +225,28 @@ export class StreaksService {
         giftType: specialGiftDef ? specialGiftDef.type : null,
         status,
         giftName: null,
-      });
+      })
     }
 
     if (assetIdsToFetch.length > 0) {
       const storeItems = await this.prisma.storeItem.findMany({
         where: { assetId: { in: assetIdsToFetch } },
         select: { assetId: true, name: true },
-      });
+      })
 
-      const itemsMap = storeItems.reduce((acc, item) => {
-        acc[item.assetId] = item;
-        return acc;
-      }, {} as Record<string, { assetId: string; name: string }>);
+      const itemsMap = storeItems.reduce(
+        (acc, item) => {
+          acc[item.assetId] = item
+          return acc
+        },
+        {} as Record<string, { assetId: string; name: string }>,
+      )
 
       timeline.forEach((day) => {
         if (day.giftAssetId && itemsMap[day.giftAssetId]) {
-          day.giftName = itemsMap[day.giftAssetId].name;
+          day.giftName = itemsMap[day.giftAssetId].name
         }
-      });
+      })
     }
 
     return {
@@ -255,6 +254,6 @@ export class StreaksService {
       streakRewardClaimed: claimedToday,
       userTier,
       timeline,
-    };
+    }
   }
 }

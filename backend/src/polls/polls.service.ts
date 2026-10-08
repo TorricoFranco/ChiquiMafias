@@ -352,29 +352,42 @@ export class PollsService {
     }
 
     const COINS_PER_VOTE = 50
-    const totalCoins = pendingVotes.length * COINS_PER_VOTE
 
     const voteIds = pendingVotes.map((v) => v.id)
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.vote.updateMany({
-        where: { id: { in: voteIds } },
+    // Update condicional: con dos claims simultáneos cada voto se paga una sola vez
+    const claimedCount = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.vote.updateMany({
+        where: { id: { in: voteIds }, rewardClaimed: false },
         data: { rewardClaimed: true },
       })
+      if (count === 0) {
+        throw new BadRequestException(
+          'No tenés recompensas pendientes para reclamar.',
+        )
+      }
 
-      await this.walletService.addCoins({
-        userId,
-        amount: totalCoins,
-        type: 'POLL_VOTE',
-        description: `Recompensa por participar en ${pendingVotes.length} encuestas`,
-      })
+      await this.walletService.addCoins(
+        {
+          userId,
+          amount: count * COINS_PER_VOTE,
+          type: 'POLL_VOTE',
+          description: `Recompensa por participar en ${count} encuestas`,
+        },
+        tx,
+      )
+      return count
     })
+
+    await this.walletService.syncBalanceCache(userId)
+
+    const totalCoins = claimedCount * COINS_PER_VOTE
 
     return {
       status: 'success',
-      claimedCount: pendingVotes.length,
+      claimedCount,
       coinsAwarded: totalCoins,
-      message: `¡Reclamaste ${totalCoins} monedas de ${pendingVotes.length} encuestas con éxito!`,
+      message: `¡Reclamaste ${totalCoins} monedas de ${claimedCount} encuestas con éxito!`,
     }
   }
 
