@@ -1,3 +1,5 @@
-- [Patrones de bug recurrentes](recurring-bug-patterns.md): Roles/Public, endpoints de debug, sanciones con assertCanSanction, auth de sockets, stale cache, TOCTOU
-- [Env de prod](prod-env-config.md): docker-compose.yml usa env_file .env, así que no listar una var en environment: no la excluye
+- [Patrones de bug recurrentes](recurring-bug-patterns.md): Roles/Public, sanciones, sockets, TOCTOU, Redis en tx, `where` undefined, alta "una vigente", cron que borra el tier, P2002 amplio
+- [Hechos de runtime verificados](verified-runtime-facts.md): guards WS, $executeRaw void, ioredis caído, Throttler, Discord, tipos de Wallet, DB de dev, tiempos de MP
+- [Env de prod](prod-env-config.md): compose de prod usa env_file .env; ENABLE_DEV_TOOLS fijo en "false"; scripts del host leen backend/.env
 - [Decisiones de diseño](dev-tools-design.md): DevToolsGuard, api-football solo ADMIN en prod, Discord solo sanciona USERs, WARN sin jerarquía
+- [Working tree compartido](feedback-shared-worktree.md): no `npm run lint` (--fix), solo `npx eslint <archivo>`; nunca e2e ni `npm test`
