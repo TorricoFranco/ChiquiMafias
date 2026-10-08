@@ -254,6 +254,7 @@ export class StoreService {
       },
     )
 
+    await this.walletService.syncBalanceCache(userId, updatedBalance)
     this.chatGateway.sendWalletUpdate(userId, updatedBalance)
     return purchase
   }

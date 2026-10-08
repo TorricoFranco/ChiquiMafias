@@ -48,14 +48,31 @@ export class SubscriptionsCronService {
           break
         }
 
-        expiredCount += batch.length
-
         for (const sub of batch) {
-          await this.prisma.$transaction(async (tx) => {
-            await tx.userSubscription.update({
-              where: { id: sub.id },
+          // Update condicional: si un cobro renovó la suscripción entre el findMany y
+          // acá, no se pisa el mes pagado
+          const outcome = await this.prisma.$transaction(async (tx) => {
+            const { count } = await tx.userSubscription.updateMany({
+              where: { id: sub.id, status: sub.status, endsAt: { lte: now } },
               data: { status: SubscriptionStatus.EXPIRED },
             })
+            if (count === 0) return 'skipped'
+
+            // Si el usuario ya tiene otra vigente (por ejemplo, canceló y se volvió a
+            // suscribir), conserva el tier y los cosméticos de esa
+            const otherCurrent = await tx.userSubscription.count({
+              where: {
+                userId: sub.userId,
+                id: { not: sub.id },
+                status: {
+                  in: [
+                    SubscriptionStatus.ACTIVE,
+                    SubscriptionStatus.GRACE_PERIOD,
+                  ],
+                },
+              },
+            })
+            if (otherCurrent > 0) return 'superseded'
 
             await tx.user.update({
               where: { id: sub.userId },
@@ -65,7 +82,12 @@ export class SubscriptionsCronService {
                 activeBannerId: null,
               },
             })
+            return 'expired'
           })
+
+          if (outcome === 'skipped') continue
+          expiredCount++
+          if (outcome === 'superseded') continue
 
           this.chatGateway.server
             .to(`user:${sub.userId}`)
@@ -105,19 +127,24 @@ export class SubscriptionsCronService {
           break
         }
 
-        activeCount += batch.length
-
         for (const sub of batch) {
           const graceEndDate = new Date()
           graceEndDate.setHours(graceEndDate.getHours() + 48)
 
-          await this.prisma.userSubscription.update({
-            where: { id: sub.id },
+          // Condicional: un cobro que renovó entre el findMany y acá ya extendió endsAt
+          const { count } = await this.prisma.userSubscription.updateMany({
+            where: {
+              id: sub.id,
+              status: SubscriptionStatus.ACTIVE,
+              endsAt: { lte: now },
+            },
             data: {
               status: SubscriptionStatus.GRACE_PERIOD,
               endsAt: graceEndDate,
             },
           })
+          if (count === 0) continue
+          activeCount++
 
           this.chatGateway.server
             .to(`user:${sub.userId}`)

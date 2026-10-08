@@ -11,6 +11,15 @@ import { CoinShopService } from 'src/coin-shop/coin-shop.service'
 import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service'
 import { MercadoPagoWebhookPayload } from 'src/subscriptions'
 
+// Estados de pago que se mandan a coin-shop: los que acreditan y las reversas (reembolso, contracargo)
+const COIN_ORDER_PAYMENT_STATUSES = [
+  'approved',
+  'processed',
+  'authorized',
+  'refunded',
+  'charged_back',
+]
+
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name)
@@ -131,12 +140,8 @@ export class WebhookService {
 
         for (const merchantPayment of merchantOrder.payments) {
           if (!merchantPayment?.id) continue
-          // Solo procesar pagos aprobados/procesados/autorizados
-          if (
-            !['approved', 'processed', 'authorized'].includes(
-              merchantPayment.status,
-            )
-          ) {
+          // Solo procesar pagos aprobados/procesados/autorizados, o reversas de uno acreditado
+          if (!COIN_ORDER_PAYMENT_STATUSES.includes(merchantPayment.status)) {
             continue
           }
 
@@ -150,9 +155,7 @@ export class WebhookService {
             paymentDetails &&
             (paymentDetails.external_reference?.startsWith('coin_order_') ||
               merchantOrder.external_reference?.startsWith('coin_order_')) &&
-            ['approved', 'processed', 'authorized'].includes(
-              paymentDetails.status,
-            )
+            COIN_ORDER_PAYMENT_STATUSES.includes(paymentDetails.status)
           ) {
             this.logger.log(
               `Pago de orden de monedas encontrado en orden de comercio ${dataId}. Procesando...`,

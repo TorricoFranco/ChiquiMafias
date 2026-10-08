@@ -5,8 +5,13 @@ import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service'
 import { RedisService } from '../redis/redis.service'
 import { SubscriptionPricingService } from './domain/subscription-pricing.service'
 import { ConfigService } from '@nestjs/config'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { BadRequestException, ConflictException } from '@nestjs/common'
 import { SubscriptionTier, SubscriptionStatus } from '@prisma/client'
+import { SubscriptionRewardsService } from './Subscription-rewards.service'
+import { WalletService } from '../wallet/wallet.service'
+import { MercadoPagoWebhookPayload } from './interfaces/mercado-pago.interface'
+import { UPGRADE_LINK_TTL_SECONDS } from './constants/subscription.constants'
 
 describe('SubscriptionCheckoutService (Unit Tests)', () => {
   let service: SubscriptionCheckoutService
@@ -16,6 +21,7 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
   let pricingService: SubscriptionPricingService
 
   const mockPrismaService = {
+    $transaction: jest.fn(),
     user: {
       findUnique: jest.fn(),
     },
@@ -26,13 +32,37 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     processedPayment: {
       findUnique: jest.fn(),
     },
   }
 
+  const mockSubscriptionRewardsService = {
+    grantRewards: jest.fn(),
+  }
+
+  const mockWalletService = {
+    addCoins: jest.fn(),
+    syncBalanceCache: jest.fn(),
+  }
+
+  const addCoinsCall = () =>
+    mockWalletService.addCoins.mock.calls[0] as [
+      Record<string, unknown>,
+      unknown,
+    ]
+
+  const mockEventEmitter = {
+    emit: jest.fn(),
+  }
+
   const mockMercadoPagoService = {
+    getMercadoPagoConfig: jest.fn().mockReturnValue({
+      FRONTEND_SUCCESS_URL: 'http://localhost:3005/success',
+      CURRENCY: 'ARS',
+    }),
     createPreapproval: jest.fn(),
     cancelPreapprovalInMercadoPago: jest.fn(),
     getPaymentDetails: jest.fn(),
@@ -72,6 +102,12 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
           useValue: mockSubscriptionPricingService,
         },
         { provide: ConfigService, useValue: mockConfigService },
+        {
+          provide: SubscriptionRewardsService,
+          useValue: mockSubscriptionRewardsService,
+        },
+        { provide: WalletService, useValue: mockWalletService },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile()
 
@@ -204,13 +240,18 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
-    it('✅ Success: Si el tier es superior, ejecuta startCheckout y guarda el puente en Redis', async () => {
+    it('✅ Success: Si el tier es superior, ejecuta startCheckout, estima el bono con el precio del plan actual y guarda el puente en Redis', async () => {
       const activeSub = {
         id: 'sub-actual',
         tier: SubscriptionTier.TIER_1,
         endsAt: new Date(),
       }
+      const upgradeRef = '6f1c2d3e-0000-4000-8000-000000000123'
       mockPrismaService.userSubscription.findFirst.mockResolvedValue(activeSub)
+      mockPrismaService.subscriptionPlan.findUnique.mockResolvedValue({
+        tier: SubscriptionTier.TIER_1,
+        basePriceARS: 3000,
+      })
 
       mockSubscriptionPricingService.getTierValue.mockImplementation((tier) => {
         if (tier === SubscriptionTier.TIER_3) return 3
@@ -224,7 +265,7 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
         .spyOn(service, 'startCheckout')
         .mockResolvedValue({
           init_point: 'https://mp.com/upgrade',
-          external_reference: 'ref-upgrade-123',
+          external_reference: upgradeRef,
           subscription_id: 'new-sub-id',
           tier: SubscriptionTier.TIER_3,
         })
@@ -239,11 +280,14 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
         SubscriptionTier.TIER_3,
         true,
       )
+      expect(
+        mockSubscriptionPricingService.calculateUpgradeBonus,
+      ).toHaveBeenCalledWith(activeSub.endsAt, 3000)
       expect(mockRedisService.redis.set).toHaveBeenCalledWith(
-        'subscription:upgrade:ref-upgrade-123',
+        `subscription:upgrade:${upgradeRef}`,
         'sub-actual',
         'EX',
-        3600,
+        UPGRADE_LINK_TTL_SECONDS,
       )
       expect(result.bonus_coins).toBe(150)
       expect(result.init_point).toBe('https://mp.com/upgrade')
@@ -307,59 +351,80 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
   })
 
   describe('processWebhook', () => {
-    const mockPayload = {
-      type: 'payment',
-      action: 'payment.created',
+    const buildPayload = (type: string): MercadoPagoWebhookPayload => ({
+      action: 'created',
+      application_id: 1,
+      date: '2026-10-07T12:00:00Z',
+      entity: 'authorized_payment',
+      id: 1,
+      type,
+      version: 1,
       data: { id: 'mp-payment-111' },
-    }
-
-    const mockPaymentDetails = {
-      status: 'approved',
-      external_reference: 'ref-checkout-999',
-    }
+    })
+    const mockPayload = buildPayload('subscription_authorized_payment')
 
     const mockLocalSub = {
       id: 'sub-local-123',
       userId: 'user-123',
       tier: SubscriptionTier.TIER_2,
+      status: SubscriptionStatus.PENDING,
       mpExternalRef: 'ref-checkout-999',
+      mpPreapprovalId: 'mp-preapp-local',
     }
 
-    let txMock: any
+    const oldSub = {
+      id: 'old-sub-id-abc',
+      tier: SubscriptionTier.TIER_1,
+      status: SubscriptionStatus.ACTIVE,
+      mpPreapprovalId: 'mp-old-preapp-000',
+      autoRenew: true,
+      endsAt: new Date(),
+    }
+
+    const createTxMock = () => ({
+      processedPayment: { create: jest.fn().mockResolvedValue({}) },
+      userSubscription: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ ...mockLocalSub, status: 'ACTIVE' }),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      user: { update: jest.fn().mockResolvedValue({}) },
+      wallet: { upsert: jest.fn().mockResolvedValue({ id: 'wallet-123' }) },
+      subscriptionPlan: {
+        findUnique: jest.fn().mockResolvedValue({ basePriceARS: 3000 }),
+      },
+      coinTransaction: { create: jest.fn().mockResolvedValue({}) },
+    })
+
+    let txMock: ReturnType<typeof createTxMock>
 
     beforeEach(() => {
-      mockMercadoPagoService.getPaymentDetails.mockResolvedValue(
-        mockPaymentDetails,
-      )
+      mockPrismaService.processedPayment.findUnique.mockResolvedValue(null)
+      mockMercadoPagoService.getPaymentDetails.mockResolvedValue({
+        status: 'processed',
+        external_reference: 'ref-checkout-999',
+      })
       mockPrismaService.userSubscription.findFirst.mockResolvedValue(
         mockLocalSub,
       )
       mockRedisService.redis.get.mockResolvedValue(null)
+      mockMercadoPagoService.cancelPreapprovalInMercadoPago.mockResolvedValue(
+        {},
+      )
 
-      txMock = {
-        processedPayment: { create: jest.fn().mockResolvedValue({}) },
-        userSubscription: { update: jest.fn().mockResolvedValue(mockLocalSub) },
-        user: {
-          update: jest.fn().mockResolvedValue({ wallet: { id: 'wallet-123' } }),
-        },
-        subscriptionPlan: {
-          findUnique: jest.fn().mockResolvedValue({ benefits: [] }),
-        },
-        coinTransaction: { create: jest.fn().mockResolvedValue({}) },
-        wallet: { update: jest.fn().mockResolvedValue({}) },
-      }
-
-      ;(prisma as any).$transaction = jest
-        .fn()
-        .mockImplementation((callback) => callback(txMock))
+      txMock = createTxMock()
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (tx: typeof txMock) => Promise<unknown>) => callback(txMock),
+      )
     })
 
-    it('✅ Idempotencia - Caso 1: Si ocurre un choque de unicidad (P2002) en la DB, responde con éxito sin duplicar beneficios', async () => {
-      const prismaError: any = new Error('Prisma Error')
-      prismaError.code = 'P2002'
-      txMock.processedPayment.create.mockRejectedValue(prismaError)
-
-      mockPrismaService.processedPayment.findUnique.mockResolvedValue(null)
+    it('✅ Idempotencia: Si el pago ya está registrado (P2002), responde idempotente sin tocar la suscripción', async () => {
+      txMock.processedPayment.create.mockRejectedValue(
+        Object.assign(new Error('Prisma Error'), { code: 'P2002' }),
+      )
 
       const result = await service.processWebhook(mockPayload)
 
@@ -367,19 +432,113 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
         status: 'idempotent',
         message: 'Pago ya fue procesado',
       })
-      expect(txMock.userSubscription.update).not.toHaveBeenCalled()
+      expect(txMock.userSubscription.updateMany).not.toHaveBeenCalled()
+      expect(mockSubscriptionRewardsService.grantRewards).not.toHaveBeenCalled()
     })
 
-    it('✅ Resiliencia - Caso 2: Si la baja de la sub vieja en MP falla en un Upgrade, el webhook termina exitosamente', async () => {
-      mockRedisService.redis.get.mockResolvedValue('old-sub-id-abc')
+    it('✅ Alta: El evento que pasa la suscripción de PENDING a ACTIVE entrega el regalo una sola vez', async () => {
+      const result = await service.processWebhook(mockPayload)
 
-      txMock.userSubscription.findUnique = jest.fn().mockResolvedValue({
-        id: 'old-sub-id-abc',
-        status: SubscriptionStatus.ACTIVE,
-        mpPreapprovalId: 'mp-old-preapp-000',
-        endsAt: new Date(),
+      expect(txMock.userSubscription.updateMany).toHaveBeenCalledTimes(1)
+      expect(txMock.userSubscription.updateMany.mock.calls[0][0]).toMatchObject(
+        {
+          where: { id: mockLocalSub.id, status: SubscriptionStatus.PENDING },
+          data: { status: SubscriptionStatus.ACTIVE },
+        },
+      )
+      expect(mockSubscriptionRewardsService.grantRewards).toHaveBeenCalledWith(
+        'user-123',
+        SubscriptionTier.TIER_2,
+        txMock,
+      )
+      expect(txMock.user.update).toHaveBeenCalled()
+      // Un usuario que nunca recibió monedas no tiene wallet: se crea para registrar el pago
+      expect(txMock.wallet.upsert.mock.calls[0][0]).toMatchObject({
+        where: { userId: 'user-123' },
+        create: { userId: 'user-123' },
       })
+      expect(mockWalletService.syncBalanceCache).toHaveBeenCalledWith(
+        'user-123',
+      )
+      expect(mockEventEmitter.emit).toHaveBeenCalledTimes(1)
+      expect(mockEventEmitter.emit.mock.calls[0][0]).toBe(
+        'subscription.purchased',
+      )
+      expect(result.message).toBe(
+        'Pago procesado y beneficios aplicados correctamente.',
+      )
+    })
 
+    it('✅ Renovación: Un pago sobre una suscripción ya activa solo extiende el período, sin regalos', async () => {
+      txMock.userSubscription.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 })
+
+      const result = await service.processWebhook(mockPayload)
+
+      expect(txMock.userSubscription.updateMany.mock.calls[1][0]).toMatchObject(
+        {
+          where: {
+            id: mockLocalSub.id,
+            OR: [
+              { status: SubscriptionStatus.ACTIVE },
+              { status: SubscriptionStatus.GRACE_PERIOD },
+              { status: SubscriptionStatus.EXPIRED, autoRenew: true },
+            ],
+          },
+          data: { status: SubscriptionStatus.ACTIVE },
+        },
+      )
+      expect(mockSubscriptionRewardsService.grantRewards).not.toHaveBeenCalled()
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled()
+      expect(mockWalletService.syncBalanceCache).not.toHaveBeenCalled()
+      expect(txMock.coinTransaction.create).toHaveBeenCalledTimes(1)
+      expect(result.message).toBe('Pago procesado: período renovado.')
+    })
+
+    it('❌ Fail - Otra activa: No reactiva una en GRACE_PERIOD o EXPIRED por falta de pago si el usuario ya tiene otra suscripción ACTIVE', async () => {
+      txMock.userSubscription.updateMany.mockResolvedValue({ count: 0 })
+      txMock.userSubscription.count.mockResolvedValue(1)
+
+      await service.processWebhook(mockPayload)
+
+      const renewalWhere = (
+        txMock.userSubscription.updateMany.mock.calls[1] as [
+          { where: { OR: unknown[] } },
+        ]
+      )[0].where
+      expect(renewalWhere.OR).toHaveLength(1)
+      expect(txMock.user.update).not.toHaveBeenCalled()
+    })
+
+    it('❌ Fail - Suscripción vencida: Un cobro sobre una EXPIRED que no se puede reactivar no cambia el tier y cancela su débito en MP', async () => {
+      mockPrismaService.userSubscription.findFirst.mockResolvedValue({
+        ...mockLocalSub,
+        status: SubscriptionStatus.EXPIRED,
+      })
+      txMock.userSubscription.updateMany.mockResolvedValue({ count: 0 })
+
+      const result = await service.processWebhook(mockPayload)
+
+      expect(txMock.user.update).not.toHaveBeenCalled()
+      expect(mockSubscriptionRewardsService.grantRewards).not.toHaveBeenCalled()
+      expect(txMock.coinTransaction.create).toHaveBeenCalledTimes(1)
+      expect(
+        mockMercadoPagoService.cancelPreapprovalInMercadoPago,
+      ).toHaveBeenCalledWith('mp-preapp-local')
+      expect(result.message).toBe(
+        'Pago registrado sin reactivar la suscripción.',
+      )
+    })
+
+    it('✅ Upgrade: Vence la suscripción vieja, paga el bono una vez y limpia Redis después del commit aunque MP falle al cancelar', async () => {
+      mockRedisService.redis.get.mockResolvedValue(oldSub.id)
+      txMock.userSubscription.findMany.mockResolvedValue([oldSub])
+      mockSubscriptionPricingService.calculateUpgradeBonus.mockReturnValue({
+        daysRemaining: 10,
+        bonusCoins: 2000,
+        coinsPerDay: 200,
+      })
       mockMercadoPagoService.cancelPreapprovalInMercadoPago.mockRejectedValue(
         new Error('Mercado Pago API Timeout o Error 500'),
       )
@@ -387,12 +546,210 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
       const result = await service.processWebhook(mockPayload)
 
       expect(result.status).toBe('success')
-      expect(txMock.userSubscription.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'old-sub-id-abc' },
-          data: expect.objectContaining({ status: SubscriptionStatus.EXPIRED }),
-        }),
+      expect(txMock.userSubscription.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: oldSub.id,
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: true,
+        },
+        data: { status: SubscriptionStatus.EXPIRED, autoRenew: false },
+      })
+      expect(
+        mockSubscriptionPricingService.calculateUpgradeBonus,
+      ).toHaveBeenCalledWith(oldSub.endsAt, 3000)
+      expect(addCoinsCall()[0]).toMatchObject({
+        userId: 'user-123',
+        amount: 2000,
+        enforceCap: false,
+      })
+      expect(addCoinsCall()[1]).toBe(txMock)
+      expect(mockRedisService.redis.del).toHaveBeenCalledWith(
+        'subscription:upgrade:ref-checkout-999',
       )
+      expect(
+        mockRedisService.redis.del.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(
+        txMock.userSubscription.findUnique.mock.invocationCallOrder[0],
+      )
+      expect(
+        mockMercadoPagoService.cancelPreapprovalInMercadoPago,
+      ).toHaveBeenCalledWith(oldSub.mpPreapprovalId)
+    })
+
+    it('❌ Fail - Upgrade ya cobrado: Si otra alta ya venció la suscripción vieja, no paga el bono ni cancela en MP', async () => {
+      mockRedisService.redis.get.mockResolvedValue(oldSub.id)
+      txMock.userSubscription.findMany.mockResolvedValue([oldSub])
+      txMock.userSubscription.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 })
+
+      await service.processWebhook(mockPayload)
+
+      expect(mockWalletService.addCoins).not.toHaveBeenCalled()
+      expect(
+        mockMercadoPagoService.cancelPreapprovalInMercadoPago,
+      ).not.toHaveBeenCalled()
+      expect(mockSubscriptionRewardsService.grantRewards).toHaveBeenCalledTimes(
+        1,
+      )
+    })
+
+    it('✅ Una sola vigente: Si la key del upgrade venció, el alta igual vence y cancela la vieja, sin bono', async () => {
+      txMock.userSubscription.findMany.mockResolvedValue([oldSub])
+
+      await service.processWebhook(mockPayload)
+
+      expect(txMock.userSubscription.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: oldSub.id,
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: true,
+        },
+        data: { status: SubscriptionStatus.EXPIRED, autoRenew: false },
+      })
+      expect(mockWalletService.addCoins).not.toHaveBeenCalled()
+      expect(
+        mockMercadoPagoService.cancelPreapprovalInMercadoPago,
+      ).toHaveBeenCalledWith(oldSub.mpPreapprovalId)
+    })
+
+    it('✅ Una sola vigente: Una suscripción en GRACE_PERIOD reemplazada por la nueva se vence y se cancela, sin bono', async () => {
+      mockRedisService.redis.get.mockResolvedValue(oldSub.id)
+      txMock.userSubscription.findMany.mockResolvedValue([
+        { ...oldSub, status: SubscriptionStatus.GRACE_PERIOD },
+      ])
+
+      await service.processWebhook(mockPayload)
+
+      expect(txMock.userSubscription.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: oldSub.id,
+          status: SubscriptionStatus.GRACE_PERIOD,
+          autoRenew: true,
+        },
+        data: { status: SubscriptionStatus.EXPIRED, autoRenew: false },
+      })
+      expect(mockWalletService.addCoins).not.toHaveBeenCalled()
+      expect(
+        mockMercadoPagoService.cancelPreapprovalInMercadoPago,
+      ).toHaveBeenCalledWith(oldSub.mpPreapprovalId)
+    })
+
+    it('✅ Una sola vigente: Una EXPIRED por falta de pago con el débito vivo se da de baja en MP al activar la nueva', async () => {
+      const expiredSub = { ...oldSub, status: SubscriptionStatus.EXPIRED }
+      txMock.userSubscription.findMany.mockResolvedValue([expiredSub])
+
+      await service.processWebhook(mockPayload)
+
+      const [{ where }] = txMock.userSubscription.findMany.mock.calls[0] as [
+        { where: { OR: unknown[] } },
+      ]
+      expect(where.OR).toContainEqual({
+        status: SubscriptionStatus.EXPIRED,
+        autoRenew: true,
+      })
+      expect(txMock.userSubscription.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: oldSub.id,
+          status: SubscriptionStatus.EXPIRED,
+          autoRenew: true,
+        },
+        data: { status: SubscriptionStatus.EXPIRED, autoRenew: false },
+      })
+      expect(mockWalletService.addCoins).not.toHaveBeenCalled()
+      expect(
+        mockMercadoPagoService.cancelPreapprovalInMercadoPago,
+      ).toHaveBeenCalledWith(oldSub.mpPreapprovalId)
+    })
+
+    it('✅ Estado intermedio: Un authorized_payment en scheduled se ignora y no pasa la suscripción a GRACE_PERIOD', async () => {
+      mockMercadoPagoService.getPaymentDetails.mockResolvedValue({
+        status: 'scheduled',
+        external_reference: 'ref-checkout-999',
+      })
+
+      const result = await service.processWebhook(mockPayload)
+
+      expect(result.status).toBe('ignored')
+      expect(
+        mockPrismaService.userSubscription.updateMany,
+      ).not.toHaveBeenCalled()
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('✅ Fallo de pago: Un cobro en recycling solo pasa a GRACE_PERIOD una suscripción ACTIVE', async () => {
+      mockMercadoPagoService.getPaymentDetails.mockResolvedValue({
+        status: 'recycling',
+        external_reference: 'ref-checkout-999',
+      })
+      mockPrismaService.userSubscription.updateMany.mockResolvedValue({
+        count: 0,
+      })
+
+      const result = await service.processWebhook(mockPayload)
+
+      expect(result.status).toBe('failed')
+      expect(
+        mockPrismaService.userSubscription.updateMany.mock.calls[0][0],
+      ).toMatchObject({
+        where: {
+          mpExternalRef: 'ref-checkout-999',
+          status: SubscriptionStatus.ACTIVE,
+        },
+        data: { status: SubscriptionStatus.GRACE_PERIOD },
+      })
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('✅ Autorización: El preapproval autorizado no activa ni regala nada hasta el primer cobro', async () => {
+      mockMercadoPagoService.getPaymentDetails.mockResolvedValue({
+        status: 'authorized',
+        external_reference: 'ref-checkout-999',
+      })
+
+      const result = await service.processWebhook(
+        buildPayload('subscription_preapproval'),
+      )
+
+      expect(result.status).toBe('ignored')
+      expect(
+        mockPrismaService.processedPayment.findUnique,
+      ).not.toHaveBeenCalled()
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
+      expect(mockSubscriptionRewardsService.grantRewards).not.toHaveBeenCalled()
+    })
+
+    it('❌ Fail - Cobro rechazado: Un authorized_payment procesado con el pago rechazado no activa la suscripción', async () => {
+      mockMercadoPagoService.getPaymentDetails.mockResolvedValue({
+        status: 'processed',
+        external_reference: 'ref-checkout-999',
+        payment: { id: 1, status: 'rejected' },
+      })
+      mockPrismaService.userSubscription.updateMany.mockResolvedValue({
+        count: 0,
+      })
+
+      const result = await service.processWebhook(mockPayload)
+
+      expect(result.status).toBe('failed')
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('❌ Fail - Sin referencia: Un pago sin external_reference se ignora sin tocar ninguna suscripción', async () => {
+      mockMercadoPagoService.getPaymentDetails.mockResolvedValue({
+        status: 'rejected',
+      })
+
+      const result = await service.processWebhook(mockPayload)
+
+      expect(result.status).toBe('ignored')
+      expect(
+        mockPrismaService.userSubscription.updateMany,
+      ).not.toHaveBeenCalled()
+      expect(
+        mockPrismaService.userSubscription.findFirst,
+      ).not.toHaveBeenCalled()
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
     })
   })
 })
