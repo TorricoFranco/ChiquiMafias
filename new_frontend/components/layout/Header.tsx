@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Flame, Bell, Gift, PlusCircle, ChevronDown, Menu, User, Zap } from 'lucide-react';
+import { Flame, Bell, Gift, PlusCircle, ChevronDown, Menu, User, Zap, Settings } from 'lucide-react';
 import { useUserStore } from "@/store/useUserStore";
 import { useWallet } from "@/features/wallet/socket/useWalletSocket";
 import NotificationBell from '@/features/notifications/components/NotificationBell';
@@ -10,6 +10,7 @@ import { useUIStore } from '@/store/useUIStore';
 import { AnimatedBalance } from '@/features/wallet/components/AnimatedBalance';
 import { useMyWinStreak } from '@/features/stats/hooks/useStats';
 import { MobileMenu } from './MobileMenu';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 interface HeaderProps {
     activeTab: string;
@@ -20,6 +21,9 @@ export const Header: React.FC<HeaderProps> = ({
     activeTab,
     setActiveTab,
 }) => {
+
+    const setActiveTabSocial = useNavigationStore((state) => state.setActiveTab)
+
     const toggleMobileSidebar = useUIStore((state) => state.toggleMobileSidebar)
     const isMobileSidebarOpen = useUIStore((state) => state.isMobileSidebarOpen)
     const [showUserMenu, setShowUserMenu] = useState(false);
@@ -170,26 +174,21 @@ export const Header: React.FC<HeaderProps> = ({
                                                 <p className="font-bold text-[#e5e2e1]">{displayName}</p>
                                                 <p className="text-[10px] text-[#d2f000]">{currentTier}</p>
                                             </div>
+
                                             <button
                                                 onClick={() => {
+                                                    setActiveTabSocial("Mi Perfil");
                                                     setShowUserMenu(false);
                                                 }}
-                                                className="w-full text-left px-4 py-2 hover:bg-[#2a2a2a] text-[#e5e2e1] flex items-center gap-2"
+                                                className="w-full flex items-center gap-2 px-4 py-2 text-[#c6c9ab] hover:text-white hover:bg-[#2a2a2a] transition-colors text-left"
                                             >
-                                                <Gift className="w-3.5 h-3.5 text-[#d2f000]" /> Recompensa Diaria
+                                                <Settings className="w-4 h-4" />
+                                                <span className="font-semibold">Editar perfil</span>
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    setShowUserMenu(false);
-                                                }}
-                                                className="w-full text-left px-4 py-2 hover:bg-[#2a2a2a] text-[#e5e2e1] flex items-center gap-2"
-                                            >
-                                                <PlusCircle className="w-3.5 h-3.5 text-[#d2f000]" /> Cargar Fichas
-                                            </button>
+
                                         </div>
                                     )}
                                 </div>
-
                                 {/* Chiqui Coins */}
                                 <div
                                     role="group"
@@ -205,7 +204,8 @@ export const Header: React.FC<HeaderProps> = ({
                                     <AnimatedBalance balance={balance ?? 0} loading={loading} />
 
                                     <button
-                                        className="text-[#c6c9ab] hover:text-[#d2f000] transition-colors ml-0.5"
+                                        onClick={() => setActiveTabSocial("Tienda", "coins")}
+                                        className="text-[#c6c9ab] hover:text-[#d2f000] transition-colors ml-0.5 cursor-pointer"
                                         title="Obtener fichas"
                                     >
                                         <PlusCircle className="w-3.5 h-3.5" />

@@ -13,9 +13,12 @@ import { useBuyCoinPack, useGetCoinPacks } from '@/features/coins-shop/hooks/use
 import { StoreItem } from '../types';
 import { useSubscriptions } from '@/features/subscriptions/hooks/useSubcriptions';
 import { SubscriptionTier, SubscriptionPlanDto } from '@/features/subscriptions/types';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 export const StoreView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'suscripciones' | 'coins' | 'cosmeticos'>('suscripciones');
+
+    const activeTab = useNavigationStore((state) => state.storeSubTab);
+    const setActiveTab = useNavigationStore((state) => state.setStoreSubTab);
 
     const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
     const [itemToBuy, setItemToBuy] = useState<StoreItem | null>(null);
@@ -47,7 +50,7 @@ export const StoreView: React.FC = () => {
     const { mutateAsync: buyItem, isPending: isBuying } = useBuyItem();
 
     const { data: coinPacks } = useGetCoinPacks();
-    const { mutateAsync: buyCoinPack } = useBuyCoinPack();  
+    const { mutateAsync: buyCoinPack } = useBuyCoinPack();
 
     const handleSubscribe = (targetTier: SubscriptionTier, isUpgrade: boolean) => {
         if (isUpgrade) {
