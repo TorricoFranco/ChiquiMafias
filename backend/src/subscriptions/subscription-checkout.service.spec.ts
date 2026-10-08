@@ -194,7 +194,11 @@ describe('SubscriptionCheckoutService (Unit Tests)', () => {
         false,
       )
 
-      expect(mockMercadoPagoService.createPreapproval).toHaveBeenCalled()
+      expect(mockMercadoPagoService.createPreapproval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'Suscripción: Plateísta - ChiquiMafias',
+        }),
+      )
       expect(mockPrismaService.userSubscription.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
