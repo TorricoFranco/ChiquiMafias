@@ -1,9 +1,10 @@
 import { useUserStore } from "@/store/useUserStore";
 import Cookies from "js-cookie";
 
-// Un solo refresh en vuelo por pestaña: el backend rota el refresh token, así que dos pedidos en paralelo
-// con la misma cookie hacen que el segundo dé 401 y cierre la sesión.
+// El backend rota el refresh token sin período de gracia: dos POST /auth/refresh en paralelo con la misma
+// cookie hacen que el segundo dé 401 y cierre la sesión. Por eso todo refresh pasa por acá, dentro del lock.
 let refreshPromise: Promise<string | null> | null = null;
+let sessionRefreshPromise: Promise<SessionRefresh> | null = null;
 
 // Solo mira `exp` (sin validar la firma) para decidir si vale la pena reusar el token de otra pestaña.
 const isTokenFresh = (token: string) => {
@@ -15,11 +16,23 @@ const isTokenFresh = (token: string) => {
     }
 };
 
-// Serializa el refresh entre pestañas cuando el navegador lo soporta.
-const withRefreshLock = async (fn: () => Promise<string | null>): Promise<string | null> =>
+// Serializa el refresh entre pestañas cuando el navegador lo soporta. No anidar: el lock no es reentrante.
+const withRefreshLock = async <T>(fn: () => Promise<T>): Promise<T> =>
     typeof navigator !== "undefined" && navigator.locks
         ? await navigator.locks.request("chiquimafias-auth-refresh", fn)
         : fn();
+
+// Solo se llama con el lock tomado.
+const postRefresh = async () => {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+    });
+    const data = await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, data };
+};
+
+type SessionRefresh = Awaited<ReturnType<typeof postRefresh>>;
 
 const requestNewToken = async (failedToken: string | null): Promise<string | null> => {
     // Otra pestaña pudo renovar mientras esperábamos el lock: la cookie `accessToken` es compartida.
@@ -30,17 +43,13 @@ const requestNewToken = async (failedToken: string | null): Promise<string | nul
     }
 
     try {
-        const refreshRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
-            method: "POST",
-            credentials: "include",
-        });
+        const { ok, data } = await postRefresh();
 
-        if (!refreshRes.ok) {
+        if (!ok) {
             await useUserStore.getState().logout();
             return null;
         }
 
-        const data = await refreshRes.json();
         const newAccessToken: string = data.access_token;
 
         useUserStore.getState().setUserInfo({ accessToken: newAccessToken });
@@ -76,6 +85,19 @@ export function refreshAccessToken(failedToken: string | null = useUserStore.get
         });
     }
     return refreshPromise;
+}
+
+/**
+ * POST /auth/refresh para restaurar la sesión al cargar la app: devuelve la respuesta completa (con el usuario)
+ * y no toca el store. Comparte el lock con `refreshAccessToken`, así dos pestañas que abren a la vez no se pisan.
+ */
+export function refreshSession(): Promise<SessionRefresh> {
+    if (!sessionRefreshPromise) {
+        sessionRefreshPromise = withRefreshLock(postRefresh).finally(() => {
+            sessionRefreshPromise = null;
+        });
+    }
+    return sessionRefreshPromise;
 }
 
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {

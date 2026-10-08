@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUserStore } from "@/store/useUserStore";
 import { streakApi } from "@/features/streak/api/streakApi";
-import { authApi } from "@/features/auth/api/authApi";
+import { refreshSession } from "@/lib/apiFetch";
 import BannedAppealScreen from "@/features/supports/components/appeal/BannedAppealScreen";
 import Cookies from "js-cookie";
 import LoginModal from "@/features/auth/components/LoginModal";
@@ -24,20 +24,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     useEffect(() => {
         async function restoreSession() {
             try {
-                const res = await authApi.refresh();
+                // Pasa por el lock compartido: otra pestaña puede estar rotando el refresh token ahora mismo.
+                const { ok, status, data } = await refreshSession();
 
-                if (res.status === 403) {
-                    const errorData = await res.json();
-                    if (errorData.code === "USER_BANNED") {
-                        setIsBanned(true);
-                        setLoading(false);
-                        return;
-                    }
+                if (status === 403 && data?.code === "USER_BANNED") {
+                    setIsBanned(true);
+                    setLoading(false);
+                    return;
                 }
 
-                if (res.ok) {
-                    const data = await res.json();
-
+                if (ok) {
                     Cookies.set("accessToken", data.access_token, {
                         secure: process.env.NODE_ENV === "production",
                         sameSite: "lax",
