@@ -244,6 +244,13 @@ describe('BetsService', () => {
       })
 
       mockRedisService.redis.eval.mockResolvedValue(luaResponse)
+      mockPrisma.market.findUnique.mockResolvedValue({
+        id: dto.marketId,
+        options: [
+          { id: dto.optionId, initialProb: 50, totalStaked: 1000 },
+          { id: 'opt-2', initialProb: 50, totalStaked: 500 },
+        ],
+      })
 
       const result = await service.placeBet(userId, dto)
 
@@ -263,6 +270,11 @@ describe('BetsService', () => {
         {
           optionId: dto.optionId,
           newTotalStaked: 1500,
+          newOdds: 1.85,
+          options: [
+            { id: dto.optionId, currentOdds: 1.85, totalStaked: 1500 },
+            { id: 'opt-2', currentOdds: 2.18, totalStaked: 500 },
+          ],
         },
       )
 

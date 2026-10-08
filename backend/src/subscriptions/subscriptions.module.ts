@@ -7,6 +7,7 @@ import { SubscriptionPricingService } from './domain/subscription-pricing.servic
 import { SubscriptionsController } from './subscriptions.controller'
 import { MercadoPagoModule } from 'src/mercado-pago/mercado-pago.module'
 import { SubscriptionCheckoutService } from './subscription-checkout.service'
+import { SubscriptionRewardsService } from './Subscription-rewards.service'
 
 @Module({
   imports: [ChatModule, WalletModule, MercadoPagoModule],
@@ -16,11 +17,13 @@ import { SubscriptionCheckoutService } from './subscription-checkout.service'
     SubscriptionsCronService,
     SubscriptionPricingService,
     SubscriptionCheckoutService,
+    SubscriptionRewardsService,
   ],
   exports: [
     SubscriptionsService,
     SubscriptionPricingService,
     SubscriptionCheckoutService,
+    SubscriptionRewardsService,
   ],
 })
 export class SubscriptionsModule { }

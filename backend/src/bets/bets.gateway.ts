@@ -23,7 +23,6 @@ export class BetsGateway implements OnGatewayConnection {
   public server: Server
 
   private readonly DASHBOARD_ROOM = 'bets_dashboard'
-
   constructor(private readonly authService: AuthService) { }
 
   async handleConnection(client: Socket) {
@@ -84,7 +83,12 @@ export class BetsGateway implements OnGatewayConnection {
 
   emitPoolUpdate(
     marketId: string,
-    poolData: { optionId: string; newTotalStaked: number },
+    poolData: {
+      optionId: string
+      newTotalStaked: number
+      newOdds: number
+      options: { id: string; currentOdds: number; totalStaked: number }[]
+    },
   ) {
     this.logger.debug(
       `Actualizando pool para el market: ${marketId}, opción: ${poolData.optionId}`,

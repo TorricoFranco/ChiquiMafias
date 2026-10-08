@@ -1,35 +1,38 @@
-import { SubscriptionTier } from '@prisma/client'
 
 /**
- * DESCUENTO APLICADO EN FINES DE SEMANA O PROMOCIONES
- * Se aplica como porcentaje de rebaja sobre el precio base
+ * DESCUENTOS Y PROMOCIONES
  */
-export const WEEKEND_DISCOUNT_PERCENTAGE = 15 // 15% de descuento
+export const WEEKEND_DISCOUNT_PERCENTAGE = 10
+export const SUNDAY_VIP_DISCOUNT_PERCENTAGE = 15
+export const SUNDAY_VIP_UPGRADE_DISCOUNT_PERCENTAGE = 25
+
+export const PROMO_MESSAGES = {
+  SUNDAY_VIP_UPGRADE: '⚡ UPGRADE VIP 25% OFF', 
+  SUNDAY_VIP: '⚡ OFERTA DOMINGO VIP 15% OFF',   
+  WEEKEND: '🔥 OFERTA DE FIN DE SEMANA',
+} as const
 
 /**
- * CICLO DE SUSCRIPCIÓN
- * Período en días para el cual se genera la suscripción
+ * CICLO DE SUSCRIPCIÓN Y PERÍODOS
  */
 export const SUBSCRIPTION_CYCLE_DAYS = 30
-
-/**
- * PERÍODO DE GRACIA
- * Tiempo en horas para recuperación ante fallo de pago
- */
 export const GRACE_PERIOD_HOURS = 48
 
 /**
- * CONVERSIÓN DE DÍAS A MONEDAS VIRTUALES (PARA UPGRADE)
- * Cantidad de coins por cada día no consumido del plan anterior
- */
-export const COINS_PER_DAY_UPGRADE = 100
-
-/**
- * VALORES FIJOS DE INTEGRACIÓN
+ * INTEGRACIONES
  */
 export const MERCADO_PAGO_CONSTANTS = {
   PREAPPROVAL_ENDPOINT: '/preapproval',
   PREAPPROVAL_PLAN_ENDPOINT: '/preapproval_plan',
   CURRENCY: 'ARS',
   TIMEZONE: 'America/Argentina/Buenos_Aires',
+}
+
+/**
+ * MAPEO DE MONEDAS POR DÍA RESTANTE SEGÚN LA TRANSICIÓN
+ */
+export const UPGRADE_COINS_PER_DAY_MAP: Record<string, number> = {
+  'TIER_1_TO_TIER_2': 100,
+  'TIER_1_TO_TIER_3': 200,
+  'TIER_2_TO_TIER_3': 300,
 }

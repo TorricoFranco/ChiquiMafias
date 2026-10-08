@@ -8,6 +8,7 @@ import { MatchesMappers } from './matches.mappers'
 import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
+import { StandingsService } from 'src/standings/standings.service'
 
 @Injectable()
 export class MatchesService {
@@ -20,6 +21,7 @@ export class MatchesService {
     private prisma: PrismaService,
     private redisService: RedisService,
     private api: PrematchServiceApi,
+    private standingsService: StandingsService,
   ) { }
 
   async getMatchDetails(
@@ -274,8 +276,8 @@ export class MatchesService {
   async getAggregatedData(matchId: string): Promise<PreMatchResponseDto> {
     const cacheKey = `pre_match:${matchId}`
 
-    const cached = await this.redisService.redis.get(cacheKey)
-    if (cached) return JSON.parse(cached) as PreMatchResponseDto
+    // const cached = await this.redisService.redis.get(cacheKey)
+    // if (cached) return JSON.parse(cached) as PreMatchResponseDto
 
     if (this.pendingRequests.has(matchId))
       return this.pendingRequests.get(matchId)
@@ -292,29 +294,35 @@ export class MatchesService {
 
         if (!match) throw new Error('Match no encontrado')
 
-        const hId = match.home_team.api_team_id
-        const aId = match.away_team.api_team_id
+        const hId = String(match.home_team.id)
+        const aId = String(match.away_team.id)
+
+        const hIdApi = String(match.home_team.api_team_id) 
+        const aIdApi = String(match.away_team.api_team_id) 
         const leagueId = match.league_id
         const season = match.season
 
         const [h2h, hForm, aForm, standings] = await Promise.all([
-          this.api.getH2H(`${hId}-${aId}`),
-          this.api.getLatestResults(hId),
-          this.api.getLatestResults(aId),
-          this.api.getStandings(leagueId, season),
+          this.api.getH2H(`${hIdApi}-${aIdApi}`),
+          this.api.getLatestResults(hIdApi),
+          this.api.getLatestResults(aIdApi),
+          this.standingsService.getCachedFullStandings(leagueId, season),
         ])
+
 
         const processed = MatchesMappers.toPreMatchResponse(
           { h2h, hForm, aForm, standings },
           hId,
           aId,
+          hIdApi,
+          aIdApi
         )
 
         await this.redisService.redis.set(
           cacheKey,
           JSON.stringify(processed),
           'EX',
-          3600,
+          3600
         )
         return processed
       } catch (error) {

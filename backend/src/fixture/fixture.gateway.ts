@@ -33,15 +33,15 @@ export class FixtureLeagueGateway implements OnApplicationBootstrap {
       return
     }
 
-    // Ahora ya debería funcionar
     await this.redisService.subscribe('league_live_updates', (data) => {
       try {
         if (!data) return
         const parsed = JSON.parse(data)
 
+
         const leagueIdStr = String(parsed.leagueId).trim()
         const room = `league_${leagueIdStr}`
-
+      
         if (!this.server) {
           this.logger.error('WebSocket Server no inicializado')
           return

@@ -19,11 +19,9 @@ export class MercadoPagoService {
   ) { }
 
   getMercadoPagoConfig() {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL', {
-      infer: true,
-    })
-
     return {
+      FRONTEND_URL: this.configService.get<string>('FRONTEND_URL', { infer: true }) || 'https://chiquimafias.com',
+      BACKEND_URL: this.configService.get<string>('API_BACKEND_URL', { infer: true }) || 'https://api.chiquimafias.com',
       API_BASE_URL: this.configService.get<string>('MERCADO_PAGO_API_URL', {
         infer: true,
       }),
@@ -34,10 +32,10 @@ export class MercadoPagoService {
       WEBHOOK_URL: this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL', {
         infer: true,
       }),
-      FRONTEND_SUCCESS_URL: `${frontendUrl}/${this.configService.get<string>('FRONTEND_SUCCESS_URL', { infer: true })}`,
+      FRONTEND_SUCCESS_URL: `${this.configService.get<string>('FRONTEND_URL', { infer: true })?.replace(/^\//, '') || ''}`,
       ...MERCADO_PAGO_CONSTANTS,
     }
-  }
+  } 
 
   private get retryStrategy() {
     return retry({
@@ -123,6 +121,34 @@ export class MercadoPagoService {
     }
   }
 
+  public async getMerchantOrderDetails(id: string | number): Promise<any> {
+    try {
+      const mpConfig = this.getMercadoPagoConfig()
+
+      const response = (await firstValueFrom(
+        this.http
+          .get(`${mpConfig.API_BASE_URL}/merchant_orders/${id}`, {
+            headers: { Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}` },
+          })
+          .pipe(this.retryStrategy),
+      )) as AxiosResponse<any>
+
+      return response.data
+    } catch (error) {
+      const status = error.response?.status
+      this.logger.error(
+        `[MP API Error] No se pudieron obtener detalles de la orden de comercio ${id}`,
+        error.response?.data || error.message,
+      )
+
+      if (status && status >= 400 && status < 500) {
+        return null
+      }
+
+      throw error
+    }
+  }
+
   public async createPreapproval(payload: MercadoPagoPreapprovalPayload) {
     const mpConfig = this.getMercadoPagoConfig()
 
@@ -142,5 +168,20 @@ export class MercadoPagoService {
     )) as AxiosResponse<MercadoPagoPreapprovalResponse>
 
     return response.data
+  }
+
+  public async createPreference(payload: any) {
+    const mpConfig = this.getMercadoPagoConfig();
+    const response = (await firstValueFrom(
+      this.http
+        .post(`${mpConfig.API_BASE_URL}/checkout/preferences`, payload, {
+          headers: {
+            Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        .pipe(this.retryStrategy),
+    )) as AxiosResponse<any>;
+    return response.data;
   }
 }

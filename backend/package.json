@@ -17,7 +17,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:unit": "jest \".spec.ts$\"",
+    "test:unit": "jest src/",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
@@ -43,6 +43,7 @@
     "class-validator": "^0.14.3",
     "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.7",
+    "dayjs": "^1.11.23",
     "google-auth-library": "^10.5.0",
     "helmet": "^8.3.0",
     "ioredis": "^5.8.2",

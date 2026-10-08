@@ -6,7 +6,7 @@ import Header from "@/components/layout/Header";
 
 import { SocketProvider } from "@/context/SocketContext";
 import QueryProvider from "@/context/QueryProvider";
-import AuthProvider from "@/context/AuthProvider"; 
+import AuthProvider from "@/context/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,7 +37,7 @@ export default function RootLayout({
         />
 
         <QueryProvider>
-          <AuthProvider> 
+          <AuthProvider>
             <SocketProvider>
               <Header />
               <div className="pt-16" />

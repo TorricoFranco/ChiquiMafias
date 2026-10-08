@@ -9,7 +9,9 @@ import { RedisService } from '../redis/redis.service'
 import { ChatGateway } from '../chat/chat.gateway'
 
 import { WalletOperation } from './interfaces/wallet-operation.interface'
-import { Prisma, Wallet } from '@prisma/client'
+import { Prisma, Wallet, TransactionType } from '@prisma/client'
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
 
 @Injectable()
 export class WalletService {
@@ -19,26 +21,15 @@ export class WalletService {
     private readonly prisma: PrismaService,
     private readonly chatGateway: ChatGateway,
     private readonly redisService: RedisService,
+    private readonly eventEmitter: EventEmitter2,
   ) { }
-
-  async updateWalletBalance(userId: string, amount: number, type: any) {
-    const updatedWallet = await this.prisma.wallet.update({
-      where: { userId },
-      data: { balance: { increment: amount } },
-    })
-
-    this.chatGateway.server.to(userId).emit('wallet:balance_updated', {
-      balance: updatedWallet.balance,
-    })
-
-    return updatedWallet
-  }
 
   /**
    * Agrega monedas de forma atómica y registra la transacción
    */
   async addCoins(operation: WalletOperation): Promise<Wallet> {
     const { userId, amount, type, description, referenceId } = operation
+    const MAX_COIN_BALANCE = 50000
 
     if (amount <= 0) {
       throw new BadRequestException('El monto a agregar debe ser mayor a cero')
@@ -46,27 +37,47 @@ export class WalletService {
 
     try {
       const updatedWallet = await this.prisma.$transaction(async (tx) => {
-        const wallet = await tx.wallet.upsert({
+        let wallet = await tx.wallet.findUnique({
           where: { userId },
-          update: { balance: { increment: amount } },
-          create: {
-            userId,
-            balance: 1000 + amount,
-          },
         })
 
-        await tx.coinTransaction.create({
-          data: {
-            walletId: wallet.id,
-            amount: amount,
-            type: type,
-            description: description,
-            referenceId: referenceId || null,
-          },
-        })
+        let newBalance: number
+        let realAmountAdded: number
+
+        if (!wallet) {
+          newBalance = Math.min(1000 + amount, MAX_COIN_BALANCE)
+          realAmountAdded = newBalance - 1000
+
+          wallet = await tx.wallet.create({
+            data: {
+              userId,
+              balance: newBalance,
+            },
+          })
+        } else {
+          newBalance = Math.min(wallet.balance + amount, MAX_COIN_BALANCE)
+          realAmountAdded = newBalance - wallet.balance
+
+          wallet = await tx.wallet.update({
+            where: { userId },
+            data: { balance: newBalance },
+          })
+        }
+
+        if (realAmountAdded > 0) {
+          await tx.coinTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: realAmountAdded,
+              type: type,
+              description: description,
+              referenceId: referenceId || null,
+            },
+          })
+        }
 
         this.logger.log(
-          `[WALLET DB OK] +${amount} coins a User:${userId} por ${type}`,
+          `[WALLET DB OK] +${realAmountAdded} coins a User:${userId} por ${type}. Balance final: ${newBalance}`,
         )
         return wallet
       })
@@ -79,8 +90,20 @@ export class WalletService {
       )
 
       this.logger.log(
-        `[WALLET SYNC OK] +${operation.amount} coins a User:${operation.userId} sincronizado en Redis`,
+        `[WALLET SYNC OK] Balance de User:${operation.userId} actualizado a ${updatedWallet.balance} en Redis`,
       )
+
+      if (type === TransactionType.ADMIN_GIFT) {
+        const amountGift = operation.amount;
+
+        this.eventEmitter.emit('wallet.admin_gift', {
+          userId: updatedWallet.userId,
+          amount: amountGift,
+          description: description,
+          newBalance: updatedWallet.balance,
+        });
+      }
+
 
       return updatedWallet
     } catch (error) {

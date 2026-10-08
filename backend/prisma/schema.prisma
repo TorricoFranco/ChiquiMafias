@@ -125,7 +125,7 @@ model Matches {
   events_finalized  Boolean   @default(false)
   stats_fetched     Boolean   @default(false)
   stats_finalized   Boolean   @default(false)
-  market_created    Boolean     @default(false)
+  market_created    Boolean   @default(false)
 
   events        MatchEvents[]
   lineups       MatchLineup[]
@@ -278,6 +278,7 @@ model Rounds {
 
   @@unique([league_id, season, name])
 }
+
 model MatchLineup {
   id         String  @id @default(uuid())
   match_id   String
@@ -315,7 +316,6 @@ model MatchPlayer {
   @@index([match_id, is_starting])
 }
 
-
 enum MatchStatus {
   SCHEDULED
   LIVE
@@ -342,23 +342,24 @@ enum EventStatus {
 // ------------------------
 
 enum SystemRole {
-  USER          // Hincha común
-  MODERATOR   // Jefe de Barra (Moderador)
-  ADMIN       // Administrador
-  PRESIDENT  
+  USER // Hincha común
+  MODERATOR // Jefe de Barra (Moderador)
+  ADMIN // Administrador
+  PRESIDENT
 }
 
 enum SubscriptionTier {
-  TIER_1    
-  TIER_2    
-  TIER_3    
+  TIER_1
+  TIER_2
+  TIER_3
 }
 
 model SubscriptionPlan {
   id           String           @id @default(uuid())
   tier         SubscriptionTier @unique
-  name         String           
+  name         String
   basePriceARS Float
+  storeDiscountPercentage Int @default(0)
   benefits     String[]
   isActive     Boolean          @default(true)
   createdAt    DateTime         @default(now())
@@ -369,29 +370,29 @@ model SubscriptionPlan {
 
 enum SubscriptionStatus {
   PENDING
-  ACTIVE                
-  GRACE_PERIOD          
-  CANCELLATION_PENDING  
-  EXPIRED              
+  ACTIVE
+  GRACE_PERIOD
+  CANCELLATION_PENDING
+  EXPIRED
 }
 
 model UserSubscription {
-  id              String             @id @default(uuid())
-  userId          String
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  tier            SubscriptionTier   
-  status          SubscriptionStatus @default(PENDING)
-  
-  startsAt        DateTime           @default(now())
-  endsAt          DateTime
-  autoRenew       Boolean            @default(true)
-  
-  mpPreapprovalId String?            @unique
-  mpExternalRef   String             @unique 
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  tier   SubscriptionTier
+  status SubscriptionStatus @default(PENDING)
+
+  startsAt  DateTime @default(now())
+  endsAt    DateTime
+  autoRenew Boolean  @default(true)
+
+  mpPreapprovalId String? @unique
+  mpExternalRef   String  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@map("user_subscriptions")
@@ -399,58 +400,64 @@ model UserSubscription {
 
 enum UserStatus {
   ACTIVE
-  BANNED     
+  BANNED
 }
 
 model ProcessedPayment {
   id        String   @id @default(uuid())
-  paymentId String   @unique 
+  paymentId String   @unique
   createdAt DateTime @default(now())
 
   @@map("processed_payments")
 }
 
 model User {
-  id                 String  @id @default(uuid())
-  name               String
-  email              String  @unique
-  googleId           String  @unique
-  username           String? @unique
-  isFirstLogin       Boolean @default(true)
+  id           String  @id @default(uuid())
+  name         String
+  email        String  @unique
+  googleId     String  @unique
+  username     String? @unique
+  isFirstLogin Boolean @default(true)
 
-  status                 UserStatus         @default(ACTIVE)
-  mutedUntil     DateTime?
-  
-  role               SystemRole    @default(USER)
-  activeSubscriptionTier SubscriptionTier? 
-  subscriptions      UserSubscription[]
+  status     UserStatus @default(ACTIVE)
+  mutedUntil DateTime?
 
+  role                   SystemRole         @default(USER)
+  activeSubscriptionTier SubscriptionTier?
+  subscriptions          UserSubscription[]
 
-  tickets        Ticket[]
-  ticketMessages TicketMessage[]
-  reportsMade       Report[]        @relation("ReporterRelation")
-  reportsAgainst    Report[]        @relation("ReportedRelation")
-  reportsResolved   Report[]        @relation("ReportResolver")
-  
-  wallet             Wallet?
-  votes              Vote[]
-  bets               Bet[]
-  notifications      Notification[]
+  tickets         Ticket[]
+  ticketMessages  TicketMessage[]
+  reportsMade     Report[]        @relation("ReporterRelation")
+  reportsAgainst  Report[]        @relation("ReportedRelation")
+  reportsResolved Report[]        @relation("ReportResolver")
+
+  wallet        Wallet?
+  votes         Vote[]
+  bets          Bet[]
+  userStats       UserStats?
+  notifications Notification[]
 
   hashedRefreshToken String?
-  activeNameColorId String?
-  activeBannerId    String?
+  activeNameColorId  String?
+  activeBannerId     String?
+  activeChatBubbleId String?
 
   currentStreak       Int       @default(0)
   lastCheckIn         DateTime?
   streakRewardClaimed Boolean   @default(true)
 
-  createdAt          DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  teamId String?       @map("team_id")
-  team   FootballTeam? @relation(fields: [teamId], references: [id])
-  inventory    UserInventory[]
-  polls        Poll[]
+  teamId    String?         @map("team_id")
+  team      FootballTeam?   @relation(fields: [teamId], references: [id])
+  inventory UserInventory[]
+  polls     Poll[]
+
+  comments         Comment[]
+  pollReactions    PollReaction[]
+  commentReactions CommentReaction[]
+  coinOrders       CoinOrder[]
 
   @@map("users")
 }
@@ -461,39 +468,95 @@ model FootballTeam {
   slug     String @unique
   badgeUrl String
   users    User[]
-  tier      Int      @default(3)
+  tier     Int    @default(3)
 
   @@map("football_teams")
 }
 
+// POLLS
+
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
 
 model Poll {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   title       String
   description String?
-  options     Json    
-  status      String   @default("PENDING")
-  createdAt   DateTime @default(now())
+  options     Json
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
   startsAt    DateTime?
-  endsAt      DateTime? 
-  icon        String   @default("USER")
-  votes       Vote[]
+  endsAt      DateTime?
+  icon        String    @default("USER")
 
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  reports   Report[]
+  votes     Vote[]
+  comments  Comment[]
+  reactions PollReaction[]
 }
 
 model Vote {
-  id       String @id @default(uuid())
-  pollId   String
-  userId   String
-  optionId Int
-  poll     Poll   @relation(fields: [pollId], references: [id])
-  user     User   @relation(fields: [userId], references: [id])
+  id            String  @id @default(uuid())
+  pollId        String
+  userId        String
+  optionId      Int
+  poll          Poll    @relation(fields: [pollId], references: [id])
+  user          User    @relation(fields: [userId], references: [id])
+  rewardClaimed Boolean @default(false)
 
   @@unique([pollId, userId])
 }
 
+model Comment {
+  id        String   @id @default(uuid())
+  text      String
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  pollId String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  isPremium   Boolean  @default(false)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reports   Report[]
+  reactions CommentReaction[]
+
+  @@index([pollId])
+  @@map("comments")
+}
+
+model PollReaction {
+  id   String       @id @default(uuid())
+  type ReactionType
+
+  pollId String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+}
+
+model CommentReaction {
+  id   String       @id @default(uuid())
+  type ReactionType
+
+  commentId String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+}
 
 // Wallet y Transacciones
 model Wallet {
@@ -510,10 +573,10 @@ model CoinTransaction {
   id          String          @id @default(uuid())
   walletId    String
   wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  amount      Int             
+  amount      Int
   type        TransactionType
-  description String          
-  referenceId String?         
+  description String
+  referenceId String?
   createdAt   DateTime        @default(now())
 
   @@index([walletId])
@@ -529,41 +592,53 @@ enum TransactionType {
   POLL_REFUND
   BADGE_REWARD
   STREAK_REWARD
+  SUBSCRIPTION_REWARD
   MERCADO_PAGO_BUY
   ADMIN_GIFT
 }
 
 // Mercado de apuestas
 
-model Market {
-  id          String       @id @default(uuid())
-  title       String       
-  fixtureId   Int?         
-  isManual    Boolean      @default(false)
-  status      MarketStatus @default(OPEN)
-  createdAt   DateTime     @default(now())
-  closesAt    DateTime    
-  settledAt   DateTime?
+enum MarketType {
+  MATCH
+  CUSTOM
+}
 
-  options     MarketOption[]
+model Market {
+  id    String @id @default(uuid())
+  title String
+
+  type        MarketType @default(MATCH)
+  category    String?
+  description String?
+  metadata    Json?
+
+  fixtureId Int?
+  isManual  Boolean      @default(false)
+  status    MarketStatus @default(OPEN)
+  createdAt DateTime     @default(now())
+  closesAt  DateTime
+  settledAt DateTime?
+
+  options MarketOption[]
 }
 
 enum MarketStatus {
-  OPEN       // Recibiendo apuestas
-  LOCKED     // Ventana cerrada, evento en progreso
-  SETTLED    // Finalizado y pagado de forma normal
-  REFUNDED   // Cancelado/Suspendido o sin ganadores, puntos devueltos
+  OPEN // Recibiendo apuestas
+  LOCKED // Ventana cerrada, evento en progreso
+  SETTLED // Finalizado y pagado de forma normal
+  REFUNDED // Cancelado/Suspendido o sin ganadores, puntos devueltos
 }
 
 model MarketOption {
-  id          String   @id @default(uuid())
+  id          String @id @default(uuid())
   marketId    String
-  market      Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
-  name        String  
-  initialProb Float    
-  totalStaked Int      @default(0) 
+  market      Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  name        String
+  initialProb Float
+  totalStaked Int    @default(0)
 
-  bets        Bet[]
+  bets Bet[]
 }
 
 model Bet {
@@ -572,7 +647,9 @@ model Bet {
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   optionId   String
   option     MarketOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  stake      Int          
+  stake      Int
+  payout     Int? // Cuánto se le devolvió/pagó en total al ganar
+  multiplier Float? // A cuánto multiplicó (ej: 2.5)
   status     BetStatus    @default(PENDING)
   createdAt  DateTime     @default(now())
 
@@ -587,12 +664,30 @@ enum BetStatus {
   REFUNDED
 }
 
+model UserStats {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalBetsPlaced     Int      @default(0)
+  totalBetsWon        Int      @default(0)
+  totalCoinsStaked    Int      @default(0)
+  totalCoinsWon       Int      @default(0)
+  
+  highestMultiplier   Float    @default(0) 
+  currentWinStreak    Int      @default(0) 
+  longestWinStreak    Int      @default(0) 
+  
+  updatedAt           DateTime @updatedAt
+}
+
 // NOTIFICATIONS
 
 enum NotifyType {
   BET_WON
   BET_LOST
   BET_REFUND
+  ADMIN_GIFT
   POLL_REJECTED
   POLL_APPROVED
   POLL_REWARD
@@ -600,34 +695,34 @@ enum NotifyType {
   MATCH_STARTING
   STORE_NEW_CONTENT
   SYSTEM_ALERT
-  SUPPORT_MODERATION_WARN    
-  SUPPORT_MODERATION_MUTE    
-  SUPPORT_MODERATION_UNBAN    
+  SUPPORT_MODERATION_WARN
+  SUPPORT_MODERATION_MUTE
+  SUPPORT_MODERATION_UNBAN
 }
 
 model Notification {
   id          String     @id @default(uuid())
   userId      String
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String    
-  message     String    
+  title       String
+  message     String
   type        NotifyType
-  referenceId String?    
-  metadata    Json?      
-  readAt      DateTime? 
+  referenceId String?
+  metadata    Json?
+  readAt      DateTime?
   createdAt   DateTime   @default(now())
 
   @@index([userId, readAt, createdAt(sort: Desc)])
 }
 
 model GlobalAnnouncement {
-  id          String                  @id @default(uuid())
-  title       String   
-  message     String   
-  type        NotifyType              
-  referenceId String?                 
-  metadata    Json?                   
-  createdAt   DateTime                @default(now())
+  id          String                   @id @default(uuid())
+  title       String
+  message     String
+  type        NotifyType
+  referenceId String?
+  metadata    Json?
+  createdAt   DateTime                 @default(now())
   readBy      GlobalAnnouncementRead[]
 
   @@index([createdAt(sort: Desc)])
@@ -646,70 +741,72 @@ model GlobalAnnouncementRead {
 // STORE
 
 enum ItemType {
-  STICKER_PACK    // Permanente
-  NAME_COLOR      // Permanente
-  BANNER          // Permanente
-  MEGAPHONE       // Consumible
-  CUSTOM_POLL     // Consumible
+  STICKER_PACK // Permanente
+  NAME_COLOR // Permanente
+  BANNER // Permanente
+  CHAT_BUBBLE // Permanente
+  MEGAPHONE // Consumible
+  CUSTOM_POLL // Consumible
+  BUFF // reducciones de cooldown, pesos de voto, etc
 }
 
 enum DiscountScope {
-  ALL           
-  BY_TYPE         
-  SPECIFIC_ITEM   
+  ALL
+  BY_TYPE
+  SPECIFIC_ITEM
 }
 
 model StoreItem {
-  id          String        @id @default(uuid())
-  name        String        
+  id          String   @id @default(uuid())
+  name        String
   description String
-  price       Int            
+  price       Int
   type        ItemType
-  assetId     String        
-  isActive    Boolean        @default(true)
-  createdAt   DateTime       @default(now())
+  assetId     String   @unique
+  isActive    Boolean  @default(true)
+  isPurchasable Boolean        @default(true)
+  createdAt   DateTime @default(now())
 
   inventories UserInventory[]
-  discounts   StoreDiscount[] 
+  discounts   StoreDiscount[]
 }
 
 model StoreDiscount {
-  id           String        @id @default(uuid())
-  name         String        
-  percentage   Int         
-  scope        DiscountScope
-  
-  targetType   ItemType?     
+  id         String        @id @default(uuid())
+  name       String
+  percentage Int
+  scope      DiscountScope
+
+  targetType ItemType?
 
   targetItemId String?
-  item         StoreItem?    @relation(fields: [targetItemId], references: [id], onDelete: Cascade)
+  item         StoreItem? @relation(fields: [targetItemId], references: [id], onDelete: Cascade)
 
-  startDate    DateTime      
-  endDate      DateTime     
-  isActive     Boolean       @default(true) 
-  createdAt    DateTime      @default(now())
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
-  @@index([startDate, endDate]) 
+  @@index([startDate, endDate])
 }
 
 model UserInventory {
-  id          String    @id @default(uuid())
-  userId      String
-  itemId      String
-  quantity    Int       @default(1) 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String   @id @default(uuid())
+  userId    String
+  itemId    String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  item        StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, itemId]) 
+  @@unique([userId, itemId])
 }
 
 /// -------------------------
 /// Enums
 /// -------------------------
-
 
 // SUPORT REPORT AND TICKETS
 
@@ -740,17 +837,18 @@ enum ReportStatus {
 }
 
 model Ticket {
-  id               String          @id @default(uuid())
-  userId           String       
-  user             User            @relation(fields: [userId], references: [id])
-  category         TicketCategory  
-  subject          String       
-  status           TicketStatus    @default(OPEN)
-  discordThreadId  String?         
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  
-  messages         TicketMessage[]
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id])
+  category        TicketCategory
+  subject         String
+  status          TicketStatus   @default(OPEN)
+  discordThreadId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  messages TicketMessage[]
+
   @@map("tickets")
 }
 
@@ -758,32 +856,86 @@ model TicketMessage {
   id            String   @id @default(uuid())
   ticketId      String
   ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  senderId      String   
+  senderId      String
   sender        User     @relation(fields: [senderId], references: [id])
   message       String   @db.Text
-  screenshotUrl String?  
-  fromDiscord   Boolean  @default(false) 
+  screenshotUrl String?
+  fromDiscord   Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   @@map("ticket_messages")
 }
 
 model Report {
-  id              String       @id @default(uuid())
-  reporterId      String       
-  reporter        User         @relation("ReporterRelation", fields: [reporterId], references: [id])
-  reportedId      String       
-  reported        User         @relation("ReportedRelation", fields: [reportedId], references: [id])
-  reason          ReportReason
-  details         String       @db.Text
-  status          ReportStatus @default(PENDING) 
-  discordMessageId String?    
-  createdAt       DateTime     @default(now())
+  id         String @id @default(uuid())
+  reporterId String
+  reporter   User   @relation("ReporterRelation", fields: [reporterId], references: [id])
+
+  reportedId String
+  reported   User   @relation("ReportedRelation", fields: [reportedId], references: [id])
+
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+
+  pollId String?
+  poll   Poll?   @relation(fields: [pollId], references: [id], onDelete: SetNull)
+
+  reason           ReportReason
+  details          String       @db.Text
+  status           ReportStatus @default(PENDING)
+  discordMessageId String?
+  createdAt        DateTime     @default(now())
 
   resolvedById String?
-  resolvedBy   User?    @relation("ReportResolver", fields: [resolvedById], references: [id])
-  
+  resolvedBy   User?   @relation("ReportResolver", fields: [resolvedById], references: [id])
+
   @@index([resolvedById])
-  @@index([reportedId])  
+  @@index([reportedId])
   @@map("reports")
+}
+
+// ──────────────────────────────────────────
+// Coin Shop - Packs de Monedas (One-off)
+// ──────────────────────────────────────────
+
+enum CoinOrderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CoinPack {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  coinsAmount Int
+  bonusCoins  Int      @default(0)
+  priceARS    Float
+  isPopular   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders CoinOrder[]
+
+  @@map("coin_packs")
+}
+
+model CoinOrder {
+  id               String          @id @default(uuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packId           String
+  pack             CoinPack        @relation(fields: [packId], references: [id])
+  status           CoinOrderStatus @default(PENDING)
+  finalPriceARS    Float
+  coinsToCredit    Int
+  mpExternalRef    String          @unique
+  mpPreferenceId   String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([mpExternalRef])
+  @@map("coin_orders")
 }

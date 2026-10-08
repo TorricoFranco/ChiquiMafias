@@ -1,6 +1,15 @@
-import { Controller, Get, Param, Post, Query, Body } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Body,
+  UseGuards,
+} from '@nestjs/common'
 import { RedisService } from 'src/redis/redis.service'
 import { NotFoundException } from '@nestjs/common'
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ApiFootballHttp } from 'src/api-football/http/api-football.http'
 import { ApiFootballResponse } from 'src/api-football/interfaces/types'
 import { PrismaService } from 'src/prisma/prisma.service'
@@ -8,19 +17,28 @@ import { ApiFixture } from 'src/api-football/interfaces/fixture'
 import { SystemRole } from 'src/auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
+import { DevToolsGuard } from 'src/auth/guards/dev-tools.guard'
 
+// Solo para desarrollo: requiere ENABLE_DEV_TOOLS=true y rol ADMIN.
+@ApiTags('[DEV] Test Events (solo con ENABLE_DEV_TOOLS=true)')
+@ApiBearerAuth()
 @Controller('test-events')
+@UseGuards(DevToolsGuard, RolesGuard)
+@Roles(SystemRole.ADMIN)
 export class TestEventsController {
   constructor(
     private readonly redisService: RedisService,
     private prisma: PrismaService,
     private http: ApiFootballHttp,
-  ) { }
+  ) {}
 
+  @ApiOperation({
+    summary: '[DEV] Simular el evento LINEUPS_READY de un partido',
+    description:
+      'Publica en Redis (match_updates) para probar el gateway sin esperar al cron real.',
+  })
   // Testear Alineaciones: /test-events/lineups?matchId=ID_DE_TU_PARTIDO
   @Get('lineups')
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async testLineups(@Query('matchId') matchId: string) {
     const payload = {
       matchId: matchId,
@@ -34,10 +52,11 @@ export class TestEventsController {
     return { message: 'Evento LINEUPS_READY enviado', payload }
   }
 
+  @ApiOperation({
+    summary: '[DEV] Simular una actualización de marcador (MATCH_UPDATE)',
+  })
   // Testear Marcador: /test-events/score?matchId=ID_DE_TU_PARTIDO&home=2&away=1
   @Get('score')
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async testScore(
     @Query('matchId') matchId: string,
     @Query('home') home: string,
@@ -58,10 +77,11 @@ export class TestEventsController {
     return { message: 'Evento MATCH_UPDATE enviado', payload }
   }
 
+  @ApiOperation({
+    summary: '[DEV] Simular el fin de un partido (MATCH_UPDATE con status FT)',
+  })
   // Testear Fin de Partido: /test-events/end?matchId=ID_DE_TU_PARTIDO
   @Get('end')
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async testEnd(@Query('matchId') matchId: string) {
     const payload = {
       matchId: matchId,
@@ -75,10 +95,12 @@ export class TestEventsController {
     return { message: 'Evento MATCH_UPDATE (FT) enviado', payload }
   }
 
+  @ApiOperation({
+    summary:
+      '[DEV] Simular un evento completo (gol + tarjeta roja) sobre un partido real de la DB',
+  })
   // Testaear eventos de score
   @Get('test-full-event')
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async testFullEvent(
     @Query('matchId') matchId: string,
     @Query('status') status: string = '2H',
@@ -181,11 +203,13 @@ export class TestEventsController {
     })
   }
 
+  @ApiOperation({
+    summary:
+      '[DEV] Simular la actualización en vivo de varios partidos (como lo haría el cron de liga)',
+  })
   // Testear Score updated de League Fixture
   // CONTROLLER
   @Post()
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async testLeague(@Body() body: { matches: any[] }) {
     return await this.simulateLeagueUpdate(body.matches)
   }
@@ -239,11 +263,11 @@ export class TestEventsController {
 
     return { status: 'Sent as Cron', sent: liveScoresHash }
   }
+  @ApiOperation({
+    summary: '[DEV] Traer un partido de la DB con equipos, liga y estadio',
+  })
   // TRAER DATA BD DE MATCHES
-
   @Get(':id')
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async findOne(@Param('id') id: string) {
     return await this.getMatchById(id)
   }
@@ -266,9 +290,11 @@ export class TestEventsController {
     return match
   }
 
+  @ApiOperation({
+    summary:
+      '[DEV] Forzar manualmente los flags tracked/is_live_finished de un partido',
+  })
   @Post('toggle-tracking/:id')
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async toggleTracking(
     @Param('id') id: string,
     @Query('tracked') tracked: string,
@@ -295,10 +321,12 @@ export class TestEventsController {
   }
 
   // 2. Solo resetea 'is_live_finished' a false para que el cron lo vuelva a tomar
+  @ApiOperation({
+    summary:
+      '[DEV] Resetear is_live_finished para que el cron vuelva a tomar el partido como en vivo',
+  })
   // Testear: /test-events/reset-live/:id
   @Post('reset-live/:id')
-  @Post('admin/add-coins')
-  @Roles(SystemRole.ADMIN)
   async resetLiveStatus(@Param('id') id: string) {
     const updatedMatch = await this.prisma.matches.update({
       where: { id },

@@ -4,6 +4,7 @@ import {
   IsString,
   IsUUID,
   MinLength,
+  IsOptional
 } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 import { ReportReason } from '@prisma/client'
@@ -28,4 +29,14 @@ export class CreateReportDto {
     message: 'El detalle debe contener un mínimo de 10 caracteres.',
   })
   details: string
+
+  @ApiProperty({ example: 'uuid_del_comentario', required: false })
+  @IsOptional()
+  @IsUUID()
+  commentId?: string
+
+  @ApiProperty({ example: 'uuid_de_la_encuesta', required: false })
+  @IsOptional()
+  @IsUUID()
+  pollId?: string
 }

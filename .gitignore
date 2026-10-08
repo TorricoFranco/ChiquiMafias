@@ -16,6 +16,9 @@ out/
 .env.test.local
 .env.production.local
 *.env
+.env.*
+!.env.example
+backup_dev.sql
 
 prisma/dev.db
 prisma/dev.db-journal
@@ -42,4 +45,7 @@ coverage/
 
 backend/public/logos/
 
-backend/.agents/
+# --- Claude Code (personal, no se comparte) ---
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/agent-memory-local/

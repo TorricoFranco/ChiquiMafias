@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { BetsService } from './bets.service'
+import { RedisService } from 'src/redis/redis.service'
 import { BetsGateway } from './bets.gateway'
+
+import { calculateMarketOdds } from './utils/odds.util'
 
 @Injectable()
 export class BetsCronService {
@@ -13,6 +16,7 @@ export class BetsCronService {
     private readonly prisma: PrismaService,
     private readonly betsService: BetsService,
     private readonly betsGateway: BetsGateway,
+    private readonly redisService: RedisService,
   ) { }
 
   @Cron(CronExpression.EVERY_30_MINUTES)
@@ -52,18 +56,32 @@ export class BetsCronService {
           `[AUTO-MARKET] Generando pozo para: ${match.home_team.name} vs ${match.away_team.name}`,
         )
 
-        const initialProbabilities = { home: 40, draw: 30, away: 30 }
+        const initialProbabilities = { home: 33, draw: 34, away: 33 }
         const closesAt = new Date(match.date.getTime() - 5 * 60 * 1000)
 
-        // Capturamos el mercado creado desde la transacción
         const newMarketCreated = await this.prisma.$transaction(async (tx) => {
           const market = await tx.market.create({
             data: {
               title: `${match.home_team.name} vs ${match.away_team.name} - Torneo Argentino`,
+              type: 'MATCH',
               fixtureId: match.api_fixture_id,
               isManual: false,
               status: 'OPEN',
               closesAt: closesAt,
+              metadata: {
+                homeTeam: {
+                  name: match.home_team.name,
+                  short: match.home_team.short_code || match.home_team.name.substring(0, 3).toUpperCase(),
+                  api_team_id: match.home_team.api_team_id,
+                  logoUrl: `${match.home_team.api_team_id}`
+                },
+                awayTeam: {
+                  name: match.away_team.name,
+                  short: match.away_team.short_code || match.away_team.name.substring(0, 3).toUpperCase(),
+                  api_team_id: match.away_team.api_team_id,
+                  logoUrl: `${match.away_team.api_team_id}`
+                }
+              },
               options: {
                 create: [
                   {
@@ -78,7 +96,7 @@ export class BetsCronService {
                 ],
               },
             },
-            include: { options: true }, // 👈 CLAVE: Incluir las opciones para mandarlas completas al front
+            include: { options: true },
           })
 
           await tx.matches.update({
@@ -89,12 +107,26 @@ export class BetsCronService {
           return market
         })
 
+        const redis = this.redisService.redis
+        const marketKey = `market:${newMarketCreated.id}`
+
+        await redis.hset(
+          marketKey,
+          'status',
+          'OPEN',
+          'closesAt',
+          closesAt.getTime().toString(),
+        )
+
+        for (const opt of newMarketCreated.options) {
+          await redis.hset(marketKey, opt.id, '0')
+        }
+
         this.logger.log(
           `[AUTO-MARKET] Mercado creado exitosamente [ID API: ${match.api_fixture_id}]`,
         )
 
-        // 🔥 AVISO POR WEBSOCKET (Fuera de la tx): Aparece la tarjeta nueva en la Home de todos al instante
-        this.betsGateway.emitMarketCreated(newMarketCreated)
+        this.betsGateway.emitMarketCreated(calculateMarketOdds(newMarketCreated))
       } catch (error: any) {
         this.logger.error(
           `Error al crear mercado automático para el partido ID: ${match.id}`,
@@ -105,7 +137,7 @@ export class BetsCronService {
   }
 
   /**
-   * 🔒 CRON 2: Cierra la ventana pasando de OPEN a LOCKED.
+   *  Cierre de la ventana pasando de OPEN a LOCKED.
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async handleMarketLocking() {
@@ -123,13 +155,11 @@ export class BetsCronService {
         `[CRON] Bloqueando ${marketsToLock.length} mercados que entraron en juego`,
       )
 
-      // Ejecutamos el update en bloque en la BD
       await this.prisma.market.updateMany({
         where: { id: { in: marketsToLock.map((m) => m.id) } },
         data: { status: 'LOCKED' },
       })
 
-      // 🔥 AVISO POR WEBSOCKET: Recorremos los que bloqueamos y les metemos el candado en el Front
       for (const market of marketsToLock) {
         this.betsGateway.emitMarketStatusChange(market.id, 'LOCKED')
       }
@@ -137,7 +167,7 @@ export class BetsCronService {
   }
 
   /**
-   * 🧠 CRON 3: Chequea partidos jugados para pagarles a los usuarios.
+   *  Chequeo de partidos jugados para pagarles a los usuarios.
    */
   @Cron('0 */15 * * * *')
   async handleMarketSettlement() {
@@ -158,12 +188,10 @@ export class BetsCronService {
       const matchStatusFromApi: string = 'FT'
       const winnerName = 'Boca'
 
-      // CASO DE FALLO A (BR-06): Partido suspendido/cancelado
       if (matchStatusFromApi === 'SUSP' || matchStatusFromApi === 'CANX') {
         this.logger.warn(
           `Partido ${market.title} suspendido por la API. Ejecutando REEMBOLSO masivo`,
         )
-        // 🚨 OJO ACÁ: No llamamos al Gateway desde el Cron directamente
         await this.betsService.settleMarket(market.id, { status: 'REFUNDED' })
         continue
       }
@@ -178,7 +206,6 @@ export class BetsCronService {
             `Liquidando mercado ${market.title}. Ganador: ${winnerName}`,
           )
 
-          // 🚨 OJO ACÁ: Tampoco llamamos al Gateway desde el Cron directamente
           await this.betsService.settleMarket(market.id, {
             status: 'SETTLED',
             winningOptionId: winningOption.id,
