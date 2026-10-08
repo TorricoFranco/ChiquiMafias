@@ -59,6 +59,7 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 ].map((sub) => (
                     <button
                         key={sub.id}
+                        aria-pressed={activeSubTab === sub.id}
                         onClick={() => setActiveSubTab(sub.id)}
                         className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${activeSubTab === sub.id
                                 ? 'bg-[#353534] border-[#d2f000] text-[#d2f000]'

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Sliders, Coins, Clock } from 'lucide-react';
-import { AdminMarket } from '../../types';
+import { Market } from '../../types';
 
 interface AdminMarketCardProps {
-  market: AdminMarket;
-  onOpenSettleModal: (market: AdminMarket) => void;
+  market: Market;
+  onOpenSettleModal: (market: Market) => void;
 }
 
 export const AdminMarketCard: React.FC<AdminMarketCardProps> = ({
@@ -17,7 +17,7 @@ export const AdminMarketCard: React.FC<AdminMarketCardProps> = ({
   );
 
   return (
-    <div className="bg-[#1c1b1b] border border-[#353534] rounded-2xl p-5 flex flex-col gap-4 hover:border-[#454932] transition-all">
+    <article aria-label={market.title} className="bg-[#1c1b1b] border border-[#353534] rounded-2xl p-5 flex flex-col gap-4 hover:border-[#454932] transition-all">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#353534] pb-4">
         <div className="flex flex-col gap-1">
@@ -130,6 +130,6 @@ export const AdminMarketCard: React.FC<AdminMarketCardProps> = ({
         </span>
         <span className="font-mono text-[10px]">ID: {market.id}</span>
       </div>
-    </div>
+    </article>
   );
 };

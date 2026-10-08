@@ -53,6 +53,7 @@ export const CosmeticsTab: React.FC<CosmeticsTabProps> = ({
           ].map((tab) => (
             <button
               key={tab.id}
+              aria-pressed={cosmeticFilter === tab.id}
               onClick={() => {
                 setCosmeticFilter(tab.id as any);
                 setCosmeticSubtype('all');
@@ -88,6 +89,7 @@ export const CosmeticsTab: React.FC<CosmeticsTabProps> = ({
         .map((sub) => (
           <button
             key={sub.id}
+            aria-pressed={cosmeticSubtype === sub.id}
             onClick={() => setCosmeticSubtype(sub.id)}
             className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
               cosmeticSubtype === sub.id

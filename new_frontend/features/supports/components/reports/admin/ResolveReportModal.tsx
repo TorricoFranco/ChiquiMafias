@@ -34,6 +34,7 @@ export const ResolveReportModal: React.FC<ResolveReportModalProps> = ({
   );
   const [resolveMuteHours, setResolveMuteHours] = useState(24);
 
+  // El padre cierra el modal cuando el backend confirma: si falla, la sanción queda cargada.
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onResolveReport(
@@ -42,7 +43,6 @@ export const ResolveReportModal: React.FC<ResolveReportModalProps> = ({
       resolveReason,
       resolveAction === 'MUTE' ? resolveMuteHours : undefined
     );
-    onClose();
   };
 
   const actions = [
@@ -58,15 +58,20 @@ export const ResolveReportModal: React.FC<ResolveReportModalProps> = ({
         className="fixed inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-[#1c1b1b] border border-red-500/50 rounded-2xl max-w-md w-full p-6 z-10 shadow-2xl animate-in zoom-in-95">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resolve-report-title"
+        className="relative bg-[#1c1b1b] border border-red-500/50 rounded-2xl max-w-md w-full p-6 z-10 shadow-2xl animate-in zoom-in-95"
+      >
         <div className="flex justify-between items-center border-b border-[#353534] pb-3 mb-4">
           <div className="flex items-center gap-2 text-red-400">
             <ShieldAlert className="w-5 h-5" />
-            <h3 className="font-extrabold text-base text-[#e5e2e1] uppercase">
+            <h3 id="resolve-report-title" className="font-extrabold text-base text-[#e5e2e1] uppercase">
               Resolver Denuncia & Sancionar
             </h3>
           </div>
-          <button onClick={onClose} className="text-[#c6c9ab] hover:text-[#e5e2e1]">
+          <button onClick={onClose} aria-label="Cerrar" className="text-[#c6c9ab] hover:text-[#e5e2e1]">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -85,16 +90,17 @@ export const ResolveReportModal: React.FC<ResolveReportModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold uppercase text-[#c6c9ab] mb-2">
+            <span id="resolve-report-action" className="block text-[10px] font-bold uppercase text-[#c6c9ab] mb-2">
               Acción a ejecutar *
-            </label>
-            <div className="grid grid-cols-2 gap-2">
+            </span>
+            <div role="group" aria-labelledby="resolve-report-action" className="grid grid-cols-2 gap-2">
               {actions.map((act) => {
                 const Icon = act.icon;
                 return (
                   <button
                     key={act.id}
                     type="button"
+                    aria-pressed={resolveAction === act.id}
                     onClick={() => setResolveAction(act.id as any)}
                     className={`p-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                       resolveAction === act.id
@@ -112,10 +118,11 @@ export const ResolveReportModal: React.FC<ResolveReportModalProps> = ({
 
           {resolveAction === 'MUTE' && (
             <div>
-              <label className="block text-[10px] font-bold uppercase text-[#c6c9ab] mb-1">
+              <label htmlFor="resolve-report-mute-hours" className="block text-[10px] font-bold uppercase text-[#c6c9ab] mb-1">
                 Duración del Mute (Horas):
               </label>
               <select
+                id="resolve-report-mute-hours"
                 value={resolveMuteHours}
                 onChange={(e) => setResolveMuteHours(Number(e.target.value))}
                 className="w-full bg-[#131313] border border-[#353534] text-xs text-[#e5e2e1] px-3 py-2 rounded-xl outline-none"
@@ -130,10 +137,11 @@ export const ResolveReportModal: React.FC<ResolveReportModalProps> = ({
           )}
 
           <div>
-            <label className="block text-[10px] font-bold uppercase text-[#c6c9ab] mb-1">
+            <label htmlFor="resolve-report-reason" className="block text-[10px] font-bold uppercase text-[#c6c9ab] mb-1">
               Justificación / Razón enviada al usuario *
             </label>
             <textarea
+              id="resolve-report-reason"
               rows={2}
               required
               value={resolveReason}

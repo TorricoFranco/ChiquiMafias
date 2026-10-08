@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { subscriptionApi } from "../api/subscriptionsApi";
 import { useUserStore } from "@/store/useUserStore"; 
 import { SubscriptionTier } from "../types/index";
@@ -18,6 +19,7 @@ export function useSubscriptions() {
     onSuccess: (data) => {
       if (data.init_point) window.location.href = data.init_point;
     },
+    onError: () => toast.error("No pudimos iniciar la suscripción. Probá de nuevo."),
   });
 
   const upgradeMutation = useMutation({
@@ -25,7 +27,7 @@ export function useSubscriptions() {
     onSuccess: (data) => {
       if (data.init_point) window.location.href = data.init_point;
     },
-    onError: (err) => console.error("Error en upgrade:", err),
+    onError: () => toast.error("No pudimos mejorar tu plan. Probá de nuevo."),
   });
 
   const cancelMutation = useMutation({

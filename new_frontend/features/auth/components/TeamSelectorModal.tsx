@@ -28,7 +28,12 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
 
     return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="bg-[#1a1a1a] border border-[#2b2b2b] w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Elegí tu Club"
+                className="bg-[#1a1a1a] border border-[#2b2b2b] w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+            >
 
                 {/* HEADER DEL MODAL */}
                 <div className="p-4 border-b border-[#2b2b2b] flex justify-between items-center bg-[#111]">
@@ -36,7 +41,7 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
                         <h3 className="text-white font-bold text-lg">Elegí tu Club</h3>
                         <p className="text-xs text-gray-400">Seleccioná el cuadro del cual sos hincha para personalizar tu experiencia</p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition">
+                    <button onClick={onClose} aria-label="Cerrar" className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -97,7 +102,8 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
                     ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                             {filteredTeams.map((team) => (
-                                <div
+                                <button
+                                    type="button"
                                     key={team.id}
                                     onClick={() => onSelect(team.id, team.name, team.badgeUrl)}
                                     className="flex flex-col items-center justify-center p-4 bg-[#222]/40 border border-[#2b2b2b] rounded-xl cursor-pointer hover:bg-sky-500/10 hover:border-sky-500/50 transition duration-200 text-center group"
@@ -105,7 +111,7 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
                                     <div className="relative w-14 h-14 mb-2 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                                         <Image
                                             src={team.badgeUrl}
-                                            alt={team.name}
+                                            alt=""
                                             fill
                                             sizes="56px"
                                             className="object-contain"
@@ -115,7 +121,7 @@ export default function TeamSelectorModal({ isOpen, onClose, onSelect, teams }: 
                                     <span className="text-xs font-medium text-gray-200 group-hover:text-white transition-colors line-clamp-2">
                                         {team.name}
                                     </span>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     )}

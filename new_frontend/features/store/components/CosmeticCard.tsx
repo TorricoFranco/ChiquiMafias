@@ -59,7 +59,7 @@ export const CosmeticCard: React.FC<CosmeticCardProps> = ({ item, onBuy, onEquip
     : [];
 
   return (
-    <div className="bg-[#1c1b1b] border border-[#353534] hover:border-[#454932] rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group">
+    <article aria-label={item.name} className="bg-[#1c1b1b] border border-[#353534] hover:border-[#454932] rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all group">
       <div className="flex flex-col gap-3">
 
         <div className="flex justify-between items-center border-b border-[#353534] pb-2 min-h-[32px]">
@@ -257,6 +257,7 @@ export const CosmeticCard: React.FC<CosmeticCardProps> = ({ item, onBuy, onEquip
               <div className="flex items-center justify-between bg-[#131313] border border-[#353534] rounded-xl px-2 min-w-[80px]">
                 <button
                   onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  aria-label="Restar una unidad"
                   className="p-1 text-[#c6c9ab] hover:text-[#d2f000] disabled:opacity-50 transition-colors"
                   disabled={quantity <= 1}
                 >
@@ -265,6 +266,7 @@ export const CosmeticCard: React.FC<CosmeticCardProps> = ({ item, onBuy, onEquip
                 <span className="text-sm font-bold text-white font-mono">{quantity}</span>
                 <button
                   onClick={() => setQuantity(q => q + 1)}
+                  aria-label="Sumar una unidad"
                   className="p-1 text-[#c6c9ab] hover:text-[#d2f000] transition-colors"
                 >
                   <Plus className="w-4 h-4" />
@@ -290,6 +292,6 @@ export const CosmeticCard: React.FC<CosmeticCardProps> = ({ item, onBuy, onEquip
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 };

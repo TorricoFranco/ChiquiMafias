@@ -181,7 +181,7 @@ export function ChatPanel({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+      <div role="log" aria-label="Mensajes del chat" className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
         {messages.map((msg) => (
           <ChatMessage
             key={msg.messageId}
@@ -240,7 +240,7 @@ export function ChatPanel({
           >
             <img
               src="/icons/megaphone-icon.png"
-              alt="Megáfono"
+              alt=""
               className="w-6 h-6 object-contain"
             />
 
@@ -260,6 +260,7 @@ export function ChatPanel({
         <div className="flex space-x-2">
           <div className="relative flex-1">
             <input
+              aria-label="Mensaje para el chat"
               maxLength={100}
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -285,6 +286,7 @@ export function ChatPanel({
 
           <button
             onClick={handleSend}
+            aria-label="Enviar mensaje"
             disabled={timeLeft !== null || input.trim().length === 0}
             className={clsx(
               "p-3 rounded-full disabled:opacity-50 transition-colors flex items-center justify-center flex-shrink-0",

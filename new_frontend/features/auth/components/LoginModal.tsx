@@ -22,7 +22,12 @@ export default function LoginModal({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#181818] p-8 rounded-2xl border border-[#2b2b2b] w-full max-w-md shadow-2xl🎴">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={showOnboarding ? "Completá tu perfil" : "Iniciá sesión"}
+                className="bg-[#181818] p-8 rounded-2xl border border-[#2b2b2b] w-full max-w-md shadow-2xl🎴"
+            >
                 {!showOnboarding ? (
                     <>
                         <h2 className="text-white text-xl mb-4 font-semibold">Iniciá sesión</h2>

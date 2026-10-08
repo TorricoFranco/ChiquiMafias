@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sliders, CheckCircle, RotateCcw, AlertTriangle } from 'lucide-react';
-import { AdminMarket } from '../../types/adminTypes';
+import { Market } from '../../types';
 
 interface SettleMarketModalProps {
-    market: AdminMarket;
+    market: Market;
     onClose: () => void;
     onConfirm: (
         marketId: string,
@@ -42,7 +42,12 @@ export const SettleMarketModal: React.FC<SettleMarketModalProps> = ({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="relative bg-[#1c1b1b] border border-[#d2f000]/60 rounded-2xl max-w-lg w-full p-6 z-10 shadow-2xl animate-in zoom-in-95">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Liquidar Mercado de Apuestas"
+                className="relative bg-[#1c1b1b] border border-[#d2f000]/60 rounded-2xl max-w-lg w-full p-6 z-10 shadow-2xl animate-in zoom-in-95"
+            >
                 <div className="flex justify-between items-center border-b border-[#353534] pb-3 mb-4">
                     <div className="flex items-center gap-2">
                         <Sliders className="w-5 h-5 text-[#d2f000]" />
@@ -50,7 +55,7 @@ export const SettleMarketModal: React.FC<SettleMarketModalProps> = ({
                             Liquidar Mercado de Apuestas
                         </h3>
                     </div>
-                    <button onClick={onClose} className="text-[#c6c9ab] hover:text-[#e5e2e1]">
+                    <button onClick={onClose} aria-label="Cerrar" className="text-[#c6c9ab] hover:text-[#e5e2e1]">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -71,6 +76,7 @@ export const SettleMarketModal: React.FC<SettleMarketModalProps> = ({
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 type="button"
+                                aria-pressed={settleAction === 'SETTLED'}
                                 onClick={() => setSettleAction('SETTLED')}
                                 className={`p-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${settleAction === 'SETTLED'
                                     ? 'bg-[#d2f000]/15 border-[#d2f000] text-[#d2f000]'
@@ -83,6 +89,7 @@ export const SettleMarketModal: React.FC<SettleMarketModalProps> = ({
 
                             <button
                                 type="button"
+                                aria-pressed={settleAction === 'REFUNDED'}
                                 onClick={() => setSettleAction('REFUNDED')}
                                 className={`p-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${settleAction === 'REFUNDED'
                                     ? 'bg-red-500/20 border-red-500 text-red-300'

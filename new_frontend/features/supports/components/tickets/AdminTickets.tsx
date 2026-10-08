@@ -121,6 +121,7 @@ export const AdminTickets: React.FC = () => {
                                         Estado:
                                     </span>
                                     <select
+                                        aria-label="Estado del ticket"
                                         value={detailedTicket.status}
                                         onChange={(e) =>
                                             updateTicketStatus({

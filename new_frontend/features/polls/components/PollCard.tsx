@@ -23,7 +23,7 @@ export const PollCard = ({ poll }: { poll: Poll }) => {
     const commentsCount = poll.stats?.comments || 0;
 
     return (
-        <div className="bg-[#1c1b1b] border border-[#353534] rounded-xl p-5 flex flex-col gap-4 shadow-sm hover:border-[#454932] transition-colors">
+        <article aria-label={poll.title} className="bg-[#1c1b1b] border border-[#353534] rounded-xl p-5 flex flex-col gap-4 shadow-sm hover:border-[#454932] transition-colors">
 
             {/* Header de la Card */}
             <div className="flex items-center gap-3">
@@ -57,11 +57,11 @@ export const PollCard = ({ poll }: { poll: Poll }) => {
 
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 border-r border-[#353534] pr-4">
-                        <button onClick={() => handlePollReaction("LIKE")} className={`flex items-center gap-1.5 hover:bg-[#2a2a2a] p-1.5 rounded transition-colors ${poll.userReaction === 'LIKE' ? 'text-[#d2f000]' : 'text-[#c6c9ab] hover:text-[#d2f000]'}`}>
+                        <button onClick={() => handlePollReaction("LIKE")} aria-label={`Me gusta (${poll.likesCount || 0})`} aria-pressed={poll.userReaction === 'LIKE'} className={`flex items-center gap-1.5 hover:bg-[#2a2a2a] p-1.5 rounded transition-colors ${poll.userReaction === 'LIKE' ? 'text-[#d2f000]' : 'text-[#c6c9ab] hover:text-[#d2f000]'}`}>
                             <ThumbsUp className="w-4 h-4" />
                             <span className="text-[12px] font-medium">{poll.likesCount || 0}</span>
                         </button>
-                        <button onClick={() => handlePollReaction("DISLIKE")} className={`flex items-center gap-1.5 hover:bg-[#2a2a2a] p-1.5 rounded transition-colors ${poll.userReaction === 'DISLIKE' ? 'text-red-400' : 'text-[#c6c9ab] hover:text-red-400'}`}>
+                        <button onClick={() => handlePollReaction("DISLIKE")} aria-label={`No me gusta (${poll.dislikesCount || 0})`} aria-pressed={poll.userReaction === 'DISLIKE'} className={`flex items-center gap-1.5 hover:bg-[#2a2a2a] p-1.5 rounded transition-colors ${poll.userReaction === 'DISLIKE' ? 'text-red-400' : 'text-[#c6c9ab] hover:text-red-400'}`}>
                             <ThumbsDown className="w-4 h-4" />
                             <span className="text-[12px] font-medium">{poll.dislikesCount || 0}</span>
                         </button>
@@ -69,6 +69,7 @@ export const PollCard = ({ poll }: { poll: Poll }) => {
 
                     <button
                         onClick={() => setShowComments(!showComments)}
+                        aria-expanded={showComments}
                         className={`flex items-center gap-1.5 text-xs font-semibold px-2 py-1.5 rounded transition-colors cursor-pointer ${showComments ? 'text-[#191e00] bg-[#d2f000]' : 'text-[#c6c9ab] hover:text-[#d2f000] hover:bg-[#2a2a2a]'
                             }`}
                     >
@@ -79,6 +80,6 @@ export const PollCard = ({ poll }: { poll: Poll }) => {
             </div>
 
             {showComments && <PollComments pollId={poll.id} />}
-        </div>
+        </article>
     );
 };

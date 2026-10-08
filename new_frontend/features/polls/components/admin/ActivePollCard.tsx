@@ -1,6 +1,6 @@
 import React from 'react';
 import { Flame, MessageSquare, ThumbsUp, XCircle } from 'lucide-react';
-import { AdminPollItem } from '../../types/adminTypes';
+import { AdminPollItem } from '../../types';
 
 
 interface ActivePollCardProps {

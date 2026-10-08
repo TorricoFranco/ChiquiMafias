@@ -116,10 +116,12 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
   const activeMeta =
     LEADERBOARD_CATEGORIES.find((c) => c.id === activeCategory) || LEADERBOARD_CATEGORIES[0];
 
-  // Separate Top 3 for podium if no search filter active
+  // Podio con el Top 3 (sin búsqueda activa). Con menos de 3 jugadores no hay podio
+  // y la tabla los muestra a todos; si no, quedaban fuera de las dos vistas.
   const hasSearch = searchQuery.trim().length > 0;
-  const podiumItems = !hasSearch ? rawLeaderboardData.slice(0, 3) : [];
-  const tableItems = !hasSearch ? leaderboardData.slice(3) : leaderboardData;
+  const showPodium = !hasSearch && rawLeaderboardData.length >= 3;
+  const podiumItems = showPodium ? rawLeaderboardData.slice(0, 3) : [];
+  const tableItems = showPodium ? leaderboardData.slice(3) : leaderboardData;
 
   const renderCategoryIcon = (iconName: string, active: boolean) => {
     const cls = `w-4 h-4 ${active ? 'text-[#191e00]' : 'text-[#d2f000]'}`;
@@ -206,6 +208,7 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
                 return (
                   <button
                     key={cat.id}
+                    aria-pressed={isActive}
                     onClick={() => {
                       setActiveCategory(cat.id as LeaderboardCategory);
                       setSearchQuery('');
@@ -240,7 +243,7 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
             </div>
 
             {/* Podium for Top 3 (Shown when no search filter is active) */}
-            {!hasSearch && podiumItems.length >= 3 && (
+            {showPodium && (
               <LeaderboardPodium
                 category={activeCategory}
                 items={podiumItems}
@@ -252,7 +255,7 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
             <LeaderboardTable
               category={activeCategory}
               items={tableItems}
-              startIndex={!hasSearch ? 3 : 0}
+              startIndex={showPodium ? 3 : 0}
               currentUserId={userStats?.userId || 'user-uuid-abc'}
               onSelectUser={(u) => setSelectedUser(u)}
               searchQuery={searchQuery}

@@ -32,10 +32,12 @@ export const usePollComments = (pollId: string, page: number = 1, limit: number 
 };
 
 export const usePendingRewards = () => {
+  const userId = useUserStore((state) => state.id);
   return useQuery({
     queryKey: ['pending-rewards'],
     queryFn: pollsApi.getPendingRewards,
     staleTime: 1000 * 60,
+    enabled: !!userId,
   });
 };
 

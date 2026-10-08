@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Send, Image as ImageIcon, X, Loader2 } from 'lucide-react';
 import { uploadToCloudinary } from '@/lib/uploadHelper';
+import { TICKET_MESSAGE_MAX_LENGTH } from '../../../constants';
 
 interface TicketReplyFormProps {
   onSendReply: (message: string, screenshotUrl?: string) => void;
@@ -102,13 +103,16 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({ onSendReply, d
             : 'bg-[#131313] border-[#353534] text-[#c6c9ab] hover:text-white'
             }`}
           title="Adjuntar imagen / screenshot"
+          aria-label="Adjuntar imagen"
         >
           <ImageIcon className="w-4 h-4" />
         </button>
 
         <input
           type="text"
+          aria-label="Respuesta del soporte"
           placeholder="Escribir respuesta oficial del soporte..."
+          maxLength={TICKET_MESSAGE_MAX_LENGTH}
           value={replyMessage}
           onChange={(e) => setReplyMessage(e.target.value)}
           className="flex-1 bg-[#131313] border border-[#353534] focus:border-[#d2f000] text-xs text-[#e5e2e1] px-3.5 py-2.5 rounded-xl outline-none"
@@ -117,7 +121,7 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({ onSendReply, d
         <button
           type="submit"
           disabled={!replyMessage.trim() || isPending}
-          className="..."
+          className="bg-[#d2f000] text-[#191e00] hover:bg-[#b8d300] font-black text-xs px-4 py-2.5 rounded-xl uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isPending ? (
             <>

@@ -1,6 +1,6 @@
 ---
 name: verificar
-description: Verifica los cambios actuales antes de dar una tarea por terminada o de commitear. Corre build, lint y tests unitarios solo de las apps que cambiaron (backend, new_frontend, discord-bot) y resume los fallos. Usar al terminar cualquier cambio de código.
+description: Verifica los cambios actuales antes de dar una tarea por terminada o de commitear. Corre build, lint y tests (unitarios en el backend, e2e mockeados en new_frontend) solo de las apps que cambiaron (backend, new_frontend, discord-bot) y resume los fallos. Usar al terminar cualquier cambio de código.
 argument-hint: "[rama base, por defecto develop]"
 allowed-tools:
   - Bash(git status *)
@@ -12,6 +12,9 @@ allowed-tools:
   - Bash(npx prisma generate *)
   - Bash(npx prisma validate *)
   - Bash(npx tsc --noEmit *)
+  - Bash(npm run typecheck:e2e *)
+  - Bash(npx eslint *)
+  - Bash(npx playwright test *)
 ---
 
 # Verificación de cambios
@@ -43,8 +46,12 @@ Si el cambio toca `wallet/`, `bets/`, `subscriptions/`, `webhook/`, `coin-shop/`
 
 Desde `new_frontend/`:
 
-1. `npm run lint`
-2. `npm run build`
+1. `npm run lint`. Hay errores previos en código viejo: reportá solo los de archivos que cambiaron. Para `e2e/` tiene que dar 0, porque el CI lo exige: `npx eslint e2e playwright.config.ts`.
+2. `npm run typecheck:e2e`
+3. `npm run build`
+4. E2E mockeados: `npx playwright test --project=mocked-desktop --project=mocked-mobile`. No necesitan backend. Reutilizan `npm run dev:e2e` en :3100 si está corriendo; si no, lo levantan solos. **Nunca** `npm run test:e2e` desde `backend/`.
+   - Si falla uno, corrélo solo (`npx playwright test <spec> --project=mocked-desktop --repeat-each=3`) para separar un flake de carga del dev server de un fallo real, y mirá el `error-context.md` / screenshot en `test-results/`.
+   - Si el cambio tocó textos, roles o `aria-label`, es esperable que fallen locators: corregí el test solo si el cambio de UI era intencional.
 
 ## 4. discord-bot
 

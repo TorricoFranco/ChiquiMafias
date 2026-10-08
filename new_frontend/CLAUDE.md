@@ -23,7 +23,28 @@ npm run build   # verificación principal (tipos + build)
 npm run lint    # eslint (eslint-config-next)
 ```
 
-No hay tests: se verifica con `npm run lint` + `npm run build`.
+## Tests E2E (Playwright)
+
+```bash
+npm run dev:e2e              # servidor de tests en :3100 (dejalo corriendo: los tests lo reutilizan)
+npx playwright test --project=mocked-desktop --project=mocked-mobile   # = npm run test:e2e
+npx playwright test e2e/specs/mocked/bets --project=mocked-desktop     # un dominio
+npm run typecheck:e2e        # tipos de e2e/ (factories con los tipos de features/*/types)
+npm run test:e2e:report      # último reporte HTML
+```
+
+- **Mockeados** (`e2e/specs/mocked/`, la suite principal): no necesitan backend. La API (`http://localhost:3007`) se mockea en modo estricto: una request sin mock hace fallar el test con el método y el path. Socket.IO se emula con `page.routeWebSocket`, y Google, Mercado Pago y Cloudinary se stubbean.
+- **Proyectos:** `mocked-desktop` corre todo menos `@mobile-only`. `mocked-mobile` (Pixel 7) corre solo lo marcado `@mobile` o `@mobile-only`.
+- **Full-stack** (`e2e/specs/fullstack/`, `npm run test:e2e:fullstack`): smoke contra el stack real de Docker en :3005. No corre en CI.
+  - Requisitos:
+    - `.env.dev` con `ENABLE_DEV_TOOLS=true`, que habilita `POST /auth/dev-login`, y `CLIENT_URL=http://localhost:3005` (es el CORS de los sockets). Tiene que ser un solo valor: la validación de Joi rechaza una lista.
+    - El backend no puede correr con `NODE_ENV=production`. `docker-compose.dev.yml` lo toma de `${NODE_ENV}`, o sea de la shell o del `.env` de la raíz, no de `.env.dev`. Si hace falta: `$env:NODE_ENV="development"; docker compose -f docker-compose.dev.yml up -d backend`.
+  - Antes de correrlo: `docker compose -f docker-compose.dev.yml up` y `docker compose -f docker-compose.dev.yml exec backend npm run seed:e2e` (usuarios `e2e-*@chiquimafias.test` y el ítem `[E2E] Banner`). El setup carga monedas con `add-coins`.
+  - Corre en serie y deja datos marcados `[E2E]` en la DB de dev (mercados, mensajes). Nunca borra tablas.
+- **CI:** `.github/workflows/frontend.yml` corre el build de producción (`build:e2e` + `start:e2e`) con la suite mockeada.
+- Convenciones en `../.claude/rules/frontend-e2e.md`, que se cargan solas al tocar `e2e/`.
+- Si cambiás textos, roles o `aria-label` de la UI, corré los tests del dominio: los locators dependen de eso.
+- Si cambia una respuesta del backend, actualizá también su factory en `e2e/factories/` y el mock por defecto en `e2e/support/defaults.ts`.
 
 ## Estructura
 
@@ -48,6 +69,7 @@ No hay tests: se verifica con `npm run lint` + `npm run build`.
 - Componentes con estado, hooks o eventos llevan `"use client"`.
 - Si cambia un DTO o un evento del backend, actualizá `features/<dominio>/types` y la api o el socket en el mismo cambio.
 - Antes de usar una API de Next (routing, caching, `cookies()`, params async, metadata, etc.), leé la guía en `node_modules/next/dist/docs/`, porque Next 16 cambió APIs.
+- Al terminar un cambio en `features/`, `app/`, `context/`, `store/` o `hooks/`, y antes de abrir la PR, pedí revisión al subagente `frontend-reviewer`.
 
 ## Diseño
 

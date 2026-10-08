@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Coins, X } from 'lucide-react';
 import { UserEntity } from '../../types';
 import { useAdminAddCoins } from '@/hooks/useWallet';
+import { toast } from 'sonner';
 
 interface AddCoinsModalProps {
   user: UserEntity | null;
@@ -24,6 +25,7 @@ export const AddCoinsModal: React.FC<AddCoinsModalProps> = ({ user, onClose }) =
       { userId: user.id, amount, description },
       {
         onSuccess: () => {
+          toast.success(`Se acreditaron ${amount.toLocaleString('es-AR')} monedas a @${user.username}`);
           onClose();
         },
       }
@@ -32,9 +34,15 @@ export const AddCoinsModal: React.FC<AddCoinsModalProps> = ({ user, onClose }) =
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-[#1c1b1b] border border-[#353534] rounded-2xl p-5 w-full max-w-md shadow-xl relative">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-coins-title"
+        className="bg-[#1c1b1b] border border-[#353534] rounded-2xl p-5 w-full max-w-md shadow-xl relative"
+      >
         <button
           onClick={onClose}
+          aria-label="Cerrar"
           className="absolute top-4 right-4 text-[#909378] hover:text-white"
         >
           <X className="w-5 h-5" />
@@ -42,7 +50,7 @@ export const AddCoinsModal: React.FC<AddCoinsModalProps> = ({ user, onClose }) =
 
         <div className="flex items-center gap-2 mb-4">
           <Coins className="w-5 h-5 text-[#d2f000]" />
-          <h2 className="text-base font-bold text-[#e5e2e1]">Recargar Monedas</h2>
+          <h2 id="add-coins-title" className="text-base font-bold text-[#e5e2e1]">Recargar Monedas</h2>
         </div>
 
         <p className="text-xs text-[#909378] mb-4">
@@ -51,8 +59,9 @@ export const AddCoinsModal: React.FC<AddCoinsModalProps> = ({ user, onClose }) =
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="block text-xs font-semibold text-[#c6c9ab] mb-1">Monto</label>
+            <label htmlFor="add-coins-amount" className="block text-xs font-semibold text-[#c6c9ab] mb-1">Monto</label>
             <input
+              id="add-coins-amount"
               type="number"
               min={1}
               value={amount}
@@ -63,8 +72,9 @@ export const AddCoinsModal: React.FC<AddCoinsModalProps> = ({ user, onClose }) =
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#c6c9ab] mb-1">Descripción</label>
+            <label htmlFor="add-coins-description" className="block text-xs font-semibold text-[#c6c9ab] mb-1">Descripción</label>
             <input
+              id="add-coins-description"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}

@@ -14,9 +14,11 @@ export const RightSidebar = ({ currentTab }: { currentTab: string }) => {
     <aside className={`${sidebarWidth} flex flex-col border-l border-[#353534] bg-[#131313] overflow-hidden transition-all duration-300`}>
       {/* HEADER CON TABS */}
       <div className="p-3 bg-[#201f1f] border-b border-[#454932] flex-shrink-0">
-        <div className="grid grid-cols-2 bg-[#131313] p-1 rounded-xl border border-[#454932]">
+        <div role="tablist" className="grid grid-cols-2 bg-[#131313] p-1 rounded-xl border border-[#454932]">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "fixture"}
             onClick={() => setActiveTab("fixture")}
             className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === "fixture"
                 ? "bg-[#d2f000] text-[#191e00] shadow-md"
@@ -24,6 +26,7 @@ export const RightSidebar = ({ currentTab }: { currentTab: string }) => {
               }`}
           >
             <span
+              aria-hidden="true"
               className="material-symbols-outlined text-sm"
               style={activeTab === "fixture" ? { fontVariationSettings: "'FILL' 1" } : undefined}
             >
@@ -34,6 +37,8 @@ export const RightSidebar = ({ currentTab }: { currentTab: string }) => {
 
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "bets"}
             onClick={() => setActiveTab("bets")}
             className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === "bets"
                 ? "bg-[#d2f000] text-[#191e00] shadow-md"
@@ -41,6 +46,7 @@ export const RightSidebar = ({ currentTab }: { currentTab: string }) => {
               }`}
           >
             <span
+              aria-hidden="true"
               className="material-symbols-outlined text-sm"
               style={activeTab === "bets" ? { fontVariationSettings: "'FILL' 1" } : undefined}
             >

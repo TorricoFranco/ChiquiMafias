@@ -4,6 +4,11 @@
       "type": "http",
       "url": "https://mcp.mercadopago.com/mcp"
     },
+    "playwright": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@playwright/mcp@latest"]
+    },
     "stitch": {
       "type": "http",
       "url": "https://stitch.googleapis.com/mcp",

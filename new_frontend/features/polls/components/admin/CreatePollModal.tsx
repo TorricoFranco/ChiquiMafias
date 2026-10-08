@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PlusCircle, X, Trash2 } from 'lucide-react';
+import { toDateTimeLocalValue } from '@/lib/dateTimeLocal';
 
 interface CreatePollModalProps {
     onClose: () => void;
@@ -17,8 +18,8 @@ export const CreatePollModal: React.FC<CreatePollModalProps> = ({ onClose, onSub
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [icon, setIcon] = useState('FOOTBALL');
-    const [startsAt, setStartsAt] = useState(new Date().toISOString().slice(0, 16));
-    const [endsAt, setEndsAt] = useState(new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().slice(0, 16));
+    const [startsAt, setStartsAt] = useState(() => toDateTimeLocalValue(new Date()));
+    const [endsAt, setEndsAt] = useState(() => toDateTimeLocalValue(new Date(Date.now() + 48 * 60 * 60 * 1000)));
     const [options, setOptions] = useState<string[]>(['Boca Juniors', 'River Plate', 'Empate']);
 
     const handleAddOption = () => setOptions((prev) => [...prev, `Opción ${prev.length + 1}`]);

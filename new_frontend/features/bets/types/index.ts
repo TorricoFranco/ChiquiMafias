@@ -33,6 +33,10 @@ export interface Market {
   fixtureId?: number | null;
   closesAt: string;
   options: MarketOption[];
+  // GET /bets/markets devuelve la entidad completa: el panel de admin los usa.
+  isManual?: boolean;
+  createdAt?: string;
+  settledAt?: string | null;
 }
 
 export interface BetHistoryItem {

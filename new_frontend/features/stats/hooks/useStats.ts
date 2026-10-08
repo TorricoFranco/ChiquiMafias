@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { statsApi } from '../api/statsApi';
+import { useUserStore } from '@/store/useUserStore';
 import {
   LeaderboardUserStats,
   TopActiveStreakUser,
@@ -21,19 +22,23 @@ export const STATS_KEYS = {
 };
 
 export function useMyStats() {
+  const userId = useUserStore((state) => state.id);
   return useQuery({
     queryKey: STATS_KEYS.me(),
     queryFn: statsApi.getMyStats,
     staleTime: 1000 * 60 * 5,
+    enabled: !!userId,
   });
 }
 
 export function useMyWinStreak() {
+  const userId = useUserStore((state) => state.id);
   return useQuery({
     queryKey: STATS_KEYS.me(),
     queryFn: statsApi.getMyStats,
     select: (data) => data.currentWinStreak,
     staleTime: 1000 * 60 * 5,
+    enabled: !!userId,
   });
 }
 

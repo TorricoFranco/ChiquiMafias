@@ -4,7 +4,7 @@ import { OnEvent } from '@nestjs/event-emitter'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
-import type { Report, Ticket } from '@prisma/client'
+import type { Prisma, Report } from '@prisma/client'
 
 @Injectable()
 export class DiscordService {
@@ -47,7 +47,9 @@ export class DiscordService {
   }
 
   @OnEvent('ticket.created', { async: true })
-  async handleTicketCreatedEvent(ticket: any) {
+  async handleTicketCreatedEvent(
+    ticket: Prisma.TicketGetPayload<{ include: { messages: true } }>,
+  ) {
     this.logger.log(
       `Solicitando creación de Hilo en Discord para Ticket ID: ${ticket.id}`,
     )
@@ -82,6 +84,11 @@ export class DiscordService {
         this.logger.log(
           `🟢 ThreadId ${data.threadId} vinculado al Ticket ${ticket.id}`,
         )
+      } else {
+        // Sin hilo, las respuestas posteriores del usuario no llegan al staff.
+        this.logger.error(
+          `❌ El bot no creó el hilo del Ticket ${ticket.id} (HTTP ${response.status})`,
+        )
       }
     } catch (error) {
       this.logger.error(
@@ -101,18 +108,27 @@ export class DiscordService {
       `Reenviando mensaje web al hilo de Discord: ${payload.discordThreadId}`,
     )
     try {
-      await fetch(`${this.botBaseUrl}/tickets/forward-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-discord-bot-token': this.discordSecret,
+      const response = await fetch(
+        `${this.botBaseUrl}/tickets/forward-message`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-discord-bot-token': this.discordSecret,
+          },
+          body: JSON.stringify({
+            threadId: payload.discordThreadId,
+            message: payload.message,
+            screenshotUrl: payload.screenshotUrl,
+          }),
         },
-        body: JSON.stringify({
-          threadId: payload.discordThreadId,
-          message: payload.message,
-          screenshotUrl: payload.screenshotUrl,
-        }),
-      })
+      )
+
+      if (!response.ok) {
+        this.logger.error(
+          `❌ El bot no reenvió el mensaje al hilo ${payload.discordThreadId} (HTTP ${response.status})`,
+        )
+      }
     } catch (error) {
       this.logger.error('❌ Error reenviando mensaje al bot:', error.message)
     }

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { X, Plus, Trash2, AlertTriangle, Megaphone, ShoppingCart } from "lucide-react";
+import { toast } from "sonner";
 import { useProposePoll } from "@/features/polls/hooks/usePolls";
 import { useUserInventory } from "@/features/inventory/hooks/useInventory";
 
@@ -14,6 +15,7 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [options, setOptions] = useState(["", ""]);
+    const [icon, setIcon] = useState("FOOTBALL");
 
     const { data: inventory, isLoading: isLoadingInventory } = useUserInventory();
     const { mutate: proposePoll, isPending } = useProposePoll();
@@ -56,15 +58,17 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
             {
                 title: title.trim(),
                 description: cleanDescription,
-                options: validOptions
+                options: validOptions,
+                icon
             },
             {
                 onSuccess: () => {
-                    console.log("¡Encuesta enviada a moderación!");
+                    toast.success("¡Encuesta enviada a moderación!");
                     onClose();
                     setTitle("");
                     setDescription("");
                     setOptions(["", ""]);
+                    setIcon("FOOTBALL");
                 },
                 onError: (error: any) => {
                     console.error("Error del backend al proponer:", error);
@@ -78,7 +82,12 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-[#1c1b1b] border border-[#353534] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Desafiar a la Tribuna"
+                className="bg-[#1c1b1b] border border-[#353534] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-[#353534]/60">
@@ -86,7 +95,7 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                         <Megaphone className="w-5 h-5 text-[#d2f000]" />
                         Desafiar a la Tribuna
                     </h2>
-                    <button onClick={onClose} className="text-[#909378] hover:text-[#e5e2e1] transition-colors">
+                    <button onClick={onClose} aria-label="Cerrar" className="text-[#909378] hover:text-[#e5e2e1] transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -114,8 +123,9 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                     <form id="poll-form" onSubmit={handleSubmit} className="flex flex-col gap-5">
                         {/* Título */}
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-bold text-[#e5e2e1]">Pregunta principal *</label>
+                            <label htmlFor="propose-poll-title" className="text-sm font-bold text-[#e5e2e1]">Pregunta principal *</label>
                             <input
+                                id="propose-poll-title"
                                 type="text"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
@@ -128,14 +138,31 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
 
                         {/* Descripción */}
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-bold text-[#c6c9ab]">Contexto / Descripción (Opcional)</label>
+                            <label htmlFor="propose-poll-description" className="text-sm font-bold text-[#c6c9ab]">Contexto / Descripción (Opcional)</label>
                             <textarea
+                                id="propose-poll-description"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="Agregá más detalles a tu pregunta..."
                                 className="w-full bg-[#131313] border border-[#353534] rounded-lg p-3 text-sm text-[#e5e2e1] focus:outline-none focus:border-[#d2f000] transition-colors min-h-[80px] resize-none"
                                 maxLength={250}
                             />
+                        </div>
+
+                        {/* Ícono temático */}
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="propose-poll-icon" className="text-sm font-bold text-[#c6c9ab]">Ícono temático</label>
+                            <select
+                                id="propose-poll-icon"
+                                value={icon}
+                                onChange={(e) => setIcon(e.target.value)}
+                                className="w-full bg-[#131313] border border-[#353534] rounded-lg p-3 text-sm text-[#e5e2e1] focus:outline-none focus:border-[#d2f000] transition-colors"
+                            >
+                                <option value="FOOTBALL">⚽ FOOTBALL</option>
+                                <option value="TROPHY">🏆 TROPHY</option>
+                                <option value="FIRE">🔥 FIRE</option>
+                                <option value="USER">👤 USER</option>
+                            </select>
                         </div>
 
                         {/* Opciones */}
@@ -145,6 +172,7 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                                 <div key={idx} className="flex items-center gap-2">
                                     <input
                                         type="text"
+                                        aria-label={`Opción ${idx + 1}`}
                                         value={opt}
                                         onChange={(e) => handleOptionChange(idx, e.target.value)}
                                         placeholder={`Opción ${idx + 1}`}
@@ -153,7 +181,7 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                                         required={idx < 2} // Las dos primeras son obligatorias
                                     />
                                     {options.length > 2 && (
-                                        <button type="button" onClick={() => handleRemoveOption(idx)} className="p-2.5 text-[#909378] hover:text-red-400 bg-[#131313] border border-[#353534] rounded-lg transition-colors">
+                                        <button type="button" onClick={() => handleRemoveOption(idx)} aria-label={`Quitar opción ${idx + 1}`} className="p-2.5 text-[#909378] hover:text-red-400 bg-[#131313] border border-[#353534] rounded-lg transition-colors">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     )}

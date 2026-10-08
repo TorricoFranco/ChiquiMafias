@@ -11,7 +11,10 @@ export const ReportCard: React.FC<ReportCardProps> = ({
   report,
   onOpenResolveModal,
 }) => (
-  <div className="bg-[#1c1b1b] border border-[#353534] rounded-2xl p-5 flex flex-col justify-between gap-4 hover:border-[#454932] transition-all">
+  <article
+    aria-label={`Reporte contra @${report.reported.username}`}
+    className="bg-[#1c1b1b] border border-[#353534] rounded-2xl p-5 flex flex-col justify-between gap-4 hover:border-[#454932] transition-all"
+  >
     <div className="flex flex-col gap-3">
       {/* Top info */}
       <div className="flex justify-between items-start border-b border-[#353534] pb-3">
@@ -105,5 +108,5 @@ export const ReportCard: React.FC<ReportCardProps> = ({
         </div>
       )}
     </div>
-  </div>
+  </article>
 );

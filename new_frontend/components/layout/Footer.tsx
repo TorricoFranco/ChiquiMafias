@@ -4,7 +4,8 @@ import React from "react";
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="h-12 bg-[#201f1f] border-t border-[#454932] flex items-center justify-between px-4 z-50 flex-shrink-0 text-xs">
+    // En pantallas chicas ese lugar es de la MobileNav; si no, tapa el ticket de apuestas.
+    <footer className="h-12 bg-[#201f1f] border-t border-[#454932] hidden lg:flex items-center justify-between px-4 z-50 flex-shrink-0 text-xs">
       <div className="flex items-center gap-6">
         <a
           href="#"

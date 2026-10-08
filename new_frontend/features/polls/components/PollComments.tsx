@@ -89,6 +89,7 @@ export const PollComments = ({ pollId }: { pollId: string }) => {
             <form onSubmit={handleCommentSubmit} className="flex gap-2 mt-2">
                 <input
                     type="text"
+                    aria-label="Tu comentario"
                     placeholder="Dejá tu opinión..."
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
@@ -97,6 +98,7 @@ export const PollComments = ({ pollId }: { pollId: string }) => {
                 />
                 <button
                     type="submit"
+                    aria-label="Enviar comentario"
                     disabled={!commentInput.trim() || addCommentMutation.isPending}
                     className="bg-[#d2f000] text-[#191e00] font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-[#b8d300] disabled:opacity-40 transition-colors flex items-center justify-center cursor-pointer shadow-sm"
                 >

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { AdminMarket, MarketType } from '../types';
+import { Market, MarketType } from '../types';
 import { AdminBetsStats } from './admin/AdminBetsStats';
 import { AdminBetsFilter } from './admin/AdminBetsFilter';
 import { AdminMarketCard } from './admin/AdminMarketCard';
@@ -15,7 +15,7 @@ import { useAdminMarkets, useCreateManualMarket, useSettleMarket } from '../hook
 export const AdminBets: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [settleModalMarket, setSettleModalMarket] = useState<AdminMarket | null>(null);
+  const [settleModalMarket, setSettleModalMarket] = useState<Market | null>(null);
 
   const { data: markets = [], isLoading } = useAdminMarkets();
   const createMarket = useCreateManualMarket();

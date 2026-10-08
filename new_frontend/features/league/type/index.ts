@@ -51,7 +51,6 @@ export interface SeasonStats {
 }
 
 export interface AverageRow {
-  position: number;
   teamId: string;
   teamName: string;
   teamLogo: string | null;
@@ -67,14 +66,14 @@ export interface AverageRow {
 
 export interface FullStandings {
   apertura: {
-    tournament: 'APERTURA';
+    tournament: string;
     groups: {
       A: StandingRow[];
       B: StandingRow[];
     };
   };
   clausura: {
-    tournament: 'CLAUSURA';
+    tournament: string;
     groups: {
       A: StandingRow[];
       B: StandingRow[];

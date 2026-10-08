@@ -54,12 +54,15 @@ export default function StreakModal({ onClose }: StreakModalProps) {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
 
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Racha diaria"
           initial={{ opacity: 0, scale: 0.92, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.92, y: 20 }}
           className="relative w-full max-w-3xl bg-[#1c1b1b] border border-[#353534] rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden z-10 p-6 md:p-8 text-[#e5e2e1]"
         >
-          <button onClick={onClose} className="absolute top-4 right-4 text-[#909378] hover:text-white p-2 rounded-full hover:bg-[#282827] transition">
+          <button onClick={onClose} aria-label="Cerrar" className="absolute top-4 right-4 text-[#909378] hover:text-white p-2 rounded-full hover:bg-[#282827] transition">
             <X className="w-5 h-5" />
           </button>
 

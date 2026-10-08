@@ -96,6 +96,8 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
                             <button
                                 key={`regular-${num}`}
                                 onClick={() => onSelectRound(num)}
+                                aria-label={`Fecha ${num}`}
+                                aria-pressed={isActive}
                                 className={`w-6 h-6 rounded-full text-[11px] font-bold font-mono transition-all flex items-center justify-center cursor-pointer ${isActive
                                     ? 'bg-sky-500 text-white font-black shadow-[0_0_10px_rgba(14,165,233,0.5)] scale-105'
                                     : 'text-[#c6c9ab] hover:text-[#e5e2e1] hover:bg-[#2a2a2a]'
@@ -115,6 +117,8 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
                             <button
                                 key={`playoff-${stage.key}-${index}`}
                                 onClick={() => onSelectRound(stage.key)}
+                                aria-label={stage.labelFull}
+                                aria-pressed={isActive}
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${isActive
                                     ? 'bg-amber-500 text-[#191e00] font-black shadow-[0_0_10px_rgba(245,158,11,0.5)]'
                                     : 'text-[#c6c9ab] hover:text-[#e5e2e1] hover:bg-[#2a2a2a]'
@@ -149,7 +153,13 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
                                     return (
                                         <div
                                             key={`match-${match.id}-${index}`}
+                                            role="link"
+                                            tabIndex={0}
+                                            aria-label={`${match.home_team.name} vs ${match.away_team.name}`}
                                             onClick={() => handleMatchClick(String(match.id))}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleMatchClick(String(match.id));
+                                            }}
                                             className={`relative flex items-center justify-between py-2.5 px-2 hover:bg-[#252525] transition-colors cursor-pointer ${isLive
                                                 ? 'bg-red-950/10 border-l-2 border-l-red-500'
                                                 : isFinished

@@ -4,7 +4,7 @@ interface Player {
     id: string | number;
     name: string;
     number: string | number;
-    pos: string;
+    pos: string | null;
     grid?: string | null;
 }
 
@@ -16,8 +16,8 @@ interface KitColors {
 interface SoccerPitchProps {
     homePlayers: Player[];
     awayPlayers: Player[];
-    homeColors?: KitColors;
-    awayColors?: KitColors;
+    homeColors?: KitColors | null;
+    awayColors?: KitColors | null;
 }
 
 export const SoccerPitch: React.FC<SoccerPitchProps> = ({ 
@@ -69,7 +69,7 @@ export const SoccerPitch: React.FC<SoccerPitchProps> = ({
     const renderedAway = useMemo(() => processPlayers(awayPlayers, 'away'), [awayPlayers]);
     const allPlayers = [...renderedHome, ...renderedAway];
 
-    const getColors = (pos: string, side: 'home' | 'away') => {
+    const getColors = (pos: string | null, side: 'home' | 'away') => {
         const type = pos === 'G' ? 'goalkeeper' : 'player';
         const teamColors = side === 'home' ? homeColors : awayColors;
         const fallback = side === 'home' 

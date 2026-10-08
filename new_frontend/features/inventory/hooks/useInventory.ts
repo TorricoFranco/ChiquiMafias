@@ -3,9 +3,11 @@ import { inventoryApi } from '../api/inventoryApi';
 import { useUserStore } from '@/store/useUserStore';
 
 export const useUserInventory = () => {
+    const userId = useUserStore((state) => state.id);
     return useQuery({
         queryKey: ['inventory'],
         queryFn: inventoryApi.getUserInventory,
+        enabled: !!userId,
         select: (data) => {
             const items = data ?? [];
 

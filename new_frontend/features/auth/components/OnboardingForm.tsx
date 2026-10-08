@@ -59,8 +59,9 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
 
             {/* INPUT DE USERNAME */}
             <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400">Nombre de Usuario</label>
+                <label htmlFor="onboarding-username" className="text-xs text-gray-400">Nombre de Usuario</label>
                 <input
+                    id="onboarding-username"
                     className="p-2.5 rounded-xl bg-gray-800 text-white border border-transparent focus:outline-none focus:border-gray-600 transition text-sm"
                     placeholder="Tu nombre de usuario"
                     value={username}
