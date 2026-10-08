@@ -5,11 +5,14 @@ import { useUserStore } from "@/store/useUserStore";
 import { useTeams } from "@/features/teams/hooks/useTeams";
 import { authApi } from "@/features/auth/api/authApi";
 import TeamSelectorModal from "./TeamSelectorModal";
+import TermsCheckbox, { TERMS_REQUIRED_MESSAGE } from "./TermsCheckbox";
+import { CURRENT_TERMS_VERSION } from "@/features/auth/constants/terms";
 
 export default function OnboardingForm({ onComplete }: { onComplete: () => void }) {
     const [username, setUsername] = useState("");
     const [selectedTeam, setSelectedTeam] = useState<{ id: string; name: string; badgeUrl: string } | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
@@ -28,12 +31,17 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
             setErrorMessage("Por favor, seleccioná tu cuadro de fútbol.");
             return;
         }
+        if (!acceptedTerms) {
+            setErrorMessage(TERMS_REQUIRED_MESSAGE);
+            return;
+        }
 
         setIsLoading(true);
         try {
             const updatedUser = await authApi.completeProfile({
                 username,
                 teamId: selectedTeam.id,
+                acceptTerms: true,
             });
 
             const currentState = useUserStore.getState();
@@ -43,6 +51,8 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
                 username: updatedUser.username,
                 team: updatedUser.team,
                 isFirstLogin: false,
+                termsAcceptedAt: updatedUser.termsAcceptedAt ?? new Date().toISOString(),
+                termsVersion: updatedUser.termsVersion ?? CURRENT_TERMS_VERSION,
             });
 
             onComplete();
@@ -93,9 +103,11 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
                 </button>
             </div>
 
+            <TermsCheckbox checked={acceptedTerms} onChange={setAcceptedTerms} disabled={isLoading} />
+
             {/* MENSAJE DE ERROR */}
             {errorMessage && (
-                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded-lg">
+                <p role="alert" className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded-lg">
                     {errorMessage}
                 </p>
             )}

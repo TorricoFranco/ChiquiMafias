@@ -7,6 +7,7 @@ import { refreshSession } from "@/lib/apiFetch";
 import BannedAppealScreen from "@/features/supports/components/appeal/BannedAppealScreen";
 import Cookies from "js-cookie";
 import LoginModal from "@/features/auth/components/LoginModal";
+import TermsGate from "@/features/auth/components/TermsGate";
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
     const setUserInfo = useUserStore((state) => state.setUserInfo);
@@ -46,6 +47,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
                         username: data.user.username,
                         role: data.user.role,
                         isFirstLogin: data.user.isFirstLogin,
+                        termsAcceptedAt: data.user.termsAcceptedAt ?? null,
+                        termsVersion: data.user.termsVersion ?? null,
                         tier: data.user.activeSubscriptionTier || 'NONE',
                         accessToken: data.access_token,
                         team: data.user.team,
@@ -105,6 +108,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return (
         <>
             {children}
+
+            <TermsGate />
 
             {isLoginModalOpen && (
                 <LoginModal

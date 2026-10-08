@@ -8,6 +8,8 @@ export interface AuthUser {
   email: string;
   username: string | null;
   isFirstLogin: boolean;
+  termsAcceptedAt: string | null;
+  termsVersion: string | null;
   status: "ACTIVE" | "BANNED";
   mutedUntil: string | null;
   role: Role;
@@ -38,6 +40,8 @@ export function buildAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
     email: `${id}@chiquimafias.test`,
     username: "hincha_e2e",
     isFirstLogin: false,
+    termsAcceptedAt: "2026-01-15T12:00:00.000Z",
+    termsVersion: "2026-10",
     status: "ACTIVE",
     mutedUntil: null,
     role: "USER",

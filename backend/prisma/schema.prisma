@@ -418,6 +418,8 @@ model User {
   googleId     String  @unique
   username     String? @unique
   isFirstLogin Boolean @default(true)
+  termsAcceptedAt DateTime?
+  termsVersion String?
 
   status     UserStatus @default(ACTIVE)
   mutedUntil DateTime?

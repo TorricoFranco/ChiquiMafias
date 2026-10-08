@@ -14,6 +14,8 @@ export class UserEntity implements User {
   email: string
   username: string | null
   isFirstLogin: boolean
+  termsAcceptedAt: Date | null
+  termsVersion: string | null
   status: UserStatus
   mutedUntil: Date | null
   role: SystemRole
