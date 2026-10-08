@@ -21,6 +21,14 @@ Patrones vistos en las revisiones del 2026-10-05 (cierre de rutas admin, jerarqu
 - Agregado el 2026-10-06. DTOs nuevos en endpoints servicio a servicio (bot de Discord): con `forbidNonWhitelisted` e `@IsNotEmpty` pueden rechazar payloads reales del bot, y el bot no mira la respuesta, así que se pierden en silencio. Hay que contrastarlos con lo que manda `discord-bot/index.js` y `src/interactions/`.
 - Límites de Discord: cualquier texto de usuario que se reenvía necesita `MaxLength` (contenido 2000, campo de embed 1024). Los tickets ya lo tienen. Los reportes (`details`) no lo tenían al 2026-10-06.
 
+- Agregado el 2026-10-07 (rebalanceo de economía). Prisma: un campo `undefined` en `where` desaparece del filtro. En `updateMany` eso pega a toda la tabla (`handlePaymentFailure` con `mpExternalRef: paymentDetails.external_reference`). Cualquier `where` armado con datos de MP o del cliente necesita un guard `if (!x) return` antes.
+- Suscripciones: decisión del usuario (2026-10-07): el alta sale solo con el primer cobro aprobado (`subscription_authorized_payment` `processed`); el preapproval autorizado se ignora. Lo que dependa de una key de Redis creada en el checkout tiene que sobrevivir días de `recycling` (la de upgrade pasó a 15 días y el alta vence las otras ACTIVE/GRACE sin depender de la key).
+- Suscripciones: `EXPIRED` + `autoRenew: true` = vencida por falta de pago, su preapproval sigue vivo en MP y se reactiva si no hay otra ACTIVE. Un cobro que no reactiva cancela el preapproval después de cobrar. Hueco al 2026-10-07: el alta ("una sola vigente") vence ACTIVE y GRACE pero no cancela las EXPIRED+autoRenew ni toca las CANCELLATION_PENDING.
+- Suscripciones: el cron (caso 1) pone `activeSubscriptionTier`/color/banner en null al vencer una GRACE o CANCELLATION_PENDING sin mirar si el usuario tiene otra ACTIVE. Cancelar y suscribirse a otro tier (la única forma de bajar de tier) deja al usuario sin beneficios mientras paga. Cualquier camino que deje dos suscripciones vivas por usuario cae en esto.
+- Packs (2026-10-07): el crédito se ata al pago con `ProcessedPayment` `coin:<paymentId>` y la reversa con `coin:<id>:reversal`. Las órdenes acreditadas antes de eso no tienen la fila y no se revierten.
+- `try/catch` de P2002 alrededor de toda una `$transaction` (coin-shop): también atrapa el P2002 de `wallet.create` en `creditInTx` (el `FOR UPDATE` no bloquea una fila que no existe, dos primeros créditos concurrentes chocan) y lo toma como "ya procesado". Acotar el catch al insert de idempotencia.
+- La Wallet se crea recién en el primer `addCoins` (o en el upsert del pago de suscripción). Todo `coinTransaction.create` con `walletId: wallet?.id || ''` rompe por FK (P2003) para un usuario sin wallet.
+
 Ver también [[verified-runtime-facts]].
 
 **Why:** son errores silenciosos: compilan, los tests unitarios pasan y la ruta queda abierta, rota o gastando cuota.
