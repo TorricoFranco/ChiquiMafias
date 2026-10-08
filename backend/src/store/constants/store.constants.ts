@@ -4,4 +4,4 @@ export const DYNAMIC_DISCOUNTS = {
     percentage: 5,
     isActive: true,
   },
-} as const;
+} as const

@@ -57,11 +57,18 @@ export class WebhookService {
     const secret = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_SECRET')
 
     if (!secret) {
-      this.logger.error('MP_WEBHOOK_SECRET no está definido en las variables de entorno')
-      throw new InternalServerErrorException('Configuración de seguridad faltante')
+      this.logger.error(
+        'MP_WEBHOOK_SECRET no está definido en las variables de entorno',
+      )
+      throw new InternalServerErrorException(
+        'Configuración de seguridad faltante',
+      )
     }
 
-    const hmac = crypto.createHmac('sha256', secret).update(manifest).digest('hex')
+    const hmac = crypto
+      .createHmac('sha256', secret)
+      .update(manifest)
+      .digest('hex')
 
     if (hmac !== v1) {
       // Eventos sin data.id (ej: topic_merchant_order_wh) no usan esta plantilla
@@ -69,18 +76,31 @@ export class WebhookService {
         this.logger.warn(
           `[Webhook] Evento sin data.id recibido (type: ${payload?.type}). Ignorado con 200.`,
         )
-        return { status: 'ignored', message: 'Evento sin data.id no procesable' }
+        return {
+          status: 'ignored',
+          message: 'Evento sin data.id no procesable',
+        }
       }
-      this.logger.error(`[Security] Firma de Webhook inválida. RequestID: ${xRequestId}, type: ${payload?.type}, dataId: ${dataId}`)
+      this.logger.error(
+        `[Security] Firma de Webhook inválida. RequestID: ${xRequestId}, type: ${payload?.type}, dataId: ${dataId}`,
+      )
       throw new UnauthorizedException('Firma de webhook inválida')
     }
 
     try {
       if (payload.type === 'payment' && dataId) {
         this.logger.log(`Obteniendo detalles de pago para ID: ${dataId}...`)
-        const paymentDetails = await this.mercadoPagoService.getPaymentDetails(dataId, 'payment')
-        if (paymentDetails && paymentDetails.external_reference?.startsWith('coin_order_')) {
-          this.logger.log(`Webhook de pago de pack de monedas detectado. Procesando...`)
+        const paymentDetails = await this.mercadoPagoService.getPaymentDetails(
+          dataId,
+          'payment',
+        )
+        if (
+          paymentDetails &&
+          paymentDetails.external_reference?.startsWith('coin_order_')
+        ) {
+          this.logger.log(
+            `Webhook de pago de pack de monedas detectado. Procesando...`,
+          )
           await this.coinShopService.processPaymentWebhook(paymentDetails)
           return { status: 'success', message: 'Orden de monedas procesada' }
         }
@@ -90,14 +110,20 @@ export class WebhookService {
       // "órdenes de comercio" (topic_merchant_order_wh) en vez de "payment".
       // Hay que resolver la orden y procesar cada pago aprobado de ahí.
       if (
-        (payload.type === 'topic_merchant_order_wh' || payload.type === 'merchant_order') &&
+        (payload.type === 'topic_merchant_order_wh' ||
+          payload.type === 'merchant_order') &&
         dataId
       ) {
-        this.logger.log(`Evento de orden de comercio recibido (ID: ${dataId}). Resolviendo pagos...`)
-        const merchantOrder = await this.mercadoPagoService.getMerchantOrderDetails(dataId)
+        this.logger.log(
+          `Evento de orden de comercio recibido (ID: ${dataId}). Resolviendo pagos...`,
+        )
+        const merchantOrder =
+          await this.mercadoPagoService.getMerchantOrderDetails(dataId)
 
         if (!merchantOrder || !Array.isArray(merchantOrder.payments)) {
-          this.logger.warn(`Orden de comercio ${dataId} no encontrada o sin pagos. Ignorado.`)
+          this.logger.warn(
+            `Orden de comercio ${dataId} no encontrada o sin pagos. Ignorado.`,
+          )
           return { status: 'ignored', message: 'Orden de comercio sin pagos' }
         }
 
@@ -106,20 +132,27 @@ export class WebhookService {
         for (const merchantPayment of merchantOrder.payments) {
           if (!merchantPayment?.id) continue
           // Solo procesar pagos aprobados/procesados/autorizados
-          if (!['approved', 'processed', 'authorized'].includes(merchantPayment.status)) {
+          if (
+            !['approved', 'processed', 'authorized'].includes(
+              merchantPayment.status,
+            )
+          ) {
             continue
           }
 
-          const paymentDetails = await this.mercadoPagoService.getPaymentDetails(
-            merchantPayment.id,
-            'payment',
-          )
+          const paymentDetails =
+            await this.mercadoPagoService.getPaymentDetails(
+              merchantPayment.id,
+              'payment',
+            )
 
           if (
             paymentDetails &&
             (paymentDetails.external_reference?.startsWith('coin_order_') ||
               merchantOrder.external_reference?.startsWith('coin_order_')) &&
-            ['approved', 'processed', 'authorized'].includes(paymentDetails.status)
+            ['approved', 'processed', 'authorized'].includes(
+              paymentDetails.status,
+            )
           ) {
             this.logger.log(
               `Pago de orden de monedas encontrado en orden de comercio ${dataId}. Procesando...`,
@@ -127,7 +160,8 @@ export class WebhookService {
             await this.coinShopService.processPaymentWebhook({
               ...paymentDetails,
               external_reference:
-                paymentDetails.external_reference ?? merchantOrder.external_reference,
+                paymentDetails.external_reference ??
+                merchantOrder.external_reference,
             })
             processed++
           }
@@ -135,18 +169,25 @@ export class WebhookService {
 
         return {
           status: 'success',
-          message: processed > 0 ? 'Órdenes de monedas procesadas' : 'Sin órdenes de monedas procesables',
+          message:
+            processed > 0
+              ? 'Órdenes de monedas procesadas'
+              : 'Sin órdenes de monedas procesables',
         }
       }
 
-      this.logger.log(`Webhook validado. Delegando al SubscriptionCheckoutService...`)
+      this.logger.log(
+        `Webhook validado. Delegando al SubscriptionCheckoutService...`,
+      )
       return await this.subscriptionCheckoutService.processWebhook(payload)
     } catch (error) {
       this.logger.error(
         `[Webhook Error] Fallo al procesar webhook ${xRequestId}: ${error.message}`,
         error.stack,
       )
-      throw new InternalServerErrorException('Error al procesar el webhook, reintentando...')
+      throw new InternalServerErrorException(
+        'Error al procesar el webhook, reintentando...',
+      )
     }
   }
 }

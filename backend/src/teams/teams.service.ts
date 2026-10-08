@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
 export class TeamsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findSelectorTeams(search?: string) {
     return this.prisma.footballTeam.findMany({

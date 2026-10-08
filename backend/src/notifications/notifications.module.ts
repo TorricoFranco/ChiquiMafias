@@ -10,4 +10,4 @@ import { ChatModule } from 'src/chat/chat.module'
   providers: [NotificationsService, NotificationsListener],
   exports: [NotificationsService],
 })
-export class NotificationsModule { }
+export class NotificationsModule {}

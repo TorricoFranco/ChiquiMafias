@@ -12,7 +12,7 @@ export class TasksService {
     private prisma: PrismaService,
     private redisService: RedisService,
     private pollsService: PollsService,
-  ) { }
+  ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
   async handlePollStatus() {

@@ -9,6 +9,11 @@ import { MercadoPagoModule } from 'src/mercado-pago/mercado-pago.module'
 @Module({
   controllers: [WebhookController],
   providers: [WebhookService],
-  imports: [SubscriptionsModule, WalletModule, CoinShopModule, MercadoPagoModule],
+  imports: [
+    SubscriptionsModule,
+    WalletModule,
+    CoinShopModule,
+    MercadoPagoModule,
+  ],
 })
 export class WebhookModule {}

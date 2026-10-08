@@ -26,7 +26,7 @@ export class FixtureService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) { }
+  ) {}
 
   async getFixtureByMatchday(
     season: string,
@@ -227,7 +227,6 @@ export class FixtureService {
   }
 
   async getLiveLeagueScores(): Promise<GetLiveScoresResponseDto[]> {
-
     const liveScores = await this.redisService.redis.hgetall(
       `live_scores:league:${this.LEAGUE_API_ID}`,
     )

@@ -13,14 +13,14 @@ export async function upsertVenue(
     const existingVenue =
       (venue.id
         ? await prisma.venues.findUnique({
-          where: { api_venue_id: venue.id },
-          select: { id: true },
-        })
-        : null)
-      ?? await prisma.venues.findFirst({
+            where: { api_venue_id: venue.id },
+            select: { id: true },
+          })
+        : null) ??
+      (await prisma.venues.findFirst({
         where: { name: venue.name },
         select: { id: true },
-      })
+      }))
 
     const data: any = {
       name: venue.name,

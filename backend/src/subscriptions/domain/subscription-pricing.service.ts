@@ -11,8 +11,7 @@ import {
   UPGRADE_COINS_PER_DAY_MAP,
   SUNDAY_VIP_UPGRADE_DISCOUNT_PERCENTAGE,
   SUNDAY_VIP_DISCOUNT_PERCENTAGE,
-  PROMO_MESSAGES
-
+  PROMO_MESSAGES,
 } from '../constants/subscription.constants'
 import { SubscriptionPricingModel } from '../interfaces/mercado-pago.interface'
 
@@ -23,12 +22,11 @@ import timezone from 'dayjs/plugin/timezone'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
-
 @Injectable()
 export class SubscriptionPricingService {
   private readonly logger = new Logger(SubscriptionPricingService.name)
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * CÁLCULO DE PRECIOS DINÁMICOS
@@ -49,18 +47,17 @@ export class SubscriptionPricingService {
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6
 
     if (dayOfWeek === 0 && plan.tier === SubscriptionTier.TIER_3) {
-
-      if (userTier === SubscriptionTier.TIER_1 || userTier === SubscriptionTier.TIER_2) {
+      if (
+        userTier === SubscriptionTier.TIER_1 ||
+        userTier === SubscriptionTier.TIER_2
+      ) {
         discountPercentage = SUNDAY_VIP_UPGRADE_DISCOUNT_PERCENTAGE
         promoMessage = PROMO_MESSAGES.SUNDAY_VIP_UPGRADE
-      }
-      else {
+      } else {
         discountPercentage = SUNDAY_VIP_DISCOUNT_PERCENTAGE
         promoMessage = PROMO_MESSAGES.SUNDAY_VIP
       }
-
-    }
-    else if (isWeekend) {
+    } else if (isWeekend) {
       discountPercentage = WEEKEND_DISCOUNT_PERCENTAGE
       promoMessage = PROMO_MESSAGES.WEEKEND
     }
@@ -100,7 +97,7 @@ export class SubscriptionPricingService {
           benefits: plan.benefits,
           pricing,
           isCurrent: currentUserTier === plan.tier,
-          upgradeRules: UPGRADE_COINS_PER_DAY_MAP
+          upgradeRules: UPGRADE_COINS_PER_DAY_MAP,
         }
       })
     } catch (error) {

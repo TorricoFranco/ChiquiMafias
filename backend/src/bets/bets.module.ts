@@ -21,4 +21,4 @@ import { BetsCronService } from './bets-cron'
     AuthModule,
   ],
 })
-export class BetsModule { }
+export class BetsModule {}

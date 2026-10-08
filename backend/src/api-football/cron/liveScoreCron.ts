@@ -20,7 +20,7 @@ export class LiveScoreCron {
     private readonly http: ApiFootballHttp,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   @Cron('*/30 * * * * *')
   async handleLiveScores() {
@@ -103,20 +103,29 @@ export class LiveScoreCron {
 
           await this.handleMatchCleanup(matchDb.id, leagueId)
 
-          const roundForDb = ROUND_MAP[apiMatch.league.round] || apiMatch.league.round || ''
-          const tournamentForDb = roundForDb.toUpperCase().includes('CLAUSURA') ? 'CLAUSURA' : 'APERTURA'
+          const roundForDb =
+            ROUND_MAP[apiMatch.league.round] || apiMatch.league.round || ''
+          const tournamentForDb = roundForDb.toUpperCase().includes('CLAUSURA')
+            ? 'CLAUSURA'
+            : 'APERTURA'
           const detail = roundForDb.split(' - ')[1]?.trim() || roundForDb.trim()
-          const matchdayKey = !isNaN(Number(detail)) ? `fecha:${detail}` : detail.toLowerCase().replace(/\s+/g, '_')
+          const matchdayKey = !isNaN(Number(detail))
+            ? `fecha:${detail}`
+            : detail.toLowerCase().replace(/\s+/g, '_')
 
-          await this.redisService.redis.del(`fixtures:128:2026:${tournamentForDb}:${matchdayKey}`)
+          await this.redisService.redis.del(
+            `fixtures:128:2026:${tournamentForDb}:${matchdayKey}`,
+          )
 
           // Actualizar los standings
-          this.logger.log(`Partido ${matchDb.id} terminado. Solicitando actualización de Standings...`);
+          this.logger.log(
+            `Partido ${matchDb.id} terminado. Solicitando actualización de Standings...`,
+          )
 
           this.eventEmitter.emit('match.finished', {
             leagueId: leagueId,
-            season: 2026
-          });
+            season: 2026,
+          })
           continue
         }
 

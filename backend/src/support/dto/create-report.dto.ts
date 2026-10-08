@@ -4,7 +4,7 @@ import {
   IsString,
   IsUUID,
   MinLength,
-  IsOptional
+  IsOptional,
 } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 import { ReportReason } from '@prisma/client'

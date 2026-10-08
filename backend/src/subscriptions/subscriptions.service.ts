@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common'
+import { Injectable, NotFoundException, Logger } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { SubscriptionTier, SubscriptionStatus } from '@prisma/client'
 import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service'
@@ -18,25 +14,24 @@ export class SubscriptionsService {
   constructor(
     private readonly pricingService: SubscriptionPricingService,
     private readonly prisma: PrismaService,
-  ) { }
-
+  ) {}
 
   /**
- * ACTUALIZAR UN PLAN 
- */
+   * ACTUALIZAR UN PLAN
+   */
   async updatePlan(id: string, dto: UpdateSubscriptionPlanDto) {
     const plan = await this.prisma.subscriptionPlan.findUnique({
       where: { id },
-    });
+    })
 
     if (!plan) {
-      throw new NotFoundException('El plan de suscripción no existe');
+      throw new NotFoundException('El plan de suscripción no existe')
     }
 
     return this.prisma.subscriptionPlan.update({
       where: { id },
       data: dto,
-    });
+    })
   }
 
   /**

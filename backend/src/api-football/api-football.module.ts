@@ -49,4 +49,4 @@ import { StandingsModule } from 'src/standings/standings.module'
 
   imports: [StandingsModule],
 })
-export class ApiFootballModule { }
+export class ApiFootballModule {}

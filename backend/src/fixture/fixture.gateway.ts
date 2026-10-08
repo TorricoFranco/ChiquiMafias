@@ -17,7 +17,7 @@ export class FixtureLeagueGateway implements OnApplicationBootstrap {
   @WebSocketServer() server: Server
   private readonly logger = new Logger(FixtureLeagueGateway.name)
 
-  constructor(private readonly redisService: RedisService) { }
+  constructor(private readonly redisService: RedisService) {}
 
   async onApplicationBootstrap() {
     let retries = 0
@@ -38,10 +38,9 @@ export class FixtureLeagueGateway implements OnApplicationBootstrap {
         if (!data) return
         const parsed = JSON.parse(data)
 
-
         const leagueIdStr = String(parsed.leagueId).trim()
         const room = `league_${leagueIdStr}`
-      
+
         if (!this.server) {
           this.logger.error('WebSocket Server no inicializado')
           return

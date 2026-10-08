@@ -16,12 +16,16 @@ export class MercadoPagoService {
   constructor(
     private readonly http: HttpService,
     private readonly configService: ConfigService<EnvironmentVariables>,
-  ) { }
+  ) {}
 
   getMercadoPagoConfig() {
     return {
-      FRONTEND_URL: this.configService.get<string>('FRONTEND_URL', { infer: true }) || 'https://chiquimafias.com',
-      BACKEND_URL: this.configService.get<string>('API_BACKEND_URL', { infer: true }) || 'https://api.chiquimafias.com',
+      FRONTEND_URL:
+        this.configService.get<string>('FRONTEND_URL', { infer: true }) ||
+        'https://chiquimafias.com',
+      BACKEND_URL:
+        this.configService.get<string>('API_BACKEND_URL', { infer: true }) ||
+        'https://api.chiquimafias.com',
       API_BASE_URL: this.configService.get<string>('MERCADO_PAGO_API_URL', {
         infer: true,
       }),
@@ -35,7 +39,7 @@ export class MercadoPagoService {
       FRONTEND_SUCCESS_URL: `${this.configService.get<string>('FRONTEND_URL', { infer: true })?.replace(/^\//, '') || ''}`,
       ...MERCADO_PAGO_CONSTANTS,
     }
-  } 
+  }
 
   private get retryStrategy() {
     return retry({
@@ -171,7 +175,7 @@ export class MercadoPagoService {
   }
 
   public async createPreference(payload: any) {
-    const mpConfig = this.getMercadoPagoConfig();
+    const mpConfig = this.getMercadoPagoConfig()
     const response = (await firstValueFrom(
       this.http
         .post(`${mpConfig.API_BASE_URL}/checkout/preferences`, payload, {
@@ -181,7 +185,7 @@ export class MercadoPagoService {
           },
         })
         .pipe(this.retryStrategy),
-    )) as AxiosResponse<any>;
-    return response.data;
+    )) as AxiosResponse<any>
+    return response.data
   }
 }

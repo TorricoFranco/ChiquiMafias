@@ -2,7 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  ConflictException
+  ConflictException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { WalletService } from '../wallet/wallet.service'
@@ -13,7 +13,6 @@ import { CreateStoreDiscountDto } from './dto/create-store-discount.dto'
 import { UpdateStoreItemDto } from './dto/update-store-item.dto'
 import { StoreItem, Prisma, ItemType } from '@prisma/client'
 import { DYNAMIC_DISCOUNTS } from './constants/store.constants'
-
 
 //   {
 //     name: 'Gloria Albiceleste',
@@ -72,15 +71,14 @@ export class StoreService {
     private readonly prisma: PrismaService,
     private readonly walletService: WalletService,
     private readonly chatGateway: ChatGateway,
-  ) { }
-
+  ) {}
 
   async getStoreItemsAll() {
     const items = await this.prisma.storeItem.findMany({
       where: {
         isActive: true,
       },
-    });
+    })
 
     return items
   }
@@ -91,15 +89,15 @@ export class StoreService {
     userSubscriptionTierName: string = 'Suscriptor',
     tx: Prisma.TransactionClient = this.prisma,
   ) {
-    const now = new Date();
-    const eligibleDiscounts: { name: string; percentage: number }[] = [];
+    const now = new Date()
+    const eligibleDiscounts: { name: string; percentage: number }[] = []
 
     //descuento por suscripción
     if (userSubscriptionDiscount > 0) {
       eligibleDiscounts.push({
         name: `Beneficio ${userSubscriptionTierName}`,
         percentage: userSubscriptionDiscount,
-      });
+      })
     }
 
     //descuentos dinámicos
@@ -107,7 +105,7 @@ export class StoreService {
       eligibleDiscounts.push({
         name: DYNAMIC_DISCOUNTS.SUNDAY.name,
         percentage: DYNAMIC_DISCOUNTS.SUNDAY.percentage,
-      });
+      })
     }
 
     //descuentos de la base de datos
@@ -117,78 +115,85 @@ export class StoreService {
         startDate: { lte: now },
         endDate: { gte: now },
       },
-    });
+    })
 
-    const applicableDbDiscounts = activeDbDiscounts.filter(d =>
-      (d.scope === 'SPECIFIC_ITEM' && d.targetItemId === item.id) ||
-      (d.scope === 'BY_TYPE' && d.targetType === item.type) ||
-      (d.scope === 'ALL')
-    );
+    const applicableDbDiscounts = activeDbDiscounts.filter(
+      (d) =>
+        (d.scope === 'SPECIFIC_ITEM' && d.targetItemId === item.id) ||
+        (d.scope === 'BY_TYPE' && d.targetType === item.type) ||
+        d.scope === 'ALL',
+    )
 
-    applicableDbDiscounts.forEach(d => {
-      eligibleDiscounts.push({ name: d.name, percentage: d.percentage });
-    });
+    applicableDbDiscounts.forEach((d) => {
+      eligibleDiscounts.push({ name: d.name, percentage: d.percentage })
+    })
 
     if (eligibleDiscounts.length === 0) {
       return {
         currentPrice: item.price,
         isDiscounted: false,
         discountPercentage: 0,
-        discountName: ''
-      };
+        discountName: '',
+      }
     }
 
-    eligibleDiscounts.sort((a, b) => b.percentage - a.percentage);
+    eligibleDiscounts.sort((a, b) => b.percentage - a.percentage)
 
-    const top2Discounts = eligibleDiscounts.slice(0, 2);
+    const top2Discounts = eligibleDiscounts.slice(0, 2)
 
-    const totalPercentage = top2Discounts.reduce((acc, curr) => acc + curr.percentage, 0);
-    const finalPercentage = Math.min(totalPercentage, 90);
+    const totalPercentage = top2Discounts.reduce(
+      (acc, curr) => acc + curr.percentage,
+      0,
+    )
+    const finalPercentage = Math.min(totalPercentage, 90)
 
-    const discountName = top2Discounts.map(d => d.name).join(' + ');
+    const discountName = top2Discounts.map((d) => d.name).join(' + ')
 
-    const discountAmount = Math.round(item.price * (finalPercentage / 100));
-    const currentPrice = Math.max(0, item.price - discountAmount);
+    const discountAmount = Math.round(item.price * (finalPercentage / 100))
+    const currentPrice = Math.max(0, item.price - discountAmount)
 
     return {
       currentPrice,
       isDiscounted: true,
       discountPercentage: finalPercentage,
       discountName,
-    };
+    }
   }
 
   async buyItem(userId: string, itemId: string, quantity: number = 1) {
-    if (quantity < 1) throw new BadRequestException('La cantidad debe ser mayor a 0');
+    if (quantity < 1)
+      throw new BadRequestException('La cantidad debe ser mayor a 0')
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { activeSubscriptionTier: true }
-    });
+      select: { activeSubscriptionTier: true },
+    })
 
-    let userSubscriptionDiscount = 0;
-    let userSubscriptionTierName = 'Suscriptor';
+    let userSubscriptionDiscount = 0
+    let userSubscriptionTierName = 'Suscriptor'
 
     if (user?.activeSubscriptionTier) {
       const plan = await this.prisma.subscriptionPlan.findUnique({
         where: { tier: user.activeSubscriptionTier },
-        select: { storeDiscountPercentage: true }
-      });
-      userSubscriptionDiscount = plan?.storeDiscountPercentage || 0;
+        select: { storeDiscountPercentage: true },
+      })
+      userSubscriptionDiscount = plan?.storeDiscountPercentage || 0
 
-      userSubscriptionTierName = user.activeSubscriptionTier.replace('_', ' ');
+      userSubscriptionTierName = user.activeSubscriptionTier.replace('_', ' ')
     }
 
     const { purchase, updatedBalance } = await this.prisma.$transaction(
       async (tx) => {
-        const item = await tx.storeItem.findUnique({ where: { id: itemId } });
+        const item = await tx.storeItem.findUnique({ where: { id: itemId } })
 
         if (!item || !item.isActive) {
-          throw new NotFoundException('El ítem no está disponible');
+          throw new NotFoundException('El ítem no está disponible')
         }
 
         if (!item.isPurchasable) {
-          throw new BadRequestException('Este ítem es exclusivo y no se puede comprar en la tienda');
+          throw new BadRequestException(
+            'Este ítem es exclusivo y no se puede comprar en la tienda',
+          )
         }
 
         const existingInventory = await tx.userInventory.findUnique({
@@ -207,16 +212,18 @@ export class StoreService {
           )
         }
 
-        const finalQuantity = ['MEGAPHONE', 'CUSTOM_POLL'].includes(item.type) ? quantity : 1;
+        const finalQuantity = ['MEGAPHONE', 'CUSTOM_POLL'].includes(item.type)
+          ? quantity
+          : 1
 
         const discountInfo = await this.getApplicableDiscount(
           item,
           userSubscriptionDiscount,
           userSubscriptionTierName,
-          tx
-        );
+          tx,
+        )
 
-        const totalCost = discountInfo.currentPrice * finalQuantity;
+        const totalCost = discountInfo.currentPrice * finalQuantity
 
         const updatedWallet = await this.walletService.subtractCoins(
           {
@@ -251,38 +258,37 @@ export class StoreService {
     return purchase
   }
 
-
   async getStoreItems(userId?: string): Promise<StoreItemResponseDto[]> {
-    let userSubscriptionDiscount = 0;
-    let userSubscriptionTierName = 'Suscriptor';
+    let userSubscriptionDiscount = 0
+    let userSubscriptionTierName = 'Suscriptor'
 
     if (userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { activeSubscriptionTier: true }
-      });
+        select: { activeSubscriptionTier: true },
+      })
 
       if (user?.activeSubscriptionTier) {
         const plan = await this.prisma.subscriptionPlan.findUnique({
           where: { tier: user.activeSubscriptionTier },
-          select: { storeDiscountPercentage: true }
-        });
-        userSubscriptionDiscount = plan?.storeDiscountPercentage || 0;
-        userSubscriptionTierName = user.activeSubscriptionTier.replace('_', ' ');
+          select: { storeDiscountPercentage: true },
+        })
+        userSubscriptionDiscount = plan?.storeDiscountPercentage || 0
+        userSubscriptionTierName = user.activeSubscriptionTier.replace('_', ' ')
       }
     }
 
     const items = await this.prisma.storeItem.findMany({
       where: {
         isActive: true,
-        isPurchasable: true
+        isPurchasable: true,
       },
       include: {
         inventories: {
           where: { userId: userId || 'NO_USER' },
         },
       },
-    });
+    })
 
     return Promise.all(
       items.map(async (item) => {
@@ -291,8 +297,8 @@ export class StoreService {
         const discountInfo = await this.getApplicableDiscount(
           item,
           userSubscriptionDiscount,
-          userSubscriptionTierName
-        );
+          userSubscriptionTierName,
+        )
 
         return {
           id: item.id,
@@ -308,22 +314,21 @@ export class StoreService {
           discountPercentage: discountInfo.discountPercentage,
           discountName: discountInfo.discountName,
           isActive: item.isActive,
-          isPurchasable: item.isPurchasable
+          isPurchasable: item.isPurchasable,
         }
       }),
     )
   }
 
   async createStoreItem(dto: CreateStoreItemDto) {
-
     const existingItem = await this.prisma.storeItem.findUnique({
       where: { assetId: dto.assetId },
-    });
+    })
 
     if (existingItem) {
       throw new ConflictException(
         `Ya existe un artículo en la tienda con el assetId: ${dto.assetId}`,
-      );
+      )
     }
 
     return this.prisma.storeItem.create({ data: dto })
@@ -352,28 +357,28 @@ export class StoreService {
       'banner_toxic',
       'hola-susana',
       'drogba-barcelona-robo',
-      'coco-basile-los-genios-hacen-eso'
-    ];
+      'coco-basile-los-genios-hacen-eso',
+    ]
 
     await this.prisma.storeItem.updateMany({
       where: {
         assetId: {
-          in: assetsToUpdate
-        }
+          in: assetsToUpdate,
+        },
       },
       data: {
-        isPurchasable: false
-      }
-    });
+        isPurchasable: false,
+      },
+    })
 
-    const processedItems: StoreItem[] = [];
-    const errors: string[] = [];
+    const processedItems: StoreItem[] = []
+    const errors: string[] = []
 
     for (const dto of dtos) {
       try {
         const upsertedItem = await this.prisma.storeItem.upsert({
           where: {
-            assetId: dto.assetId
+            assetId: dto.assetId,
           },
           update: {
             name: dto.name,
@@ -381,7 +386,7 @@ export class StoreService {
             price: dto.price,
             type: dto.type,
             isActive: dto.isActive,
-            isPurchasable: dto.isPurchasable
+            isPurchasable: dto.isPurchasable,
           },
           create: {
             assetId: dto.assetId,
@@ -390,20 +395,22 @@ export class StoreService {
             price: dto.price,
             type: dto.type,
             isActive: dto.isActive,
-            isPurchasable: dto.isPurchasable
+            isPurchasable: dto.isPurchasable,
           },
-        });
+        })
 
-        processedItems.push(upsertedItem);
+        processedItems.push(upsertedItem)
       } catch (error) {
-        errors.push(`Falló el assetId ${dto.assetId}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+        errors.push(
+          `Falló el assetId ${dto.assetId}: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+        )
       }
     }
 
     return {
       processed: processedItems,
-      errors
-    };
+      errors,
+    }
   }
 
   /**
@@ -423,7 +430,6 @@ export class StoreService {
   async createDiscount(dto: CreateStoreDiscountDto) {
     const start = new Date(dto.startDate)
     const end = new Date(dto.endDate)
-
 
     if (end <= start) {
       throw new BadRequestException(

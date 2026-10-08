@@ -14,6 +14,6 @@ export const CHAT_RATE_LIMITS = {
     maxMessages: 20,
     penalties: [5, 10],
   },
-} as const;
+} as const
 
-export const DEFAULT_RATE_LIMIT = CHAT_RATE_LIMITS.NONE;
+export const DEFAULT_RATE_LIMIT = CHAT_RATE_LIMITS.NONE

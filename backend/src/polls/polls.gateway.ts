@@ -27,7 +27,7 @@ export class PollsGateway {
 
   private readonly logger = new Logger(PollsGateway.name)
 
-  constructor(private readonly voteService: VoteService) { }
+  constructor(private readonly voteService: VoteService) {}
 
   @UseGuards(WsJwtGuard)
   @UseFilters(AllWsExceptionFilter)
@@ -61,7 +61,7 @@ export class PollsGateway {
 
     this.server
       .to(`poll_${data.pollId}`)
-      .emit(`votoActualizado_${data.pollId}`, updatedResults);
+      .emit(`votoActualizado_${data.pollId}`, updatedResults)
 
     return { status: 'success' }
   }

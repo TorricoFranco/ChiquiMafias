@@ -4,8 +4,6 @@ import { ApiFootballHttp } from '../http/api-football.http'
 import { ApiStandingsResponse } from '../interfaces/stadings'
 import { ApiFootballResponse } from '../interfaces/types'
 
-
-
 import { upsertTeam } from '../upserts/upsert-team'
 
 import { Logger } from '@nestjs/common'
@@ -17,7 +15,7 @@ export class ApiFootballStandingsService {
   constructor(
     private http: ApiFootballHttp,
     private prisma: PrismaService,
-  ) { }
+  ) {}
 
   async getStandings(season: number, league: number) {
     const res = await this.http.get<

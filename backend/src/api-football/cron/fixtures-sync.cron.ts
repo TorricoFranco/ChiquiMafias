@@ -24,7 +24,7 @@ export class FixturesSyncCron {
     private readonly prisma: PrismaService,
     private readonly http: ApiFootballHttp,
     private readonly redis: RedisService,
-  ) { }
+  ) {}
 
   // @Cron(CronExpression.EVERY_DAY_AT_10AM)
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -99,7 +99,6 @@ export class FixturesSyncCron {
         : detail.toLowerCase().replace(/\s+/g, '_')
 
       const cacheKey = `fixtures:128:${this.SEASON}:${tournamentForDb}:${matchdayKey}`
-
 
       //DEBUG [FixturesSyncCron] Guardando cache: , fixtures:128:2026:APERTURA:fecha:9
 

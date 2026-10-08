@@ -14,4 +14,4 @@ import { ChatModule } from 'src/chat/chat.module'
   providers: [MatchesService, MatchesGateway, ApiFootballHttp],
   imports: [AuthModule, ApiFootballModule, ChatModule, StandingsModule],
 })
-export class MatchesModule { }
+export class MatchesModule {}

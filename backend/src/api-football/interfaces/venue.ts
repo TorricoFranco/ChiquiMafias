@@ -1,5 +1,5 @@
 export interface ApiVenue {
-  id: number | null 
+  id: number | null
   name: string | null
   city: string | null
   capacity?: number

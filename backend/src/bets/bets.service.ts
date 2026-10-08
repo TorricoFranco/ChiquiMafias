@@ -34,7 +34,7 @@ export class BetsService {
     private readonly chatGateway: ChatGateway,
     private readonly redisService: RedisService,
     @InjectQueue('bets-queue') private betsQueue: Queue,
-  ) { }
+  ) {}
 
   /**
    * Resuelve el GET del Frontend trayendo mercados abiertos o pausados en vivo con cuotas calculadas
@@ -192,7 +192,7 @@ export class BetsService {
         },
       },
       orderBy: { createdAt: 'desc' },
-    });
+    })
 
     return bets.map((bet) => ({
       id: bet.id,
@@ -204,7 +204,7 @@ export class BetsService {
       status: bet.status,
       marketStatus: bet.option.market.status,
       createdAt: bet.createdAt,
-    }));
+    }))
   }
 
   async settleMarket(marketId: string, dto: SettleMarketDto) {
@@ -348,15 +348,23 @@ export class BetsService {
               data: {
                 status: 'WON',
                 payout: bet.stake,
-                multiplier: multiplier
+                multiplier: multiplier,
               },
             })
 
-            const currentStats = await tx.userStats.findUnique({ where: { userId: bet.userId } })
+            const currentStats = await tx.userStats.findUnique({
+              where: { userId: bet.userId },
+            })
 
             const newStreak = (currentStats?.currentWinStreak || 0) + 1
-            const newMaxStreak = Math.max(currentStats?.longestWinStreak || 0, newStreak)
-            const newHighestMult = Math.max(currentStats?.highestMultiplier || 0, multiplier)
+            const newMaxStreak = Math.max(
+              currentStats?.longestWinStreak || 0,
+              newStreak,
+            )
+            const newHighestMult = Math.max(
+              currentStats?.highestMultiplier || 0,
+              multiplier,
+            )
 
             await tx.userStats.upsert({
               where: { userId: bet.userId },
@@ -366,15 +374,15 @@ export class BetsService {
                 totalCoinsWon: payout,
                 currentWinStreak: 1,
                 longestWinStreak: 1,
-                highestMultiplier: multiplier
+                highestMultiplier: multiplier,
               },
               update: {
                 totalBetsWon: { increment: 1 },
                 totalCoinsWon: { increment: payout },
                 currentWinStreak: newStreak,
                 longestWinStreak: newMaxStreak,
-                highestMultiplier: newHighestMult
-              }
+                highestMultiplier: newHighestMult,
+              },
             })
 
             pendingEvents.push({
@@ -389,13 +397,13 @@ export class BetsService {
               data: {
                 status: 'LOST',
                 payout: 0,
-                multiplier: multiplier
+                multiplier: multiplier,
               },
             })
 
             await tx.userStats.updateMany({
               where: { userId: bet.userId },
-              data: { currentWinStreak: 0 }
+              data: { currentWinStreak: 0 },
             })
 
             pendingEvents.push({
