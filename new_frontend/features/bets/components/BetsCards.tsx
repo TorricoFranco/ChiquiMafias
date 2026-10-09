@@ -64,7 +64,8 @@ export const BetsCards = () => {
             : 'bg-[#1c1b1b] border border-[#353534] text-[#c6c9ab] hover:text-[#e5e2e1]'
             }`}
         >
-          ⚽ Partidos ({matches.length})
+          <span aria-hidden="true" className="material-symbols-outlined text-base">sports_soccer</span>
+          Partidos ({matches.length})
         </button>
         <button
           onClick={() => setFilter('custom')}
@@ -73,19 +74,26 @@ export const BetsCards = () => {
             : 'bg-[#1c1b1b] border border-[#353534] text-[#c6c9ab] hover:text-[#e5e2e1]'
             }`}
         >
-          🎯 Especiales ({customBets.length})
+          <span aria-hidden="true" className="material-symbols-outlined text-base">emoji_events</span>
+          Especiales ({customBets.length})
         </button>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
-        {filteredMarkets.map((market) => (
-          <MarketCard
-            key={market.id}
-            market={market}
-            isCarouselMode={false}
-          />
-        ))}
-      </div>
+      {filteredMarkets.length === 0 ? (
+        <div className="text-center py-10 text-sm text-[#909378] bg-[#1c1b1b] rounded-xl border border-[#353534]">
+          No hay mercados abiertos en esta categoría por ahora.
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
+          {filteredMarkets.map((market) => (
+            <MarketCard
+              key={market.id}
+              market={market}
+              isCarouselMode={false}
+            />
+          ))}
+        </div>
+      )}
 
     </section>
   );

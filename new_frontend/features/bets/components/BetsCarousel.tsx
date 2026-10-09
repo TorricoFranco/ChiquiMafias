@@ -27,20 +27,20 @@ export const BetsCarousel: React.FC = () => {
 
     return (
         <div
-            className="p-4 border-t border-[#454932] bg-[#1c1b1b] rounded-b-xl"
+            className="p-4 border-b border-[#353534] bg-[#1c1b1b]"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
-                    <span aria-hidden="true" className="material-symbols-outlined text-sm text-[#d2f000]">
+            <div className="flex items-center justify-between mb-3.5">
+                <h3 className="font-headline text-xs font-extrabold text-[#e5e2e1] uppercase tracking-widest flex items-center gap-2">
+                    <span aria-hidden="true" className="material-symbols-outlined text-base text-[#d2f000]">
                         trending_up
                     </span>
                     MERCADOS DESTACADOS
                 </h3>
 
                 {markets.length > 1 && (
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-1">
                         {markets.map((_, idx) => (
                             <button
                                 type="button"
@@ -48,9 +48,9 @@ export const BetsCarousel: React.FC = () => {
                                 aria-label={`Ver mercado ${idx + 1} de ${markets.length}`}
                                 aria-current={idx === currentIndex ? "true" : undefined}
                                 onClick={() => setCurrentIndex(idx)}
-                                className={`w-2 h-2 rounded-full cursor-pointer transition-all ${idx === currentIndex
-                                        ? 'bg-[#d2f000]'
-                                        : 'bg-[#454932] hover:bg-[#c6c9ab]'
+                                className={`h-1.5 rounded-full cursor-pointer transition-all ${idx === currentIndex
+                                        ? 'w-5 bg-[#d2f000]'
+                                        : 'w-1.5 bg-[#454932] hover:bg-[#c6c9ab]'
                                     }`}
                             />
                         ))}
