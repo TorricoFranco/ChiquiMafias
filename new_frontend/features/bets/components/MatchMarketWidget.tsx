@@ -23,8 +23,9 @@ export const MatchMarketWidget: React.FC<MatchMarketWidgetProps> = ({ teamA, tea
 
   return (
     <div className="w-full my-4">
-      <h3 className="text-xs font-bold text-[#c6c9ab] uppercase tracking-wider mb-2 px-1">
-        Predicción del Partido
+      <h3 className="flex items-center gap-1.5 text-xs font-extrabold text-[#e5e2e1] uppercase tracking-widest mb-2 px-1">
+        <span aria-hidden="true" className="material-symbols-outlined text-base text-[#d2f000]">trending_up</span>
+        <span>Predicción del Partido</span>
       </h3>
       <MarketCard market={market} isCarouselMode={false} isDirectBet={true} />
     </div>
