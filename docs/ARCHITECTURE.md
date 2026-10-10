@@ -159,11 +159,14 @@ Cada mercado tiene un ciclo de vida gobernado por una máquina de estados,
 
 - **Ingesta (en memoria):** la apuesta se coloca **atómicamente con Lua** en Redis.
 - **Persistencia (async):** un worker de **BullMQ** la materializa en la DB.
-- **Cierre (cron):** un job por minuto pasa los mercados de `OPEN` a `LOCKED` y avisa
-  por WebSocket.
+- **Cierre (cron):** un job por minuto pasa los mercados de `OPEN` a `LOCKED` con un
+  update condicional (no pisa uno ya liquidado) y avisa por WebSocket.
 - **Liquidación (transacción):** calcula el **multiplicador pari-mutuel**, paga a los
   ganadores y hace el **reembolso automático** si el mercado quedó desierto, todo bajo
-  **lock optimista**.
+  **lock optimista**. Los mercados automáticos se liquidan cada 15 minutos con el
+  resultado que `LiveScoreCron` guarda en `Matches` (sin llamar a API-Football). El 1X2
+  es a los 90': si el partido se definió en el alargue o por penales, gana el Empate. Si
+  el partido se posterga, se cancela o se abandona, se reembolsa.
 
 El desafío central es mantener la **consistencia eventual** entre tres fuentes
 (Redis, PostgreSQL y los clientes WebSocket) sin bloquear el camino caliente.

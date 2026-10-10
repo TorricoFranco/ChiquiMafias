@@ -11,6 +11,7 @@ import { RedisService } from 'src/redis/redis.service'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import * as bcrypt from 'bcrypt'
+import { createHash } from 'crypto'
 import { FootballTeam, User } from '@prisma/client'
 import {
   JwtPayload,
@@ -142,12 +143,41 @@ export class AuthService {
       this.configService.get('BCRYPT_SALT_ROUNDS', { infer: true }) || 12,
     )
 
-    const hashed = await bcrypt.hash(refreshToken, saltRounds)
+    const hashed = await bcrypt.hash(
+      this.digestRefreshToken(refreshToken),
+      saltRounds,
+    )
 
     await this.prisma.user.update({
       where: { id: userId },
       data: { hashedRefreshToken: hashed },
     })
+  }
+
+  // bcrypt solo usa los primeros 72 bytes, y todos los refresh tokens de un
+  // usuario comparten ese prefijo (header + sub). Se hashea el SHA-256 del
+  // token (64 caracteres) para que cuente el token entero.
+  private digestRefreshToken(refreshToken: string) {
+    return createHash('sha256').update(refreshToken).digest('hex')
+  }
+
+  private async matchesRefreshTokenHash(
+    refreshToken: string,
+    hashedRefreshToken: string,
+  ) {
+    if (
+      await bcrypt.compare(
+        this.digestRefreshToken(refreshToken),
+        hashedRefreshToken,
+      )
+    ) {
+      return true
+    }
+
+    // Hash del formato viejo (bcrypt del token crudo): se acepta y la rotación
+    // lo reemplaza por el nuevo. Contra un hash nuevo nunca coincide. Se puede
+    // borrar cuando pase JWT_REFRESH_EXPIRES_IN desde el deploy del formato nuevo.
+    return bcrypt.compare(refreshToken, hashedRefreshToken)
   }
 
   async verifyToken(token: string) {
@@ -224,7 +254,7 @@ export class AuthService {
         throw new UnauthorizedException('Acceso denegado, perri')
       }
 
-      const isTokenMatched = await bcrypt.compare(
+      const isTokenMatched = await this.matchesRefreshTokenHash(
         refreshToken,
         user.hashedRefreshToken,
       )
