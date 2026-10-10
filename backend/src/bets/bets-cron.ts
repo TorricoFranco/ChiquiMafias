@@ -1,11 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { BetsService } from './bets.service'
 import { RedisService } from 'src/redis/redis.service'
 import { BetsGateway } from './bets.gateway'
 
 import { calculateMarketOdds } from './utils/odds.util'
+import { MatchOutcome, resolveMatchOutcome } from './utils/match-outcome.util'
+
+const DRAW_OPTION_NAME = 'Empate'
+
+interface MarketTeamsMetadata {
+  homeTeam?: { name?: string }
+  awayTeam?: { name?: string }
+}
 
 @Injectable()
 export class BetsCronService {
@@ -92,7 +101,10 @@ export class BetsCronService {
                     name: match.home_team.name,
                     initialProb: initialProbabilities.home,
                   },
-                  { name: 'Empate', initialProb: initialProbabilities.draw },
+                  {
+                    name: DRAW_OPTION_NAME,
+                    initialProb: initialProbabilities.draw,
+                  },
                   {
                     name: match.away_team.name,
                     initialProb: initialProbabilities.away,
@@ -154,30 +166,35 @@ export class BetsCronService {
         status: 'OPEN',
         closesAt: { lte: now },
       },
+      select: { id: true },
     })
 
-    if (marketsToLock.length > 0) {
-      this.logger.log(
-        `[CRON] Bloqueando ${marketsToLock.length} mercados que entraron en juego`,
-      )
+    if (marketsToLock.length === 0) return
 
-      await this.prisma.market.updateMany({
-        where: { id: { in: marketsToLock.map((m) => m.id) } },
+    this.logger.log(
+      `[CRON] Bloqueando ${marketsToLock.length} mercados que entraron en juego`,
+    )
+
+    for (const market of marketsToLock) {
+      // Condicional: si lo liquidaron entre la lectura y acá, no vuelve a LOCKED
+      const { count } = await this.prisma.market.updateMany({
+        where: { id: market.id, status: 'OPEN' },
         data: { status: 'LOCKED' },
       })
 
-      for (const market of marketsToLock) {
+      if (count > 0) {
         this.betsGateway.emitMarketStatusChange(market.id, 'LOCKED')
       }
     }
   }
 
   /**
-   *  Chequeo de partidos jugados para pagarles a los usuarios.
+   *  Liquida los mercados automáticos con el resultado guardado en Matches
+   *  (lo escribe LiveScoreCron al terminar el partido), sin llamar a API-Football.
    */
   @Cron('0 */15 * * * *')
   async handleMarketSettlement() {
-    this.logger.log(
+    this.logger.debug(
       '=== [CRON] Chequeando resultados de partidos finalizados ===',
     )
 
@@ -190,34 +207,101 @@ export class BetsCronService {
       include: { options: true },
     })
 
+    if (activeMarkets.length === 0) return
+
+    const matches = await this.prisma.matches.findMany({
+      where: {
+        api_fixture_id: { in: activeMarkets.map((m) => m.fixtureId!) },
+      },
+      select: {
+        api_fixture_id: true,
+        status_short: true,
+        home_goals: true,
+        away_goals: true,
+        home_team: { select: { name: true } },
+        away_team: { select: { name: true } },
+      },
+    })
+    const matchesByFixture = new Map(matches.map((m) => [m.api_fixture_id, m]))
+
     for (const market of activeMarkets) {
-      const matchStatusFromApi: string = 'FT'
-      const winnerName = 'Boca'
+      try {
+        const match = matchesByFixture.get(market.fixtureId!)
 
-      if (matchStatusFromApi === 'SUSP' || matchStatusFromApi === 'CANX') {
-        this.logger.warn(
-          `Partido ${market.title} suspendido por la API. Ejecutando REEMBOLSO masivo`,
+        if (!match) {
+          this.logger.warn(
+            `[SETTLEMENT] No se encontró el partido ${market.fixtureId} del mercado ${market.id}`,
+          )
+          continue
+        }
+
+        const outcome = resolveMatchOutcome(
+          match.status_short,
+          match.home_goals,
+          match.away_goals,
         )
-        await this.betsService.settleMarket(market.id, { status: 'REFUNDED' })
-        continue
-      }
 
-      if (matchStatusFromApi === 'FT') {
+        if (!outcome) continue
+
+        if (outcome === 'VOID') {
+          this.logger.warn(
+            `Partido ${market.title} quedó en ${match.status_short}. Ejecutando REEMBOLSO masivo`,
+          )
+          await this.betsService.settleMarket(market.id, {
+            status: 'REFUNDED',
+          })
+          continue
+        }
+
+        const winnerName = this.getWinningOptionName(
+          outcome,
+          market.metadata,
+          match,
+        )
         const winningOption = market.options.find(
           (opt) => opt.name === winnerName,
         )
 
-        if (winningOption) {
-          this.logger.log(
-            `Liquidando mercado ${market.title}. Ganador: ${winnerName}`,
+        if (!winningOption) {
+          this.logger.error(
+            `[SETTLEMENT] El mercado ${market.id} no tiene la opción "${winnerName}". Queda LOCKED para revisión manual`,
           )
-
-          await this.betsService.settleMarket(market.id, {
-            status: 'SETTLED',
-            winningOptionId: winningOption.id,
-          })
+          continue
         }
+
+        this.logger.log(
+          `Liquidando mercado ${market.title}. Ganador: ${winnerName}`,
+        )
+
+        await this.betsService.settleMarket(market.id, {
+          status: 'SETTLED',
+          winningOptionId: winningOption.id,
+        })
+      } catch (error) {
+        this.logger.error(
+          `Error al liquidar el mercado ${market.id}`,
+          error instanceof Error ? error.stack : String(error),
+        )
       }
     }
+  }
+
+  /**
+   *  Las opciones se llaman como los equipos al crear el mercado: se usa el
+   *  snapshot de metadata y, si falta, el nombre actual del equipo.
+   */
+  private getWinningOptionName(
+    outcome: Exclude<MatchOutcome, 'VOID'>,
+    metadata: Prisma.JsonValue,
+    match: { home_team: { name: string }; away_team: { name: string } },
+  ) {
+    if (outcome === 'DRAW') return DRAW_OPTION_NAME
+
+    const teams = metadata as MarketTeamsMetadata | null
+
+    if (outcome === 'HOME') {
+      return teams?.homeTeam?.name ?? match.home_team.name
+    }
+    return teams?.awayTeam?.name ?? match.away_team.name
   }
 }

@@ -22,6 +22,10 @@ import { Queue } from 'bullmq'
 
 import { calculateMarketOdds } from './utils/odds.util'
 
+// La liquidación recorre todas las apuestas del mercado en una sola transacción:
+// con el timeout por defecto de Prisma (5 s) un partido grande nunca terminaría
+const SETTLEMENT_TX_OPTIONS = { maxWait: 10_000, timeout: 60_000 }
+
 @Injectable()
 export class BetsService {
   private readonly logger = new Logger(BetsService.name)
@@ -210,12 +214,40 @@ export class BetsService {
   async settleMarket(marketId: string, dto: SettleMarketDto) {
     const { status, winningOptionId } = dto
 
-    const redis = this.redisService.redis
-    await redis.hset(`market:${marketId}`, 'status', 'SETTLED')
-
     if (status === 'SETTLED' && !winningOptionId) {
       throw new BadRequestException('Debe especificar la opción ganadora')
     }
+
+    // Validación previa: no cerrar en Redis un mercado que no se va a poder liquidar
+    const current = await this.prisma.market.findUnique({
+      where: { id: marketId },
+      select: { status: true, options: { select: { id: true } } },
+    })
+
+    if (!current) throw new NotFoundException('El mercado no existe')
+    if (current.status === 'SETTLED' || current.status === 'REFUNDED') {
+      throw new BadRequestException(
+        'Este mercado ya fue liquidado anteriormente',
+      )
+    }
+    if (
+      status === 'SETTLED' &&
+      !current.options.some((o) => o.id === winningOptionId)
+    ) {
+      throw new NotFoundException(
+        'La opción ganadora no pertenece a este mercado',
+      )
+    }
+
+    // Corta las apuestas nuevas antes de leer las existentes
+    await this.redisService.redis.hset(
+      `market:${marketId}`,
+      'status',
+      'SETTLED',
+    )
+
+    // Usuarios cuyo saldo cambió, para sincronizar Redis después del commit
+    const usersToSync = new Set<string>()
 
     const pendingEvents: Array<{
       userId: string
@@ -285,7 +317,7 @@ export class BetsService {
               data: { balance: { increment: bet.stake } },
             })
 
-            await redis.set(`wallet:${bet.userId}:balance`, wallet.balance)
+            usersToSync.add(bet.userId)
 
             await tx.coinTransaction.create({
               data: {
@@ -332,7 +364,7 @@ export class BetsService {
               data: { balance: { increment: payout } },
             })
 
-            await redis.set(`wallet:${bet.userId}:balance`, wallet.balance)
+            usersToSync.add(bet.userId)
 
             await tx.coinTransaction.create({
               data: {
@@ -347,7 +379,7 @@ export class BetsService {
               where: { id: bet.id },
               data: {
                 status: 'WON',
-                payout: bet.stake,
+                payout: payout,
                 multiplier: multiplier,
               },
             })
@@ -418,7 +450,20 @@ export class BetsService {
 
       // mercado actualizado
       return { ...market, status: finalStatusToSet, settledAt: new Date() }
-    })
+    }, SETTLEMENT_TX_OPTIONS)
+
+    // El mercado ya quedó liquidado en la DB: un fallo de Redis no corta el resto.
+    // Se relee el saldo de la DB: otra operación pudo cambiarlo después del commit.
+    for (const userId of usersToSync) {
+      try {
+        await this.walletService.syncBalanceCache(userId)
+      } catch (error) {
+        this.logger.error(
+          `No se pudo sincronizar el saldo de ${userId} en Redis tras liquidar ${marketId}`,
+          error instanceof Error ? error.message : String(error),
+        )
+      }
+    }
 
     // EMISIÓN DE EVENTOS
     this.betsGateway.emitMarketStatusChange(

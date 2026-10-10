@@ -77,6 +77,9 @@ export class BetsProcessor extends WorkerHost {
         )
         throw error
       }
+      return
     }
+
+    this.logger.warn(`Job desconocido en bets-queue: ${job.name} (${job.id})`)
   }
 }
