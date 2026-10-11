@@ -5,6 +5,8 @@ import { PollOptions } from "../PollOptions";
 import { VersusBody } from "./VersusBody";
 import { MatchBody } from "./MatchBody";
 import { FactoBody } from "./FactoBody";
+import { RatingBody } from "./RatingBody";
+import { RankingBody } from "./RankingBody";
 import { PollBodyProps } from "./types";
 
 /**
@@ -20,6 +22,10 @@ export const PollBody: React.FC<PollBodyProps> = ({ poll, onVoteUpdate }) => {
             return <MatchBody poll={poll} onVoteUpdate={onVoteUpdate} />;
         case "FACTO":
             return <FactoBody poll={poll} onVoteUpdate={onVoteUpdate} />;
+        case "RATING":
+            return <RatingBody poll={poll} onVoteUpdate={onVoteUpdate} />;
+        case "RANKING":
+            return <RankingBody poll={poll} onVoteUpdate={onVoteUpdate} />;
         default:
             return <PollOptions poll={poll} onVoteUpdate={onVoteUpdate} />;
     }

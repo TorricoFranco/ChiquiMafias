@@ -8,6 +8,7 @@ describe('PollsGateway', () => {
 
   const mockVoteService = {
     castVote: jest.fn(),
+    castRankingVote: jest.fn(),
     hasVoted: jest.fn(),
   }
 
@@ -41,7 +42,14 @@ describe('PollsGateway', () => {
 
     jest.clearAllMocks()
     mockVoteService.hasVoted.mockResolvedValue(false)
-    mockVoteService.castVote.mockResolvedValue({ '1': '7', '2': '3' })
+    mockVoteService.castVote.mockResolvedValue({
+      results: { '1': '7', '2': '3' },
+      ranking: null,
+    })
+    mockVoteService.castRankingVote.mockResolvedValue({
+      results: { '3': '4' },
+      ranking: { '3': [4, 1, 0], '1': [0, 2, 1] },
+    })
   })
 
   describe('joinPoll', () => {
@@ -100,6 +108,54 @@ describe('PollsGateway', () => {
       )
 
       expect(ack).toEqual({ status: 'success' })
+    })
+  })
+
+  describe('castVote con podio', () => {
+    it('Debe delegar en castRankingVote cuando llega un ranking', async () => {
+      const { socket } = buildClient()
+
+      await gateway.handleVote({ pollId: 'poll-1', ranking: [3, 1, 2] }, socket)
+
+      expect(mockVoteService.castRankingVote).toHaveBeenCalledWith(
+        'poll-1',
+        'user-1',
+        [3, 1, 2],
+      )
+      expect(mockVoteService.castVote).not.toHaveBeenCalled()
+    })
+
+    it('Debe emitir la matriz de posiciones solo a los que votaron', async () => {
+      const { socket } = buildClient()
+
+      await gateway.handleVote({ pollId: 'poll-1', ranking: [3, 1, 2] }, socket)
+
+      expect(to).toHaveBeenCalledWith('poll_poll-1_voted')
+      expect(emit).toHaveBeenCalledWith('rankingActualizado_poll-1', {
+        '3': [4, 1, 0],
+        '1': [0, 2, 1],
+      })
+    })
+
+    it('No debe emitir la matriz en una encuesta que no es de podio', async () => {
+      const { socket } = buildClient()
+
+      await gateway.handleVote({ pollId: 'poll-1', optionId: 1 }, socket)
+
+      expect(emit).not.toHaveBeenCalledWith(
+        'rankingActualizado_poll-1',
+        expect.anything(),
+      )
+    })
+
+    it('Debe rechazar un voto sin opción ni ranking', async () => {
+      const { socket } = buildClient()
+
+      await expect(
+        gateway.handleVote({ pollId: 'poll-1' }, socket),
+      ).rejects.toThrow('No elegiste ninguna opción')
+      expect(mockVoteService.castVote).not.toHaveBeenCalled()
+      expect(mockVoteService.castRankingVote).not.toHaveBeenCalled()
     })
   })
 

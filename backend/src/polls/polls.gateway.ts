@@ -17,6 +17,7 @@ import {
 import { WsJwtGuard } from 'src/auth/guards/ws-jwt.guard'
 import type { SocketWithUser } from 'src/auth/interfaces/active-user.interface'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
+import { WsException } from '@nestjs/websockets'
 import { CastVoteDto } from './dto/cast-vote.dto'
 import { JoinPollDto } from './dto/join-poll.dto'
 
@@ -73,23 +74,31 @@ export class PollsGateway {
     @MessageBody() data: CastVoteDto,
     @ConnectedSocket() client: SocketWithUser,
   ) {
-    const { pollId } = data
+    if (data.optionId === undefined && !data.ranking?.length) {
+      throw new WsException('No elegiste ninguna opción')
+    }
 
-    const updatedResults = await this.voteService.castVote(
-      pollId,
-      client.data.user.id,
-      data.optionId,
-    )
+    const { pollId, optionId, ranking } = data
+    const userId = client.data.user.id
+
+    // El podio llega como una lista ordenada; el resto de los tipos, con una opción.
+    const { results, ranking: rankingMatrix } = ranking?.length
+      ? await this.voteService.castRankingVote(pollId, userId, ranking)
+      : await this.voteService.castVote(pollId, userId, optionId as number)
 
     await client.join(votedRoom(pollId))
 
     // Resultados completos solo para los que ya votaron...
-    this.server
-      .to(votedRoom(pollId))
-      .emit(`votoActualizado_${pollId}`, updatedResults)
+    this.server.to(votedRoom(pollId)).emit(`votoActualizado_${pollId}`, results)
+
+    if (rankingMatrix) {
+      this.server
+        .to(votedRoom(pollId))
+        .emit(`rankingActualizado_${pollId}`, rankingMatrix)
+    }
 
     // ...y para el resto, solo cuántos votaron.
-    const totalVotes = Object.values(updatedResults).reduce(
+    const totalVotes = Object.values(results).reduce(
       (total, votes) => total + Number(votes),
       0,
     )

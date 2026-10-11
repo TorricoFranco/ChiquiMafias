@@ -220,11 +220,65 @@ describe('buildPollShape', () => {
     })
   })
 
-  describe('tipos todavía no habilitados', () => {
-    it.each(['RATING', 'RANKING'] as const)('%s se rechaza', (type) => {
-      expect(() => buildPollShape({ type, labels: [] })).toThrow(
-        'todavía no están disponibles',
-      )
+  describe('RATING', () => {
+    it('genera las 5 estrellas y guarda la escala', () => {
+      const shape = buildPollShape({ type: 'RATING', labels: [] })
+
+      expect(shape.options).toEqual([
+        { id: 1, label: '1' },
+        { id: 2, label: '2' },
+        { id: 3, label: '3' },
+        { id: 4, label: '4' },
+        { id: 5, label: '5' },
+      ])
+      expect(shape.config).toEqual({ scale: 5 })
+      expect(shape.ticketCost).toBe(1)
+    })
+
+    it('rechaza opciones mandadas por el creador', () => {
+      expect(() =>
+        buildPollShape({ type: 'RATING', labels: ['Bien', 'Mal'] }),
+      ).toThrow('son fijas')
+    })
+  })
+
+  describe('RANKING', () => {
+    it('admite de 3 a 6 candidatos, cuesta 3 tickets y guarda los lugares', () => {
+      const shape = buildPollShape({
+        type: 'RANKING',
+        labels: ['Messi', 'Maradona', 'Riquelme', 'Tévez'],
+      })
+
+      expect(shape.options).toHaveLength(4)
+      expect(shape.options[3]).toEqual({ id: 4, label: 'Tévez' })
+      expect(shape.config).toEqual({ picks: 3 })
+      expect(shape.ticketCost).toBe(3)
+    })
+
+    it('admite escudo por candidato', () => {
+      const shape = buildPollShape({
+        type: 'RANKING',
+        labels: ['Boca', 'River', 'Racing'],
+        teamIds: ['451', '435', ''],
+      })
+
+      expect(shape.options[0].teamId).toBe('451')
+      expect(shape.options[2].teamId).toBeUndefined()
+    })
+
+    it('rechaza menos de 3 candidatos: no se podría armar el podio', () => {
+      expect(() =>
+        buildPollShape({ type: 'RANKING', labels: ['Messi', 'Maradona'] }),
+      ).toThrow('al menos 3 opciones')
+    })
+
+    it('rechaza más de 6 candidatos', () => {
+      expect(() =>
+        buildPollShape({
+          type: 'RANKING',
+          labels: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+        }),
+      ).toThrow('hasta 6 opciones')
     })
   })
 })

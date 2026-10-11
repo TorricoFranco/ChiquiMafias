@@ -33,6 +33,7 @@ describe('VoteService', () => {
     startsAt: new Date(Date.now() - 60_000),
     endsAt: new Date(Date.now() + 60_000),
     type: 'CLASSIC',
+    config: null,
     options: [
       { id: 1, label: 'Boca' },
       { id: 2, label: 'River' },
@@ -61,10 +62,10 @@ describe('VoteService', () => {
   it('Debe registrar el voto y actualizar los contadores de Redis', async () => {
     mockPrisma.poll.findUnique.mockResolvedValue(activePoll())
 
-    const results = await service.castVote('poll-1', 'user-1', 1)
+    const { results, ranking } = await service.castVote('poll-1', 'user-1', 1)
 
     expect(mockPrisma.vote.create).toHaveBeenCalledWith({
-      data: { pollId: 'poll-1', userId: 'user-1', optionId: 1 },
+      data: { pollId: 'poll-1', userId: 'user-1', optionId: 1, ranking: [] },
     })
     expect(mockMulti.hincrby).toHaveBeenCalledWith(
       'poll:poll-1:results',
@@ -77,6 +78,7 @@ describe('VoteService', () => {
       '1',
     )
     expect(results).toEqual({ '1': '1' })
+    expect(ranking).toBeNull()
   })
 
   it('Debe cortar por el cooldown anti-spam antes de consultar la encuesta', async () => {
@@ -156,6 +158,126 @@ describe('VoteService', () => {
       WsException,
     )
     expect(mockPrisma.vote.create).not.toHaveBeenCalled()
+  })
+
+  describe('castRankingVote', () => {
+    const rankingPoll = (overrides: Record<string, unknown> = {}) =>
+      activePoll({
+        type: 'RANKING',
+        config: { picks: 3 },
+        options: [
+          { id: 1, label: 'Messi' },
+          { id: 2, label: 'Maradona' },
+          { id: 3, label: 'Riquelme' },
+          { id: 4, label: 'Tévez' },
+        ],
+        ...overrides,
+      })
+
+    beforeEach(() => {
+      // El hash de resultados cuenta primeros puestos; el de ranking, la matriz.
+      mockRedis.hgetall = jest
+        .fn()
+        .mockImplementation((key: string) =>
+          key.endsWith(':ranking')
+            ? Promise.resolve({ '3': '2', '3:1': '2', '1:2': '1' })
+            : Promise.resolve({ '3': '2' }),
+        )
+    })
+
+    it('Debe guardar el podio y devolver la matriz de posiciones', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(rankingPoll())
+
+      const { results, ranking } = await service.castRankingVote(
+        'poll-1',
+        'user-1',
+        [3, 1, 4],
+      )
+
+      expect(mockPrisma.vote.create).toHaveBeenCalledWith({
+        data: {
+          pollId: 'poll-1',
+          userId: 'user-1',
+          // La primera del podio también va en optionId, así el conteo normal
+          // sigue dando la cantidad de votantes.
+          optionId: 3,
+          ranking: [3, 1, 4],
+        },
+      })
+      expect(mockMulti.hincrby).toHaveBeenCalledWith(
+        'poll:poll-1:results',
+        '3',
+        1,
+      )
+      expect(mockMulti.hincrby).toHaveBeenCalledWith(
+        'poll:poll-1:ranking',
+        '3:1',
+        1,
+      )
+      expect(mockMulti.hincrby).toHaveBeenCalledWith(
+        'poll:poll-1:ranking',
+        '1:2',
+        1,
+      )
+      expect(mockMulti.hincrby).toHaveBeenCalledWith(
+        'poll:poll-1:ranking',
+        '4:3',
+        1,
+      )
+      expect(mockMulti.hset).toHaveBeenCalledWith(
+        'poll:poll-1:details',
+        'user-1',
+        '3,1,4',
+      )
+      expect(results).toEqual({ '3': '2' })
+      expect(ranking).toEqual({
+        '1': [0, 1, 0],
+        '2': [0, 0, 0],
+        '3': [2, 0, 0],
+        '4': [0, 0, 0],
+      })
+    })
+
+    it('Debe exigir exactamente la cantidad de lugares del podio', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(rankingPoll())
+
+      await expect(
+        service.castRankingVote('poll-1', 'user-1', [3, 1]),
+      ).rejects.toThrow('Tenés que elegir 3 opciones en orden')
+      expect(mockRedis.sadd).not.toHaveBeenCalled()
+    })
+
+    it('Debe rechazar la misma opción repetida', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(rankingPoll())
+
+      await expect(
+        service.castRankingVote('poll-1', 'user-1', [3, 3, 1]),
+      ).rejects.toThrow('No podés elegir la misma opción dos veces')
+    })
+
+    it('Debe rechazar una opción que no existe', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(rankingPoll())
+
+      await expect(
+        service.castRankingVote('poll-1', 'user-1', [3, 1, 99]),
+      ).rejects.toThrow('Alguna de las opciones elegidas no existe')
+    })
+
+    it('Debe rechazar un podio en una encuesta que no es de podio', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(activePoll())
+
+      await expect(
+        service.castRankingVote('poll-1', 'user-1', [1, 2, 3]),
+      ).rejects.toThrow('Esta encuesta se vota eligiendo una opción')
+    })
+
+    it('Debe rechazar un voto de una sola opción en una encuesta de podio', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(rankingPoll())
+
+      await expect(service.castVote('poll-1', 'user-1', 1)).rejects.toThrow(
+        'Esta encuesta se vota armando un podio',
+      )
+    })
   })
 
   describe('hasVoted', () => {

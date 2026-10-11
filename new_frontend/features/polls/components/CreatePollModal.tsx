@@ -24,6 +24,16 @@ interface OptionDraft {
 
 const EMPTY_OPTIONS: OptionDraft[] = [{ label: "" }, { label: "" }];
 
+/** El título cambia bastante según el tipo, así que el ejemplo también. */
+const TITLE_PLACEHOLDERS: Partial<Record<PollType, string>> = {
+    CLASSIC: "Ej: ¿Quién es el mejor jugador del torneo?",
+    FACTO: "Ej: Riquelme es el mejor 10 de la historia",
+    RATING: "Ej: ¿Qué nota le ponés al arbitraje?",
+    RANKING: "Ej: Armá tu podio de los 10 históricos",
+    VERSUS: "Ej: ¿Messi o Maradona?",
+    MATCH: "Ej: ¿Cómo sale el superclásico?",
+};
+
 export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -143,8 +153,8 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                 onClose();
                 resetForm();
             },
-            onError: (error: any) => {
-                toast.error(error?.message || "No se pudo enviar la encuesta");
+            onError: (error: Error) => {
+                toast.error(error.message || "No se pudo enviar la encuesta");
             },
         });
     };
@@ -275,7 +285,7 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                                 type="text"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                placeholder={type === "FACTO" ? "Ej: Riquelme es el mejor 10 de la historia" : "Ej: ¿Quién es el mejor jugador del torneo?"}
+                                placeholder={TITLE_PLACEHOLDERS[type] ?? TITLE_PLACEHOLDERS.CLASSIC}
                                 className="w-full bg-[#131313] border border-[#353534] rounded-lg p-3 text-sm text-[#e5e2e1] focus:outline-none focus:border-[#d2f000] transition-colors"
                                 maxLength={100}
                                 required
@@ -283,6 +293,11 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                             {type === "FACTO" && (
                                 <p className="text-[11px] text-[#909378]">
                                     Escribí una afirmación: la tribuna vota Facto o No facto y después se debate en los comentarios.
+                                </p>
+                            )}
+                            {type === "RANKING" && (
+                                <p className="text-[11px] text-[#909378]">
+                                    Cargá de 3 a 6 candidatos: cada usuario arma su podio de 3 y el resultado muestra cuántas veces quedó cada uno en cada puesto.
                                 </p>
                             )}
                         </div>
@@ -375,8 +390,16 @@ export const CreatePollModal = ({ isOpen, onClose }: CreatePollModalProps) => {
                             </div>
                         ) : (
                             <p className="text-xs text-[#c6c9ab] bg-[#131313] border border-[#353534] rounded-lg p-3">
-                                Las opciones de este tipo son fijas: <strong className="text-[#e5e2e1]">Facto</strong> y{" "}
-                                <strong className="text-[#e5e2e1]">No facto</strong>.
+                                {type === "RATING" ? (
+                                    <>
+                                        La tribuna puntúa de <strong className="text-[#e5e2e1]">1 a 5 estrellas</strong>: no hace falta cargar opciones.
+                                    </>
+                                ) : (
+                                    <>
+                                        Las opciones de este tipo son fijas: <strong className="text-[#e5e2e1]">Facto</strong> y{" "}
+                                        <strong className="text-[#e5e2e1]">No facto</strong>.
+                                    </>
+                                )}
                             </p>
                         )}
                     </form>

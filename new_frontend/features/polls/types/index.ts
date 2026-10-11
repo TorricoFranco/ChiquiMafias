@@ -34,6 +34,13 @@ export interface PollConfig {
  */
 export type PollConfigInput = Pick<PollConfig, 'layout'>;
 
+/**
+ * Veces que cada opción quedó en cada lugar del podio. La clave es el id de la
+ * opción y el array tiene una posición por lugar: el índice 0 son los primeros
+ * puestos, el 1 los segundos, y así.
+ */
+export type PollRankingResults = Record<string, number[]>;
+
 export interface Poll {
   id: string;
   title: string;
@@ -56,6 +63,10 @@ export interface Poll {
   /** Cantidad de votantes. Llega siempre, incluso sin haber votado. */
   totalVotes?: number;
   userVotedOptionId?: number | null;
+  /** Solo RANKING: el podio que armó el usuario, en orden. */
+  userRanking?: number[] | null;
+  /** Solo RANKING: la matriz de posiciones, si el usuario ya votó. */
+  rankingResults?: PollRankingResults | null;
   likesCount?: number;
   dislikesCount?: number;
   userReaction?: ReactionType | null;
@@ -82,6 +93,16 @@ export interface Comment {
   dislikesCount?: number;
   userReaction?: ReactionType | null;
   isPremium: boolean;
+}
+
+/**
+ * `MessagesNewPoll` (chat) avisa al carrusel con este evento para que salte a
+ * la encuesta. Declararlo evita el `as any` en addEventListener.
+ */
+declare global {
+  interface WindowEventMap {
+    'focus-poll': CustomEvent<{ pollId: string }>;
+  }
 }
 
 export interface ActivePollMessage {

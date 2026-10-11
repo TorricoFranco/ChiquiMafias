@@ -36,7 +36,6 @@ export const CreatePollModal: React.FC<CreatePollModalProps> = ({ onClose, onSub
     const [commentsEnabled, setCommentsEnabled] = useState(true);
 
     const rules = getPollUiRules(type, layout);
-    const isAvailable = type !== 'RATING' && type !== 'RANKING';
 
     /** Igual que en el modal del usuario: si el tipo nuevo no lleva escudos, se descartan. */
     const fitOptions = (prev: OptionDraft[], rules: PollUiRules): OptionDraft[] => {
@@ -152,11 +151,6 @@ export const CreatePollModal: React.FC<CreatePollModalProps> = ({ onClose, onSub
                                 </button>
                             ))}
                         </div>
-                        {!isAvailable && (
-                            <p className="text-[11px] text-[#ffb4ab] mt-1.5">
-                                Este tipo todavía no está habilitado en el backend.
-                            </p>
-                        )}
                     </div>
 
                     {/* FORMATO DEL MATCH */}
@@ -294,7 +288,7 @@ export const CreatePollModal: React.FC<CreatePollModalProps> = ({ onClose, onSub
 
                     <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-[#353534]">
                         <button type="button" onClick={onClose} className="text-xs font-bold text-[#c6c9ab] px-4 py-2">Cancelar</button>
-                        <button type="submit" disabled={!isAvailable || missingBadges} className="bg-[#d2f000] text-[#191e00] font-black text-xs px-6 py-2.5 rounded-xl flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <button type="submit" disabled={missingBadges} className="bg-[#d2f000] text-[#191e00] font-black text-xs px-6 py-2.5 rounded-xl flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
                             <PlusCircle className="w-4 h-4" /> Publicar en DB
                         </button>
                     </div>

@@ -522,10 +522,13 @@ model Poll {
 }
 
 model Vote {
-  id            String  @id @default(uuid())
-  pollId        String
-  userId        String
+  id     String @id @default(uuid())
+  pollId String
+  userId String
+  /// En RATING es la cantidad de estrellas (1-5); en RANKING, la opción que quedó primera.
   optionId      Int
+  /// Solo RANKING: los optionId elegidos, en orden [1º, 2º, 3º].
+  ranking       Int[]
   poll          Poll    @relation(fields: [pollId], references: [id])
   user          User    @relation(fields: [userId], references: [id])
   rewardClaimed Boolean @default(false)
