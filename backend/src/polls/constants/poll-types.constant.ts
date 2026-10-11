@@ -91,7 +91,7 @@ export const POLL_TYPE_RULES: Record<PollType, PollTypeRule> = {
     ticketCost: 2,
   },
   RATING: {
-    enabled: false,
+    enabled: true,
     votable: true,
     minOptions: 0,
     maxOptions: 0,
@@ -103,7 +103,7 @@ export const POLL_TYPE_RULES: Record<PollType, PollTypeRule> = {
     ticketCost: 1,
   },
   RANKING: {
-    enabled: false,
+    enabled: true,
     votable: true,
     minOptions: 3,
     maxOptions: 6,

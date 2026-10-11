@@ -61,7 +61,7 @@ export const POLL_TYPE_META: Record<PollType, PollTypeMeta> = {
         votable: true,
         name: "Puntuación",
         ticketCost: 1,
-        proposable: false,
+        proposable: true,
     },
     RANKING: {
         chipLabel: "RANKING",
@@ -70,7 +70,7 @@ export const POLL_TYPE_META: Record<PollType, PollTypeMeta> = {
         votable: true,
         name: "Ranking",
         ticketCost: 3,
-        proposable: false,
+        proposable: true,
     },
     FACTO: {
         chipLabel: "DEBATE",

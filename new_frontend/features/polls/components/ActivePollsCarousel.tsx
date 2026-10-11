@@ -31,8 +31,8 @@ export const ActivePollsCarousel: React.FC = () => {
       }
     };
 
-    window.addEventListener('focus-poll' as any, handleFocusPoll);
-    return () => window.removeEventListener('focus-poll' as any, handleFocusPoll);
+    window.addEventListener('focus-poll', handleFocusPoll);
+    return () => window.removeEventListener('focus-poll', handleFocusPoll);
   }, [polls])
 
   if (isLoading) {

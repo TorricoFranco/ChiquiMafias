@@ -40,7 +40,7 @@ export const AdminPolls: React.FC = () => {
                     toast.success('Encuesta oficial creada y publicada con éxito');
                     setIsCreateModalOpen(false);
                 },
-                onError: (err: any) => toast.error(err.message || 'Error al crear la encuesta'),
+                onError: (err: Error) => toast.error(err.message || 'Error al crear la encuesta'),
             }
         );
     };

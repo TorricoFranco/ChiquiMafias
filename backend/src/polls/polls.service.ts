@@ -16,10 +16,15 @@ import {
 } from './constants/poll-types.constant'
 import {
   buildPollShape,
+  parsePollConfig,
   parsePollOptions,
   parseTicketRefund,
 } from './utils/poll-shape.util'
 import type { PollTicketRefund } from './utils/poll-shape.util'
+import {
+  buildRankingMatrix,
+  buildRankingMatrixFromVotes,
+} from './utils/poll-ranking.util'
 
 @Injectable()
 export class PollsService {
@@ -376,7 +381,7 @@ export class PollsService {
         },
 
         votes: userId
-          ? { where: { userId }, select: { optionId: true } }
+          ? { where: { userId }, select: { optionId: true, ranking: true } }
           : false,
         reactions: userId
           ? { where: { userId }, select: { type: true } }
@@ -401,8 +406,15 @@ export class PollsService {
         const { votes, reactions, options, _count, ...pollData } = poll
         const redisVotes = await redis.hgetall(`poll:${poll.id}:results`)
 
-        const hasVoted = votes ? (votes as any[]).length > 0 : false
-        const userVotedOptionId = hasVoted ? (votes as any[])[0].optionId : null
+        // `votes` viene de un select condicional (false si no hay sesión), así
+        // que se normaliza una sola vez en lugar de castear en cada uso.
+        const userVotes = (votes || []) as {
+          optionId: number
+          ranking: number[]
+        }[]
+        const hasVoted = userVotes.length > 0
+        const userVotedOptionId = hasVoted ? userVotes[0].optionId : null
+        const userRanking = hasVoted ? userVotes[0].ranking : null
 
         let totalVotesForPoll = 0
 
@@ -420,10 +432,21 @@ export class PollsService {
           }
         })
 
-        const userReaction =
-          reactions && (reactions as any[]).length > 0
-            ? (reactions as any[])[0].type
+        // El podio se arma aparte: `results` solo cuenta los primeros puestos.
+        const rankingResults =
+          poll.type === 'RANKING' && canSeeResults
+            ? buildRankingMatrix(
+                await redis.hgetall(`poll:${poll.id}:ranking`),
+                parsedOptions.map((opt) => opt.id),
+                parsePollConfig(poll.config).picks,
+              )
             : null
+
+        // Igual que `votes`: el select es condicional, así que se normaliza
+        // una vez en lugar de castear a `any` en cada acceso.
+        const userReactions = (reactions || []) as { type: ReactionType }[]
+        const userReaction =
+          userReactions.length > 0 ? userReactions[0].type : null
 
         const likes =
           pollReactionCounts.find(
@@ -439,6 +462,8 @@ export class PollsService {
           options: parsedOptions,
           hasVoted,
           userVotedOptionId,
+          userRanking,
+          rankingResults,
           userReaction,
           likesCount: likes,
           dislikesCount: dislikes,
@@ -490,6 +515,8 @@ export class PollsService {
     await Promise.all([
       redis.expire(`poll:${pollId}:results`, expiry),
       redis.expire(`poll:${pollId}:voters`, expiry),
+      redis.expire(`poll:${pollId}:ranking`, expiry),
+      redis.expire(`poll:${pollId}:details`, expiry),
     ])
   }
 
@@ -579,7 +606,7 @@ export class PollsService {
         type: true,
         config: true,
         votes: {
-          select: { optionId: true, userId: true },
+          select: { optionId: true, userId: true, ranking: true },
         },
       },
     })
@@ -606,6 +633,14 @@ export class PollsService {
         type: poll.type,
         config: poll.config,
         options: parsedOptions,
+        rankingResults:
+          poll.type === 'RANKING'
+            ? buildRankingMatrixFromVotes(
+                poll.votes,
+                parsedOptions.map((opt) => opt.id),
+                parsePollConfig(poll.config).picks,
+              )
+            : null,
         hasVoted,
         totalVotes: poll.votes.length,
       }
@@ -731,9 +766,6 @@ export class PollsService {
                 select: { type: true },
               }
             : false,
-          _count: {
-            select: { reactions: true },
-          },
         },
       }),
       this.prisma.comment.count({
@@ -750,7 +782,7 @@ export class PollsService {
     })
 
     const formattedComments = comments.map((comment) => {
-      const { reactions, _count, ...commentData } = comment
+      const { reactions, ...commentData } = comment
 
       const likes =
         reactionCounts.find(

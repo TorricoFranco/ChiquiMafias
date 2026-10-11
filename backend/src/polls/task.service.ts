@@ -62,11 +62,22 @@ export class TasksService {
 
       if (Object.keys(allVotes).length === 0) continue
 
-      const voteData = Object.entries(allVotes).map(([userId, optionId]) => ({
-        pollId: poll.id,
-        userId: userId,
-        optionId: parseInt(optionId),
-      }))
+      // En RANKING el detalle es el podio en CSV ("5,2,7"); en el resto, un id suelto.
+      const voteData = Object.entries(allVotes).map(([userId, detail]) => {
+        const ranking = detail.includes(',')
+          ? detail
+              .split(',')
+              .map((id) => parseInt(id, 10))
+              .filter((id) => Number.isInteger(id))
+          : []
+
+        return {
+          pollId: poll.id,
+          userId: userId,
+          optionId: ranking.length > 0 ? ranking[0] : parseInt(detail, 10),
+          ranking,
+        }
+      })
 
       await this.prisma.vote.createMany({
         data: voteData,
