@@ -19,6 +19,8 @@ export function usePollSocket(pollId: string, initialOptions: any[] = []) {
   });
 
   const [connected, setConnected] = useState(false);
+  /** Total de votantes en vivo. Es lo único que recibe quien todavía no votó. */
+  const [liveTotal, setLiveTotal] = useState<number | null>(null);
   const lastVoteTime = useRef<number>(0);
 
   useEffect(() => {
@@ -43,6 +45,10 @@ export function usePollSocket(pollId: string, initialOptions: any[] = []) {
       setResults(updatedResults);
     };
 
+    const handleTotalActualizado = ({ totalVotes }: { totalVotes: number }) => {
+      setLiveTotal(totalVotes);
+    };
+
     const handleWsError = (err: any) => {
       console.error("[Poll WS Error]:", err.message);
     };
@@ -53,17 +59,20 @@ export function usePollSocket(pollId: string, initialOptions: any[] = []) {
     }
 
     const eventoVoto = `votoActualizado_${pollId}`;
+    const eventoTotal = `totalActualizado_${pollId}`;
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on(eventoVoto, handleVotoActualizado);
+    socket.on(eventoTotal, handleTotalActualizado);
     socket.on("ws-error", handleWsError);
 
     return () => {
-      socket.emit("leavePoll", pollId);
+      socket.emit("leavePoll", { pollId: pollId });
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off(eventoVoto, handleVotoActualizado);
+      socket.off(eventoTotal, handleTotalActualizado);
       socket.off("ws-error", handleWsError);
     };
   }, [socket, pollId]);
@@ -79,14 +88,15 @@ export function usePollSocket(pollId: string, initialOptions: any[] = []) {
     socket.disconnect().connect();
   }, [socket]);
 
+  /** Devuelve false si el voto no llegó a salir (throttle), para que el llamador no quede esperando un ack. */
   const castVote = (optionId: number, userId: string, onResponse: (res: any) => void) => {
     const now = Date.now();
 
-    if (now - lastVoteTime.current < 1000) return;
+    if (now - lastVoteTime.current < 1000) return false;
 
     if (!socket?.connected) {
       onResponse({ status: "error", message: "No estás conectado al servidor" });
-      return;
+      return true;
     }
 
     lastVoteTime.current = now;
@@ -94,7 +104,9 @@ export function usePollSocket(pollId: string, initialOptions: any[] = []) {
     socket.emit("castVote", { pollId, optionId, userId }, (response: any) => {
       onResponse(response);
     });
+
+    return true;
   };
 
-  return { results, connected, castVote, reconnect };
+  return { results, connected, liveTotal, castVote, reconnect };
 }

@@ -1,46 +1,23 @@
-import React, { useState } from "react";
+import React from "react";
 import { CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
-import { usePollSocket } from "@/features/polls/socket/usePollSocket";
-import { Poll } from "@/features/polls/types";
-import { useUserStore } from "@/store/useUserStore";
+import { usePollVote } from "@/features/polls/hooks/usePollVote";
+import { PollBodyProps } from "./bodies/types";
 
-export const PollOptions = ({ poll, onVoteUpdate }: { poll: Poll, onVoteUpdate: (totalVotes: number, connected: boolean) => void }) => {
-    const { id: userId } = useUserStore();
-    const [localVotedOptionId, setLocalVotedOptionId] = useState<number | null>(poll.userVotedOptionId || null);
-    
-    const { results, castVote, connected } = usePollSocket(poll.id, poll.options);
-
-    const getOptionVotes = (optId: number) => parseInt(results[optId.toString()] || "0");
-    const totalVotes = poll.options.reduce((sum, opt) => sum + getOptionVotes(opt.id), 0);
+/** Cuerpo clásico: una opción por línea, con barras de porcentaje al votar. */
+export const PollOptions = ({ poll, onVoteUpdate }: PollBodyProps) => {
+    const { options, connected, votedOptionId, isVoted, totalVotes, getOptionVotes, getPercentage, vote } =
+        usePollVote(poll);
 
     React.useEffect(() => {
         onVoteUpdate(totalVotes, connected);
     }, [totalVotes, connected, onVoteUpdate]);
 
-    const handleVote = (optionId: number) => {
-        if (localVotedOptionId) return;
-        if (!userId) {
-            useUserStore.getState().setLoginModalOpen(true);
-            return;
-        }
-        castVote(optionId, userId, (res: any) => {
-            if (res.status === "ok" || res.status === "success" || res.success) {
-                setLocalVotedOptionId(optionId);
-            } else {
-                toast.error(res.message || "No se pudo registrar tu voto");
-            }
-        });
-    };
-
-    const isVoted = Boolean(localVotedOptionId);
-
     return (
         <div className="flex flex-col gap-2.5 mt-1">
-            {poll.options.map((option) => {
-                const isUserSelected = localVotedOptionId === option.id;
+            {options.map((option) => {
+                const isUserSelected = votedOptionId === option.id;
                 const votesForOption = getOptionVotes(option.id);
-                const percentage = totalVotes === 0 ? 0 : Math.round((votesForOption / totalVotes) * 100);
+                const percentage = getPercentage(option.id);
 
                 if (isVoted) {
                     return (
@@ -60,7 +37,7 @@ export const PollOptions = ({ poll, onVoteUpdate }: { poll: Poll, onVoteUpdate: 
                 }
 
                 return (
-                    <button key={option.id} onClick={() => handleVote(option.id)} disabled={!connected} className="min-h-11 bg-[#131313] border border-[#353534] hover:border-[#d2f000] rounded-lg flex justify-center items-center font-bold text-xs md:text-sm text-[#e5e2e1] hover:text-[#d2f000] hover:bg-[#d2f000]/5 transition-all cursor-pointer shadow-sm active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button key={option.id} onClick={() => vote(option.id)} disabled={!connected} className="min-h-11 bg-[#131313] border border-[#353534] hover:border-[#d2f000] rounded-lg flex justify-center items-center font-bold text-xs md:text-sm text-[#e5e2e1] hover:text-[#d2f000] hover:bg-[#d2f000]/5 transition-all cursor-pointer shadow-sm active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
                         {option.label}
                     </button>
                 );

@@ -1,22 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsOptional,
   IsString,
   ValidateNested,
-  ArrayMinSize,
+  ArrayMaxSize,
   IsInt,
+  IsEnum,
+  MaxLength,
 } from 'class-validator'
 import { Type } from 'class-transformer'
+import { PollType } from '@prisma/client'
+import { PollConfigDto } from './poll-config.dto'
 
 export class PollOptionDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 1,
-    description: 'ID único de la opción dentro de la encuesta',
+    description:
+      'Ignorado: el backend numera las opciones de forma correlativa desde 1',
   })
+  @IsOptional()
   @IsInt()
-  id: number
+  id?: number
 
   @ApiProperty({
     example: 'Boca Juniors',
@@ -24,6 +31,14 @@ export class PollOptionDto {
   })
   @IsString()
   label: string
+
+  @ApiPropertyOptional({
+    example: '435',
+    description: 'Escudo de la opción (api_team_id)',
+  })
+  @IsOptional()
+  @IsString()
+  teamId?: string
 }
 
 export class CreatePollDto {
@@ -32,6 +47,7 @@ export class CreatePollDto {
     description: 'Título principal de la encuesta',
   })
   @IsString()
+  @MaxLength(100)
   title: string
 
   @ApiPropertyOptional({
@@ -40,31 +56,60 @@ export class CreatePollDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(250)
   description?: string
 
-  @ApiProperty({
-    type: [PollOptionDto],
-    description: 'Listado de opciones para votar (Mínimo 2)',
+  @ApiPropertyOptional({
+    enum: PollType,
+    default: PollType.CLASSIC,
+    description: 'Tipo de encuesta. Si no se manda, es CLASSIC',
   })
+  @IsOptional()
+  @IsEnum(PollType)
+  type?: PollType
+
+  @ApiPropertyOptional({
+    type: [PollOptionDto],
+    description:
+      'Opciones para votar. Los tipos de opciones fijas (FACTO, RATING) y los informativos no las llevan',
+  })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(2)
+  @ArrayMaxSize(6)
   @ValidateNested({ each: true })
   @Type(() => PollOptionDto)
-  options: PollOptionDto[]
+  options?: PollOptionDto[]
 
-  @ApiProperty({
+  @ApiPropertyOptional({ type: PollConfigDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PollConfigDto)
+  config?: PollConfigDto
+
+  @ApiPropertyOptional({
     example: '2026-05-17T12:00:00.000Z',
-    description: 'Fecha de apertura',
+    description: 'Fecha de apertura. Si no se manda, abre al crearse',
   })
+  @IsOptional()
   @IsDateString()
-  startsAt: string
+  startsAt?: string
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2026-05-24T21:00:00.000Z',
-    description: 'Fecha de cierre',
+    description:
+      'Fecha de cierre. Obligatoria salvo en los tipos informativos, que no cierran',
   })
+  @IsOptional()
   @IsDateString()
-  endsAt: string
+  endsAt?: string
+
+  @ApiPropertyOptional({
+    default: true,
+    description: 'Si la encuesta acepta comentarios',
+  })
+  @IsOptional()
+  @IsBoolean()
+  commentsEnabled?: boolean
 
   @ApiPropertyOptional({
     example: 'FOOTBALL',

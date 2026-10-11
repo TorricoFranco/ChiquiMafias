@@ -19,7 +19,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger'
 import { Roles } from '../auth/decorators/roles.decorator'
-import { SystemRole } from '../auth/enums/roles.enum'
+import { ROLE_HIERARCHY, SystemRole } from '../auth/enums/roles.enum'
+import type { ActiveUser } from 'src/auth/interfaces/active-user.interface'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { PollsService } from './polls.service'
 import { CreatePollDto } from './dto/create-poll.dto'
@@ -32,6 +33,8 @@ import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { CreateCommentDto } from './dto/create-comment.dto'
 import { ReactDto } from './dto/reaction.dto'
+
+const MODERATOR_INDEX = ROLE_HIERARCHY.indexOf(SystemRole.MODERATOR)
 
 @ApiTags('Polls (Encuestas)')
 @Controller('polls')
@@ -199,8 +202,14 @@ export class PollsController {
     summary:
       'Obtener encuestas que estén actualmente activas (Público / Autenticado)',
   })
-  async findActive(@GetUser('id') userId?: string) {
-    return this.pollsService.getActivePolls(userId)
+  async findActive(@GetUser() user?: ActiveUser) {
+    // La moderación ve los resultados sin tener que votar: el panel de admin
+    // consume este mismo endpoint.
+    const isStaff = Boolean(
+      user?.role && ROLE_HIERARCHY.indexOf(user.role) >= MODERATOR_INDEX,
+    )
+
+    return this.pollsService.getActivePolls(user?.id, isStaff)
   }
 
   @Get(':id/comments')
@@ -222,11 +231,13 @@ export class PollsController {
     @Param('id') pollId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
+    @GetUser('id') userId?: string,
   ) {
     return this.pollsService.getPollComments(
       pollId,
       Number(page),
       Number(limit),
+      userId,
     )
   }
 

@@ -11,7 +11,7 @@ import {
     useClosePollManually
 } from '../hooks/usePolls';
 
-import { AdminPollItem } from '../types';
+import { AdminPollItem, CreatePollDto } from '../types';
 
 import { CreatePollModal } from './admin/CreatePollModal';
 import { ApprovePollModal } from './admin/ApprovePollModal';
@@ -32,11 +32,9 @@ export const AdminPolls: React.FC = () => {
     const rejectPoll = useRejectPoll();
     const closePoll = useClosePollManually();
 
-    const handleCreateOfficialPoll = (
-        title: string, desc: string, options: any[], start: string, end: string, icon: string
-    ) => {
+    const handleCreateOfficialPoll = (dto: CreatePollDto) => {
         createPoll.mutate(
-            { title, description: desc, options, startsAt: start, endsAt: end, icon },
+            dto,
             {
                 onSuccess: () => {
                     toast.success('Encuesta oficial creada y publicada con éxito');
