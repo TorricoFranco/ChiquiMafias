@@ -3,9 +3,36 @@ export interface PollOption {
   id: number;
   label: string;
   votes: number;
+  /** api_team_id del escudo de la opción; el path se arma en TeamBadge. */
+  teamId?: string;
 }
 
 export type PollStatus = 'PENDING' | 'ACTIVE' | 'CLOSED' | 'REJECTED';
+
+export type PollType =
+  | 'CLASSIC'
+  | 'VERSUS'
+  | 'MATCH'
+  | 'RATING'
+  | 'RANKING'
+  | 'FACTO'
+  | 'NEWS'
+  | 'INFO';
+
+/** Formato del tipo MATCH: tarjeta de partido o pregunta con escudos. */
+export type MatchLayout = 'VS' | 'LIST';
+
+export interface PollConfig {
+  layout?: MatchLayout;
+  picks?: number;
+  scale?: number;
+}
+
+/**
+ * Config que acepta el backend al crear o proponer: `picks` y `scale` los
+ * define el servidor, y mandarlos da 400 por `forbidNonWhitelisted`.
+ */
+export type PollConfigInput = Pick<PollConfig, 'layout'>;
 
 export interface Poll {
   id: string;
@@ -17,12 +44,17 @@ export interface Poll {
   startsAt: string | null;
   endsAt: string | null;
   icon: string;
+  type: PollType;
+  config?: PollConfig | null;
+  commentsEnabled?: boolean;
   userId?: string | null;
   user?: {
     id: string;
     username: string;
     avatarUrl?: string | null;
   };
+  /** Cantidad de votantes. Llega siempre, incluso sin haber votado. */
+  totalVotes?: number;
   userVotedOptionId?: number | null;
   likesCount?: number;
   dislikesCount?: number;
@@ -79,19 +111,50 @@ export interface PaginatedPolls {
   };
 }
 
+/** Respuesta del ack de `castVote` por socket. */
+export interface VoteAck {
+  status?: string;
+  success?: boolean;
+  /** Código de error del backend, por ejemplo `ALREADY_VOTED`. */
+  code?: string;
+  message?: string;
+}
+
 export type ReactionType = 'LIKE' | 'DISLIKE';
 
 
 export interface ProposePollDto {
   title: string;
   description?: string;
-  options: string[];
+  type?: PollType;
+  options?: string[];
+  /** Escudos alineados por índice con options; cadena vacía para una opción sin escudo. */
+  optionTeamIds?: string[];
+  config?: PollConfigInput;
   icon?: string;
 }
 
 export interface ApprovePollDto {
   startsAt: string;
   endsAt: string;
+}
+
+export interface CreatePollOption {
+  label: string;
+  teamId?: string;
+}
+
+export interface CreatePollDto {
+  title: string;
+  description?: string;
+  type?: PollType;
+  options?: CreatePollOption[];
+  config?: PollConfigInput;
+  commentsEnabled?: boolean;
+  startsAt?: string;
+  /** Opcional: los tipos informativos no cierran. */
+  endsAt?: string;
+  icon?: string;
 }
 
 export interface CreateCommentDto {
@@ -104,6 +167,9 @@ export interface ReactDto {
 
 
 export interface AdminPollItem {
+  type?: PollType;
+  config?: PollConfig | null;
+  ticketCost?: number;
   id: string;
   title: string;
   description?: string | null;

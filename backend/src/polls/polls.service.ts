@@ -1,18 +1,30 @@
 import { Prisma } from '@prisma/client'
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 import { CreatePollDto } from './dto/create-poll.dto'
 import { ProposePollDto } from './dto/propose-poll.dto'
 import { ApprovePollDto } from './dto/aprove-poll.dto'
-import { ReactionType } from '@prisma/client'
+import { PollType, ReactionType } from '@prisma/client'
 import { CreateCommentDto } from './dto/create-comment.dto'
 import { NotFoundException } from '@nestjs/common/exceptions/not-found.exception'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { WalletService } from 'src/wallet/wallet.service'
+import {
+  POLL_TYPE_LABELS,
+  POLL_TYPE_RULES,
+} from './constants/poll-types.constant'
+import {
+  buildPollShape,
+  parsePollOptions,
+  parseTicketRefund,
+} from './utils/poll-shape.util'
+import type { PollTicketRefund } from './utils/poll-shape.util'
 
 @Injectable()
 export class PollsService {
+  private readonly logger = new Logger(PollsService.name)
+
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
@@ -21,46 +33,115 @@ export class PollsService {
   ) {}
 
   async proposePoll(userId: string, dto: ProposePollDto) {
-    const formattedOptions = dto.options.map((optionText, index) => ({
-      id: index + 1,
-      label: optionText,
-    }))
+    const type = dto.type ?? PollType.CLASSIC
+
+    if (POLL_TYPE_RULES[type]?.adminOnly) {
+      throw new BadRequestException(
+        `Las encuestas de tipo ${POLL_TYPE_LABELS[type]} solo las publica la moderación`,
+      )
+    }
+
+    const shape = buildPollShape({
+      type,
+      labels: dto.options ?? [],
+      teamIds: dto.optionTeamIds,
+      layout: dto.config?.layout,
+    })
 
     return this.prisma.$transaction(async (tx) => {
-      const inventoryItem = await tx.userInventory.findFirst({
-        where: {
-          userId,
-          item: { type: 'CUSTOM_POLL' },
-          quantity: { gte: 1 },
-        },
-      })
-
-      if (!inventoryItem) {
-        throw new BadRequestException(
-          'No tenés ningún Ticket de Encuesta disponible en tu inventario ❌',
-        )
-      }
-
-      if (inventoryItem.quantity === 1) {
-        await tx.userInventory.delete({ where: { id: inventoryItem.id } })
-      } else {
-        await tx.userInventory.update({
-          where: { id: inventoryItem.id },
-          data: { quantity: { decrement: 1 } },
-        })
-      }
+      const ticketRefund = await this.consumePollTickets(
+        tx,
+        userId,
+        shape.ticketCost,
+      )
 
       return tx.poll.create({
         data: {
           title: dto.title,
           description: dto.description || null,
-          options: formattedOptions,
+          type,
+          options: shape.options as unknown as Prisma.InputJsonValue[],
+          config: (shape.config ?? Prisma.DbNull) as Prisma.InputJsonValue,
+          ticketCost: shape.ticketCost,
+          ticketRefund: ticketRefund as unknown as Prisma.InputJsonValue,
           status: 'PENDING',
           icon: dto.icon || 'USER',
           userId: userId,
         },
       })
     })
+  }
+
+  /**
+   * Descuenta `amount` tickets de encuesta del inventario del usuario.
+   * El stock puede estar repartido en varias filas (el de la tienda y el regalo
+   * de suscripción son StoreItems distintos del mismo tipo), así que se suma todo
+   * y se descuenta fila por fila hasta cubrir el costo.
+   *
+   * @returns de qué ítem salió cada ticket, para poder devolver los mismos.
+   */
+  private async consumePollTickets(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    amount: number,
+  ): Promise<PollTicketRefund[]> {
+    const inventoryRows = await tx.userInventory.findMany({
+      where: {
+        userId,
+        item: { type: 'CUSTOM_POLL' },
+        quantity: { gte: 1 },
+      },
+      // El id desempata: sin un orden estable, dos propuestas simultáneas del
+      // mismo usuario pueden tomar los locks cruzados y provocar un deadlock.
+      orderBy: [{ quantity: 'desc' }, { id: 'asc' }],
+    })
+
+    const available = inventoryRows.reduce(
+      (total, row) => total + row.quantity,
+      0,
+    )
+
+    if (available < amount) {
+      throw new BadRequestException(
+        amount === 1
+          ? 'No tenés ningún Ticket de Encuesta disponible en tu inventario ❌'
+          : `Esta encuesta cuesta ${amount} Tickets de Encuesta y tenés ${available} ❌`,
+      )
+    }
+
+    let remaining = amount
+    const charged: PollTicketRefund[] = []
+
+    for (const row of inventoryRows) {
+      if (remaining === 0) break
+
+      const taken = Math.min(row.quantity, remaining)
+
+      // Decremento condicional: si otra propuesta simultánea ya consumió esta
+      // fila, el updateMany no afecta nada y seguimos con la siguiente en vez
+      // de dejar el inventario en negativo.
+      const { count } = await tx.userInventory.updateMany({
+        where: { id: row.id, quantity: { gte: taken } },
+        data: { quantity: { decrement: taken } },
+      })
+
+      if (count > 0) {
+        remaining -= taken
+        charged.push({ itemId: row.itemId, quantity: taken })
+      }
+    }
+
+    if (remaining > 0) {
+      throw new BadRequestException(
+        'No pudimos descontar tus Tickets de Encuesta, probá de nuevo ❌',
+      )
+    }
+
+    await tx.userInventory.deleteMany({
+      where: { userId, item: { type: 'CUSTOM_POLL' }, quantity: { lte: 0 } },
+    })
+
+    return charged
   }
 
   async getPendingPolls() {
@@ -90,18 +171,29 @@ export class PollsService {
       )
     }
 
-    const poll = await this.prisma.poll.findUnique({ where: { id: pollId } })
-    if (!poll) throw new NotFoundException('La encuesta no existe')
-    if (poll.status !== 'PENDING')
-      throw new BadRequestException('Esta encuesta ya no está pendiente')
-
-    const updatedPoll = await this.prisma.poll.update({
-      where: { id: pollId },
+    // Lock optimista: si otro moderador la rechazó entre la lectura y la
+    // escritura, esto no la publica igual.
+    const { count } = await this.prisma.poll.updateMany({
+      where: { id: pollId, status: 'PENDING' },
       data: {
         status: 'ACTIVE',
         startsAt: startsAtDate,
         endsAt: endsAtDate,
       },
+    })
+
+    if (count === 0) {
+      const exists = await this.prisma.poll.findUnique({
+        where: { id: pollId },
+        select: { id: true },
+      })
+
+      if (!exists) throw new NotFoundException('La encuesta no existe')
+      throw new BadRequestException('Esta encuesta ya no está pendiente')
+    }
+
+    const updatedPoll = await this.prisma.poll.findUniqueOrThrow({
+      where: { id: pollId },
     })
 
     if (updatedPoll.userId) {
@@ -116,103 +208,165 @@ export class PollsService {
   }
 
   async rejectPoll(pollId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const rejectedPoll = await this.prisma.$transaction(async (tx) => {
       const poll = await tx.poll.findUnique({ where: { id: pollId } })
       if (!poll) throw new NotFoundException('La encuesta no existe')
-      if (poll.status !== 'PENDING')
-        throw new BadRequestException(
-          'Solo se pueden rechazar encuestas en estado PENDING',
-        )
 
-      await tx.poll.update({
-        where: { id: pollId },
+      // Lock optimista: dos rechazos simultáneos (o un doble clic) no pueden
+      // reembolsar los tickets dos veces.
+      const { count } = await tx.poll.updateMany({
+        where: { id: pollId, status: 'PENDING' },
         data: { status: 'REJECTED' },
       })
 
-      // reembolso de ticket
+      if (count === 0) {
+        throw new BadRequestException(
+          'Solo se pueden rechazar encuestas en estado PENDING',
+        )
+      }
+
+      // Se devuelven exactamente los tickets que costó proponerla, y al mismo
+      // ítem del que salieron: el de la tienda y el regalo de suscripción son
+      // StoreItems distintos del mismo tipo.
       if (poll.userId) {
-        const storeItem = await tx.storeItem.findFirst({
-          where: { type: 'CUSTOM_POLL' },
-        })
+        const refunds = await this.resolveTicketRefunds(tx, poll)
 
-        if (!storeItem) {
-          throw new BadRequestException(
-            'No se encontró el artículo base CUSTOM_POLL en la tienda',
-          )
-        }
-
-        const existingInv = await tx.userInventory.findUnique({
-          where: {
-            userId_itemId: { userId: poll.userId, itemId: storeItem.id },
-          },
-        })
-
-        if (existingInv) {
-          await tx.userInventory.update({
-            where: { id: existingInv.id },
-            data: { quantity: { increment: 1 } },
-          })
-        } else {
-          await tx.userInventory.create({
-            data: {
+        for (const refund of refunds) {
+          await tx.userInventory.upsert({
+            where: {
+              userId_itemId: { userId: poll.userId, itemId: refund.itemId },
+            },
+            update: { quantity: { increment: refund.quantity } },
+            create: {
               userId: poll.userId,
-              itemId: storeItem.id,
-              quantity: 1,
+              itemId: refund.itemId,
+              quantity: refund.quantity,
             },
           })
         }
-
-        this.eventEmitter.emit('poll.rejected', {
-          userId: poll.userId,
-          pollId: poll.id,
-          pollTitle: poll.title,
-        })
       }
 
-      return {
-        message: 'Encuesta rechazada y consumible reembolsado al usuario.',
-      }
+      return poll
     })
+
+    // El evento se emite recién con la transacción confirmada.
+    if (rejectedPoll.userId) {
+      this.eventEmitter.emit('poll.rejected', {
+        userId: rejectedPoll.userId,
+        pollId: rejectedPoll.id,
+        pollTitle: rejectedPoll.title,
+      })
+    }
+
+    return {
+      message: 'Encuesta rechazada y consumible reembolsado al usuario.',
+    }
+  }
+
+  /**
+   * De qué ítems hay que devolver los tickets de una propuesta rechazada.
+   * Las encuestas creadas antes de este cambio no tienen desglose, así que
+   * caen al ítem comprable de la tienda.
+   */
+  private async resolveTicketRefunds(
+    tx: Prisma.TransactionClient,
+    poll: { ticketCost: number; ticketRefund: Prisma.JsonValue },
+  ): Promise<PollTicketRefund[]> {
+    const stored = parseTicketRefund(poll.ticketRefund)
+
+    if (stored.length > 0) return stored
+
+    if (poll.ticketCost <= 0) return []
+
+    const storeItem = await tx.storeItem.findFirst({
+      where: { type: 'CUSTOM_POLL', isPurchasable: true },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (!storeItem) {
+      throw new BadRequestException(
+        'No se encontró el artículo base CUSTOM_POLL en la tienda',
+      )
+    }
+
+    return [{ itemId: storeItem.id, quantity: poll.ticketCost }]
   }
 
   async createPoll(dto: CreatePollDto) {
-    const startsAtDate = new Date(dto.startsAt)
-    const endsAtDate = new Date(dto.endsAt)
+    const type = dto.type ?? PollType.CLASSIC
+    const rawOptions = dto.options ?? []
 
-    if (endsAtDate <= startsAtDate) {
+    const shape = buildPollShape({
+      type,
+      labels: rawOptions.map((option) => option.label),
+      teamIds: rawOptions.map((option) => option.teamId),
+      layout: dto.config?.layout,
+    })
+
+    const startsAtDate = dto.startsAt ? new Date(dto.startsAt) : new Date()
+    const endsAtDate = dto.endsAt ? new Date(dto.endsAt) : null
+
+    if (shape.requiresEndsAt && !endsAtDate) {
+      throw new BadRequestException(
+        'Falta la fecha de cierre (endsAt) de la encuesta.',
+      )
+    }
+
+    if (endsAtDate && endsAtDate <= startsAtDate) {
       throw new BadRequestException(
         'La fecha de finalización (endsAt) debe ser posterior a la de inicio (startsAt).',
       )
     }
 
+    // Si la programan para más adelante queda PENDING y la abre el cron cuando
+    // llega `startsAt`, igual que una propuesta aprobada.
+    const isScheduled = startsAtDate.getTime() > Date.now()
+
     const nuevaPoll = await this.prisma.poll.create({
       data: {
         title: dto.title,
         description: dto.description,
-        options: dto.options as unknown as Prisma.InputJsonValue[],
-        status: 'ACTIVE',
+        type,
+        options: shape.options as unknown as Prisma.InputJsonValue[],
+        config: (shape.config ?? Prisma.DbNull) as Prisma.InputJsonValue,
+        // La publica la moderación: no consumió tickets, así que no hay nada que devolver.
+        ticketCost: 0,
+        commentsEnabled: dto.commentsEnabled ?? true,
+        status: isScheduled ? 'PENDING' : 'ACTIVE',
         startsAt: startsAtDate,
         endsAt: endsAtDate,
         icon: dto.icon,
       },
     })
 
-    this.eventEmitter.emit('poll.created', nuevaPoll)
+    // El aviso en el chat invita a votar: no tiene sentido para una placa
+    // informativa ni para una encuesta que todavía no abrió.
+    if (POLL_TYPE_RULES[type].votable && !isScheduled) {
+      this.eventEmitter.emit('poll.created', nuevaPoll)
+    }
 
     return nuevaPoll
   }
 
-  async getActivePolls(userId?: string) {
+  /**
+   * @param revealResults fuerza los resultados por opción aunque el usuario no
+   * haya votado. Lo usa el panel de moderación, que necesita ver los números.
+   */
+  async getActivePolls(userId?: string, revealResults = false) {
     const polls = await this.prisma.poll.findMany({
       where: { status: 'ACTIVE' },
       select: {
         id: true,
         title: true,
         options: true,
+        createdAt: true,
         endsAt: true,
         icon: true,
         description: true,
-        user: { select: { username: true } },
+        type: true,
+        config: true,
+        commentsEnabled: true,
+        user: { select: { id: true, username: true } },
 
         _count: {
           select: {
@@ -247,22 +401,25 @@ export class PollsService {
         const { votes, reactions, options, _count, ...pollData } = poll
         const redisVotes = await redis.hgetall(`poll:${poll.id}:results`)
 
-        const rawOptions = options as unknown as { id: number; label: string }[]
+        const hasVoted = votes ? (votes as any[]).length > 0 : false
+        const userVotedOptionId = hasVoted ? (votes as any[])[0].optionId : null
 
         let totalVotesForPoll = 0
 
-        const parsedOptions = rawOptions.map((opt) => {
+        // Los resultados por opción se revelan recién después de votar, para no
+        // sesgar a quien todavía no votó. El total sí es público.
+        const canSeeResults = hasVoted || revealResults
+
+        const parsedOptions = parsePollOptions(options).map((opt) => {
           const optVotes = parseInt(redisVotes[opt.id.toString()] || '0', 10)
           totalVotesForPoll += optVotes
 
           return {
             ...opt,
-            votes: optVotes,
+            votes: canSeeResults ? optVotes : 0,
           }
         })
 
-        const hasVoted = votes ? (votes as any[]).length > 0 : false
-        const userVotedOptionId = hasVoted ? (votes as any[])[0].optionId : null
         const userReaction =
           reactions && (reactions as any[]).length > 0
             ? (reactions as any[])[0].type
@@ -419,6 +576,8 @@ export class PollsService {
         icon: true,
         endsAt: true,
         options: true,
+        type: true,
+        config: true,
         votes: {
           select: { optionId: true, userId: true },
         },
@@ -426,12 +585,7 @@ export class PollsService {
     })
 
     const history = polls.map((poll) => {
-      const rawOptions = poll.options as unknown as {
-        id: number
-        label: string
-      }[]
-
-      const parsedOptions = rawOptions.map((opt) => {
+      const parsedOptions = parsePollOptions(poll.options).map((opt) => {
         const voteCount = poll.votes.filter((v) => v.optionId === opt.id).length
         return {
           ...opt,
@@ -449,6 +603,8 @@ export class PollsService {
         description: poll.description,
         icon: poll.icon,
         endsAt: poll.endsAt,
+        type: poll.type,
+        config: poll.config,
         options: parsedOptions,
         hasVoted,
         totalVotes: poll.votes.length,
@@ -473,6 +629,19 @@ export class PollsService {
   }
 
   async addComment(pollId: string, userId: string, dto: CreateCommentDto) {
+    const poll = await this.prisma.poll.findUnique({
+      where: { id: pollId },
+      select: { commentsEnabled: true },
+    })
+
+    if (!poll) throw new NotFoundException('La encuesta no existe')
+
+    if (!poll.commentsEnabled) {
+      throw new BadRequestException(
+        'Esta encuesta tiene los comentarios cerrados',
+      )
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { activeSubscriptionTier: true },

@@ -20,6 +20,9 @@ import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 import { CastVoteDto } from './dto/cast-vote.dto'
 import { JoinPollDto } from './dto/join-poll.dto'
 
+/** Sala de los que ya votaron: son los únicos que reciben los resultados. */
+const votedRoom = (pollId: string) => `poll_${pollId}_voted`
+
 @WebSocketGateway()
 export class PollsGateway {
   @WebSocketServer()
@@ -33,16 +36,33 @@ export class PollsGateway {
   @UseFilters(AllWsExceptionFilter)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   @SubscribeMessage('joinPoll')
-  handleJoinRoom(
+  async handleJoinRoom(
     @MessageBody() data: JoinPollDto,
     @ConnectedSocket() client: SocketWithUser,
   ) {
     const { pollId } = data
-    this.logger.log(
-      `Cliente ${client.data.user.id} se unió a la poll: ${pollId}`,
-    )
+    const userId = client.data.user.id
 
-    client.join(`poll_${pollId}`)
+    this.logger.debug(`Cliente ${userId} se unió a la poll: ${pollId}`)
+
+    await client.join(`poll_${pollId}`)
+
+    // Los resultados por opción solo viajan a los que ya votaron.
+    if (await this.voteService.hasVoted(pollId, userId)) {
+      await client.join(votedRoom(pollId))
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
+  @UseFilters(AllWsExceptionFilter)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @SubscribeMessage('leavePoll')
+  async handleLeaveRoom(
+    @MessageBody() data: JoinPollDto,
+    @ConnectedSocket() client: SocketWithUser,
+  ) {
+    await client.leave(`poll_${data.pollId}`)
+    await client.leave(votedRoom(data.pollId))
   }
 
   @UseGuards(WsJwtGuard)
@@ -53,15 +73,31 @@ export class PollsGateway {
     @MessageBody() data: CastVoteDto,
     @ConnectedSocket() client: SocketWithUser,
   ) {
+    const { pollId } = data
+
     const updatedResults = await this.voteService.castVote(
-      data.pollId,
+      pollId,
       client.data.user.id,
       data.optionId,
     )
 
+    await client.join(votedRoom(pollId))
+
+    // Resultados completos solo para los que ya votaron...
     this.server
-      .to(`poll_${data.pollId}`)
-      .emit(`votoActualizado_${data.pollId}`, updatedResults)
+      .to(votedRoom(pollId))
+      .emit(`votoActualizado_${pollId}`, updatedResults)
+
+    // ...y para el resto, solo cuántos votaron.
+    const totalVotes = Object.values(updatedResults).reduce(
+      (total, votes) => total + Number(votes),
+      0,
+    )
+
+    this.server
+      .to(`poll_${pollId}`)
+      .except(votedRoom(pollId))
+      .emit(`totalActualizado_${pollId}`, { totalVotes })
 
     return { status: 'success' }
   }

@@ -1,21 +1,29 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, TrendingUp, Clock, PlusCircle } from "lucide-react";
+import { Sparkles, PlusCircle } from "lucide-react";
 import { useActivePolls } from "@/features/polls/hooks/usePolls";
 import { PollCard } from "./PollCard";
 import { CreatePollModal } from "./CreatePollModal";
 import { useUserInventory } from "@/features/inventory/hooks/useInventory";
+import { POLL_FILTER_GROUPS } from "@/features/polls/constants/pollTypes";
 
 export const SidebarPolls = () => {
-    const [activeFilter, setActiveFilter] = useState<"tendencias" | "recientes">("tendencias");
+    const [activeFilter, setActiveFilter] = useState(POLL_FILTER_GROUPS[0].id);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const { data: activePolls, isLoading, isError } = useActivePolls();
 
     const { data: inventory } = useUserInventory();
 
+    // El stock puede estar repartido en varias filas (ticket de tienda y regalo
+    // de suscripción son ítems distintos del mismo tipo), igual que lo suma el backend.
     const pollTicketCount =
-        inventory?.all?.find((inv) => inv.item.type === "CUSTOM_POLL")?.quantity ?? 0;
+        inventory?.customPolls?.reduce((total, inv) => total + (inv.quantity ?? 0), 0) ?? 0;
+
+    const activeGroup = POLL_FILTER_GROUPS.find((group) => group.id === activeFilter);
+    const visiblePolls = activeGroup?.types
+        ? activePolls?.filter((poll) => activeGroup.types!.includes(poll.type))
+        : activePolls;
 
     return (
         <section className="flex flex-col gap-6">
@@ -27,13 +35,17 @@ export const SidebarPolls = () => {
                     </span>
                 </div>
 
-                <div className="flex items-center bg-[#1c1b1b] border border-[#353534] p-1 rounded-xl text-xs">
-                    <button onClick={() => setActiveFilter("tendencias")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${activeFilter === "tendencias" ? "bg-[#d2f000] text-[#191e00]" : "text-[#c6c9ab] hover:text-[#e5e2e1]"}`}>
-                        <TrendingUp className="w-3.5 h-3.5" /> Tendencias
-                    </button>
-                    <button onClick={() => setActiveFilter("recientes")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${activeFilter === "recientes" ? "bg-[#d2f000] text-[#191e00]" : "text-[#c6c9ab] hover:text-[#e5e2e1]"}`}>
-                        <Clock className="w-3.5 h-3.5" /> Recientes
-                    </button>
+                <div className="flex items-center bg-[#1c1b1b] border border-[#353534] p-1 rounded-xl text-xs overflow-x-auto max-w-full">
+                    {POLL_FILTER_GROUPS.map((group) => (
+                        <button
+                            key={group.id}
+                            onClick={() => setActiveFilter(group.id)}
+                            aria-pressed={activeFilter === group.id}
+                            className={`whitespace-nowrap px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${activeFilter === group.id ? "bg-[#d2f000] text-[#191e00]" : "text-[#c6c9ab] hover:text-[#e5e2e1]"}`}
+                        >
+                            {group.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -89,10 +101,12 @@ export const SidebarPolls = () => {
             <div className="flex flex-col gap-6">
                 {isLoading && <p className="text-[#c6c9ab] text-center py-4">Cargando encuestas de la tribuna...</p>}
                 {isError && <p className="text-red-500 text-center py-4">Hubo un error al cargar las encuestas.</p>}
-                {!isLoading && !isError && activePolls?.length === 0 && (
-                    <p className="text-[#c6c9ab] text-center py-4">No hay encuestas activas en este momento.</p>
+                {!isLoading && !isError && visiblePolls?.length === 0 && (
+                    <p className="text-[#c6c9ab] text-center py-4">
+                        {activeGroup?.types ? "No hay encuestas de este tipo por ahora." : "No hay encuestas activas en este momento."}
+                    </p>
                 )}
-                {activePolls?.map((poll) => (
+                {visiblePolls?.map((poll) => (
                     <PollCard key={poll.id} poll={poll} />
                 ))}
             </div>

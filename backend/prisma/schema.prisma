@@ -482,6 +482,17 @@ enum ReactionType {
   DISLIKE
 }
 
+enum PollType {
+  CLASSIC // Texto plano, el tipo histórico
+  VERSUS // Duelo 1 vs 1, con escudos opcionales
+  MATCH // Predicción tipo partido (1-X-2) o pregunta con escudos
+  RATING // Puntuación de 1 a 5 estrellas
+  RANKING // Podio: se eligen 3 opciones ordenadas
+  FACTO // Facto / No facto, para debatir en comentarios
+  NEWS // Noticia votable, solo la crea un moderador
+  INFO // Placa informativa sin votación, solo la crea un moderador
+}
+
 model Poll {
   id          String    @id @default(uuid())
   title       String
@@ -493,6 +504,12 @@ model Poll {
   endsAt      DateTime?
   icon        String    @default("USER")
 
+  type            PollType @default(CLASSIC)
+  config          Json?
+  ticketCost      Int      @default(1) // Tickets consumidos al proponerla; se devuelven tal cual al rechazar
+  ticketRefund    Json? // [{ itemId, quantity }]: de qué ítem salió cada ticket, para devolver el mismo
+  commentsEnabled Boolean  @default(true)
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -500,6 +517,8 @@ model Poll {
   votes     Vote[]
   comments  Comment[]
   reactions PollReaction[]
+
+  @@index([status, type])
 }
 
 model Vote {

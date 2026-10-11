@@ -1,5 +1,10 @@
-- [Patrones de bug recurrentes](recurring-bug-patterns.md): Roles/Public, sanciones, sockets, TOCTOU, Redis en tx, `where` undefined, alta "una vigente", cron que borra el tier, P2002 amplio
+- [Patrones de bug recurrentes](recurring-bug-patterns.md): Roles/Public, sanciones, sockets, TOCTOU, Redis en tx, `where` undefined, alta "una vigente", cron que borra el tier, P2002 amplio, inventario multi-fila
 - [Hechos de runtime verificados](verified-runtime-facts.md): guards WS, $executeRaw void, ioredis caído, Throttler, Discord, tipos de Wallet, DB de dev, tiempos de MP
+- [Decisiones de diseño confirmadas](confirmed-design-decisions.md): migraciones fuera de git, Redis como fuente de verdad de los votos, `startsAt` decorativo, costos por tipo de encuesta — no reportarlas como bug
+- [Decisiones bets/auth](design-decisions-bets-auth.md): liquidación automática (PEN/AET/PST) y hash de refresh sha256+bcrypt con fallback
+- [Deuda conocida](known-accepted-issues.md): processor decrement, settleMarket sin addCoins, isProduction fijo — no re-reportar salvo que empeore
+- [Sync de saldo en Redis](redis-balance-sync-pattern.md): SET absoluto post-commit con valor viejo pisa escrituras; Lua va adelante de la DB
 - [Env de prod](prod-env-config.md): compose de prod usa env_file .env; ENABLE_DEV_TOOLS fijo en "false"; scripts del host leen backend/.env
-- [Decisiones de diseño](dev-tools-design.md): DevToolsGuard, api-football solo ADMIN en prod, Discord solo sanciona USERs, WARN sin jerarquía
-- [Working tree compartido](feedback-shared-worktree.md): no `npm run lint` (--fix), solo `npx eslint <archivo>`; nunca e2e ni `npm test`
+- [Decisiones de dev-tools](dev-tools-design.md): DevToolsGuard, api-football solo ADMIN en prod, Discord solo sanciona USERs, WARN sin jerarquía
+- [Working tree compartido](feedback-shared-worktree.md): no `npm run lint` (--fix), solo `npx eslint <archivo>`; nunca e2e ni `npm test`; diffs con --ignore-cr-at-eol
+- [Cómo revisar acá](review-workflow.md): releer los archivos antes de escribir el reporte, el árbol se mueve; errores de tsc preexistentes

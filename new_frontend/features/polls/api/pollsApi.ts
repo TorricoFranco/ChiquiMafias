@@ -4,6 +4,7 @@ import {
     ProposePollDto,
     ApprovePollDto,
     CreateCommentDto,
+    CreatePollDto,
     ReactDto,
     Comment,
     PaginatedComments
@@ -134,14 +135,7 @@ export const pollsApi = {
     },
 
     // Crear una encuesta directa desde cero (Solo ADMIN)
-    createPoll: async (dto: {
-        title: string;
-        description?: string;
-        options: { id: number; label: string }[];
-        startsAt: string;
-        endsAt: string;
-        icon: string;
-    }): Promise<Poll> => {
+    createPoll: async (dto: CreatePollDto): Promise<Poll> => {
         const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/polls`, {
             method: "POST",
             body: JSON.stringify(dto),

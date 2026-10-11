@@ -1,40 +1,33 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, ThumbsUp, ArrowRight } from "lucide-react";
-import { usePollSocket } from '../socket/usePollSocket';
-import { useUserStore } from '@/store/useUserStore';
+import { usePollVote } from '../hooks/usePollVote';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useReactToPoll } from '../hooks/usePolls';
 import { Poll } from "@/features/polls/types";
+import { getPollTypeMeta } from "../constants/pollTypes";
 
 interface PollCardResumeProps {
     poll: Poll;
 }
 
 export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
-    const userId = useUserStore((state) => state.id);
-    const { results, connected, castVote } = usePollSocket(poll.id, poll.options);
     const { mutate: reactToPoll } = useReactToPoll();
-
     const setActiveTab = useNavigationStore((state) => state.setActiveTab);
 
-    const [localHasVoted, setLocalHasVoted] = useState(poll.userVotedOptionId != null);
-    const [isVoting, setIsVoting] = useState(false);
+    // Misma lógica de voto que el feed: login si no hay sesión, toast si el
+    // backend rechaza y un solo voto en vuelo.
+    const {
+        options: safeOptions,
+        connected,
+        isVoted: localHasVoted,
+        isVoting,
+        getPercentage,
+        vote,
+    } = usePollVote(poll);
 
-    const totalVotes = Object.values(results).reduce((acc, val) => acc + Number(val), 0);
-    const safeOptions = Array.isArray(poll.options) ? poll.options : [];
-
-    const handleVoteClick = (optionId: number) => {
-        if (!userId || isVoting) return;
-        setIsVoting(true);
-
-        castVote(optionId, userId, (response: any) => {
-            setIsVoting(false);
-            if (response.status === 'success') {
-                setLocalHasVoted(true);
-            }
-        });
-    };
+    const typeMeta = getPollTypeMeta(poll.type);
+    const isVotable = typeMeta.votable;
 
     const handleGoToPronosticos = () => {
         setActiveTab("Pronósticos");
@@ -47,10 +40,15 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
     return (
         <div className="bg-[#1c1b1b] border border-[#353534] rounded-xl p-4 flex flex-col gap-3 shadow-sm">
             <div className="flex justify-between items-start">
-                <h4 className="text-[#e5e2e1] text-sm font-bold leading-tight line-clamp-2">
-                    {poll.title}
-                </h4>
-                {!localHasVoted && (
+                <div className="flex flex-col gap-1.5 min-w-0">
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold tracking-wider uppercase self-start ${typeMeta.chipClass}`}>
+                        {typeMeta.chipLabel}
+                    </span>
+                    <h4 className="text-[#e5e2e1] text-sm font-bold leading-tight line-clamp-2">
+                        {poll.title}
+                    </h4>
+                </div>
+                {isVotable && !localHasVoted && (
                     <span className="bg-[#d2f000]/20 text-[#d2f000] text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 animate-pulse flex items-center gap-1">
                         <div className="w-3.5 h-3.5 rounded-full overflow-hidden flex-shrink-0">
                             <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover" />
@@ -63,8 +61,7 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
             <div className="flex flex-col gap-2">
                 {safeOptions.map((option) => {
                     const optionText = option.label || 'Opción sin texto';
-                    const optionVotes = Number(results[option.id]) || 0;
-                    const percentage = totalVotes > 0 ? Math.round((optionVotes / totalVotes) * 100) : 0;
+                    const percentage = getPercentage(option.id);
 
                     if (localHasVoted) {
                         return (
@@ -86,7 +83,7 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
                     return (
                         <button
                             key={option.id}
-                            onClick={() => handleVoteClick(option.id)}
+                            onClick={() => vote(option.id)}
                             disabled={isVoting || !connected}
                             className="h-8 bg-[#201f1f] border border-[#353534] rounded-lg text-[11px] font-bold text-[#c6c9ab] hover:bg-[#353534] hover:text-white transition-all text-left px-3 disabled:opacity-50 truncate cursor-pointer"
                         >
