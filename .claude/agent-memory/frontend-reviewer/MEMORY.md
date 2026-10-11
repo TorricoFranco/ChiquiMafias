@@ -1,2 +1,3 @@
 - [Patrones de bug recurrentes](recurring-bug-patterns.md) — refresh fuera del lock, off sin handler, joins sin re-join, io() propio, Fast Refresh, e2e rojo por StrictMode
 - [Decisiones de auth/sockets confirmadas](auth-socket-confirmed-decisions.md) — refresh de BANNED=200, kick en handleConnection, providers, access token stateless, rotación bcrypt
+- [Tipos de encuesta: decisiones](polls-type-system-decisions.md) — votos en cero hasta votar, sala de votantes, Empate que inserta el backend, costos en tickets

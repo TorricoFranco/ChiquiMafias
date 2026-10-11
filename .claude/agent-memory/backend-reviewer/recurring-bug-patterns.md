@@ -29,6 +29,14 @@ Patrones vistos en las revisiones del 2026-10-05 (cierre de rutas admin, jerarqu
 - `try/catch` de P2002 alrededor de toda una `$transaction` (coin-shop): también atrapa el P2002 de `wallet.create` en `creditInTx` (el `FOR UPDATE` no bloquea una fila que no existe, dos primeros créditos concurrentes chocan) y lo toma como "ya procesado". Acotar el catch al insert de idempotencia.
 - La Wallet se crea recién en el primer `addCoins` (o en el upsert del pago de suscripción). Todo `coinTransaction.create` con `walletId: wallet?.id || ''` rompe por FK (P2003) para un usuario sin wallet.
 
+Agregado el 2026-10-11 (revisión del PR de tipos de encuesta):
+
+- `findUnique` + chequeo de estado en JS + `update` incondicional dentro de `$transaction`: en READ COMMITTED las dos requests leen el estado viejo y las dos escriben, así que el reembolso o el crédito sale dos veces. Visto en `polls.service.ts` (`approvePoll`, `rejectPoll`). El patrón correcto que ya usa el repo es `updateMany({ where: { id, status: <estado leído> } })` + abortar si `count === 0` (como en `bets` y en `claimAllPendingRewards`).
+- `UserInventory` tratado como una sola fila por tipo de ítem: un mismo `ItemType` tiene varios `StoreItem` (el comprable y el regalo de suscripción, por ejemplo `poll_ticket_gold` para `CUSTOM_POLL`), así que `findFirst({ where: { type } })` es no determinista: se cobra de una fila y se devuelve en otra, convirtiendo un ítem exclusivo en comprable y al revés. Para devolver hay que guardar de qué ítem salió cada unidad (`Poll.ticketRefund`).
+- Datos ocultos en el REST pero expuestos por el socket: los gateways re-emiten el hash completo de Redis a toda la sala, así que cualquier regla de visibilidad nueva en el service hay que replicarla en el gateway (en polls se resolvió con una sala `poll_<id>_voted` y un evento aparte con solo el total).
+- Estado calculado desde Redis en el socket y desde la DB en el REST (`hasVoted`): si la key de Redis se pierde, los dos caminos se contradicen. El socket necesita el mismo fallback a la DB.
+- Movimientos de inventario sin auditoría: las monedas tienen `CoinTransaction`, los consumibles no tienen nada equivalente, así que un cobro o una devolución mal hecha no es reconstruible.
+
 Ver también [[verified-runtime-facts]].
 
 **Why:** son errores silenciosos: compilan, los tests unitarios pasan y la ruta queda abierta, rota o gastando cuota.
