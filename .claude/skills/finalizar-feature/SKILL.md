@@ -70,6 +70,8 @@ Si algo falla: mostrá el error relevante (no el log entero) y **cortá el skill
 
 ## 4. Inferir tipo, scope y mensaje de commit
 
+**Modelo:** la redacción del mensaje la hace un subagente con `model: "haiku"` y `effort: "max"` (Haiku 5.5), igual que en la skill `commit-haiku`. Lo que sigue define el formato y la inferencia.
+
 Si `$ARGUMENTS` ya viene en formato `tipo(scope): mensaje` con `tipo` en `feat|fix|refactor|perf|security|test|chore`, usalo tal cual y saltá al paso 5.
 
 Si no, inferí mirando el diff completo (`git diff develop...HEAD` + working tree) **y** el pedido original en la conversación (es la señal más confiable sobre el diff solo):
