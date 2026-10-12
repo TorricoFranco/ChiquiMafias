@@ -9,7 +9,7 @@ import { StoreView } from "@/features/store/components/StoreView";
 import { SidebarPolls } from "@/features/polls/components/SidebaPolls";
 import { TicketActive } from "../../features/bets/components/TicketActive";
 import { BetsCards } from "../../features/bets/components/BetsCards";
-import { ClaimRewardsBanner } from "./ClaimewardsBanner";
+import { ClaimRewardsBanner, ClaimRewardsNotice } from "./ClaimewardsBanner";
 import { AdminView } from "@/features/admin/components/AdminView";
 import { UserSupportView } from "@/features/supports/components/tickets/UserSupportView";
 import { useNavigationStore } from "@/store/useNavigationStore";
@@ -29,6 +29,13 @@ export const SocialView = () => {
       </div>
 
       <main className="flex-1 bg-[#131313] flex flex-col min-w-0 border-r border-[#353534] relative overflow-y-auto">
+
+        {/* h-0: el aviso flota sobre el contenido sin empujarlo; sticky lo deja visible al scrollear */}
+        {activeTab !== "Pronósticos" && (
+          <div className="sticky top-3 z-20 h-0 overflow-visible flex justify-center pointer-events-none">
+            <ClaimRewardsNotice />
+          </div>
+        )}
         
         <div className={activeTab === "Chat" ? "flex flex-1 overflow-hidden" : "hidden"}>
           <ChatPanel className="flex-1 overflow-hidden p-0 bg-[#131313]" />
