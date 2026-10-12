@@ -30,12 +30,15 @@ test.describe("Notificaciones", () => {
 
   test("una notificación nueva llega en vivo", async ({ app, page, socket }) => {
     await app.open();
-    await expect(app.header.getByRole("button", { name: "Notificaciones", exact: true })).toBeVisible();
+    await socket.waitForConnection();
+    // La bandeja tiene que haber cargado antes del evento: si no, la notificación en vivo no entra en la lista.
+    await app.header.getByRole("button", { name: "Notificaciones", exact: true }).click();
+    const inbox = page.getByRole("dialog", { name: "Notificaciones" });
+    await expect(inbox).toContainText("No tenés notificaciones pendientes");
 
     await socket.emit("notification", buildNotification({ title: "Tu ticket fue respondido", type: "TICKET_REPLY" }));
 
-    await app.header.getByRole("button", { name: "Notificaciones (1 sin leer)" }).click();
-    await expect(page.getByRole("dialog", { name: "Notificaciones" })).toContainText("Tu ticket fue respondido");
+    await expect(inbox).toContainText("Tu ticket fue respondido");
   });
 
   test("sin notificaciones muestra el buzón vacío", async ({ app, page }) => {
