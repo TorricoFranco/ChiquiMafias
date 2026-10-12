@@ -62,36 +62,25 @@ test.describe("Carrusel de encuestas de la barra derecha", () => {
     await expect(card.getByRole("button", { name: "0 Comentarios" })).toHaveAttribute("aria-expanded", "false");
     await expect(card.getByText("Comentario que no se abre")).toHaveCount(0);
   });
+});
 
-  test("el Votar del chat muestra en el carrusel una encuesta que está entre las primeras 6", async ({ app, page, api, session, socket }) => {
-    session.loginAs("USER");
-    const first = buildPoll({ title: "Primera del carrusel" });
-    const second = buildPoll({ title: "Segunda, la que llega desde el chat" });
-    api.on("GET", "/polls/active", [first, second]);
-
-    await app.open();
-    await page.getByRole("tab", { name: "Apuestas" }).click();
-    await socket.waitForConnection();
-    await socket.emit("poll_show", { id: second.id, title: second.title, timestamp: Date.now() });
-    await page.getByRole("button", { name: "Votar", exact: true }).click();
-
-    await expect(page.getByRole("button", { name: "Ver encuesta 2 de 2" })).toHaveAttribute("aria-current", "true");
-    await expect(page.getByText("Segunda, la que llega desde el chat")).toBeVisible();
-  });
-
-  test("el Votar del chat lleva a una encuesta que quedó fuera de las 6 del carrusel", async ({ app, page, api, session, socket }) => {
+test.describe("Botón Votar del chat", () => {
+  // La barra derecha arranca en Fixture y en celular no se ve: el botón tiene que llevar
+  // a la encuesta igual, en escritorio y en celular.
+  test("lleva a la encuesta en Pronósticos aunque la barra derecha no esté en Apuestas", { tag: "@mobile" }, async ({ app, page, api, session, socket }) => {
     session.loginAs("USER");
     const others = Array.from({ length: 6 }, (_, index) => buildPoll({ title: `Encuesta ${index + 1} del carrusel` }));
     const outside = buildPoll({ title: "La encuesta número siete" });
     api.on("GET", "/polls/active", [...others, outside]);
 
     await app.open();
-    await page.getByRole("tab", { name: "Apuestas" }).click();
     await socket.waitForConnection();
     await socket.emit("poll_show", { id: outside.id, title: outside.title, timestamp: Date.now() });
     await page.getByRole("button", { name: "Votar", exact: true }).click();
 
     const card = page.getByRole("article", { name: outside.title });
+    // El resalte dura dos segundos: se mira primero.
+    await expect(card).toHaveCSS("outline-width", "2px");
     await expect(card).toBeFocused();
     await expect(card).toBeInViewport({ ratio: 0.5 });
   });

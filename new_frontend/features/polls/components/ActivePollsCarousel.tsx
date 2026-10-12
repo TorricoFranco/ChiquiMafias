@@ -4,21 +4,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivePolls } from '../hooks/usePolls';
 import { PollCardResume } from './PollCardResume';
-import { useNavigationStore } from '@/store/useNavigationStore';
 
 /** Cuántas encuestas entran en el carrusel de la barra derecha. */
 const MAX_CAROUSEL_POLLS = 6;
 
 export const ActivePollsCarousel: React.FC = () => {
   const { data: polls, isLoading } = useActivePolls();
-  const openPollInFeed = useNavigationStore((state) => state.openPollInFeed);
   // El backend ya ordena: primero las que el usuario no votó, y después las más votadas.
   const carouselPolls = useMemo(() => polls?.slice(0, MAX_CAROUSEL_POLLS), [polls]);
   const [currentIndex, setCurrentIndex] = useState(0);
   // Se pausa con el mouse encima o con el foco adentro (WCAG 2.2.2).
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocus, setHasFocus] = useState(false);
-  const [highlightPulse, setHighlightPulse] = useState(false);
 
   useEffect(() => {
     const isPaused = isHovered || hasFocus;
@@ -36,28 +33,6 @@ export const ActivePollsCarousel: React.FC = () => {
     return () => clearInterval(interval);
   }, [carouselPolls, isHovered, hasFocus]);
 
-  useEffect(() => {
-    const handleFocusPoll = (e: CustomEvent) => {
-      const targetPollId = e.detail.pollId;
-      const index = carouselPolls?.findIndex((p) => p.id === targetPollId) ?? -1;
-
-      if (index !== -1) {
-        setCurrentIndex(index);
-        setHighlightPulse(true);
-        setTimeout(() => setHighlightPulse(false), 2000);
-        return;
-      }
-
-      // La encuesta existe pero quedó fuera de las 6 del carrusel: se la lleva al feed completo.
-      if (polls?.some((poll) => poll.id === targetPollId)) {
-        openPollInFeed(targetPollId, false);
-      }
-    };
-
-    window.addEventListener('focus-poll', handleFocusPoll);
-    return () => window.removeEventListener('focus-poll', handleFocusPoll);
-  }, [carouselPolls, polls, openPollInFeed]);
-
   if (isLoading) {
     return <div className="text-center text-[#c6c9ab] text-xs py-4">Cargando encuestas...</div>;
   }
@@ -71,7 +46,7 @@ export const ActivePollsCarousel: React.FC = () => {
   const currentPoll = carouselPolls[safeIndex];
 
   return (
-    <motion.div
+    <div
       className="p-4 border-t border-[#454932] bg-[#1c1b1b] rounded-b-xl"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -80,8 +55,6 @@ export const ActivePollsCarousel: React.FC = () => {
         // Solo se reanuda cuando el foco sale del carrusel, no cuando se mueve dentro.
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHasFocus(false);
       }}
-      animate={highlightPulse ? { boxShadow: "0px 0px 15px 0px rgba(210, 240, 0, 0.4)" } : { boxShadow: "none" }}
-      transition={{ duration: 0.3 }}
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
@@ -123,6 +96,6 @@ export const ActivePollsCarousel: React.FC = () => {
           />
         </motion.div>
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 };
