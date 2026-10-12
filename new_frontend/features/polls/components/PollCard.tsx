@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useCallback } from "react";
 import { MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Poll } from "@/features/polls/types";
@@ -8,8 +10,16 @@ import { PollBody } from "./bodies/PollBody";
 import { PollComments } from "./PollComments";
 import { PollAuthor } from "./PollAuthor";
 
-export const PollCard = ({ poll }: { poll: Poll }) => {
-    const [showComments, setShowComments] = useState(false);
+interface PollCardProps {
+    poll: Poll;
+    /** Resalta la card un momento: lo usa el carrusel al llevar a una encuesta. */
+    highlight?: boolean;
+    /** Abre el panel de comentarios desde el arranque (botón Comentar del carrusel). */
+    defaultCommentsOpen?: boolean;
+}
+
+export const PollCard = ({ poll, highlight = false, defaultCommentsOpen = false }: PollCardProps) => {
+    const [showComments, setShowComments] = useState(defaultCommentsOpen);
     const [socketStats, setSocketStats] = useState({ totalVotes: 0, connected: false });
     const { mutate: reactToPoll } = useReactToPoll();
 
@@ -32,7 +42,7 @@ export const PollCard = ({ poll }: { poll: Poll }) => {
     const cardAccent = isSubscriberPoll ? `${meta.cardClass} ring-1 ring-[#d2f000]/40` : meta.cardClass;
 
     return (
-        <article aria-label={poll.title} className={`bg-[#1c1b1b] border rounded-xl p-5 flex flex-col gap-4 shadow-sm transition-colors ${cardAccent}`}>
+        <article id={`poll-${poll.id}`} aria-label={poll.title} tabIndex={highlight ? -1 : undefined} className={`bg-[#1c1b1b] border rounded-xl p-5 flex flex-col gap-4 shadow-sm transition-colors ${cardAccent} ${highlight ? "outline-2 outline-offset-4 outline-[#d2f000]" : ""}`}>
 
             {/* Header de la Card */}
             <div className="flex items-center gap-3">

@@ -123,16 +123,6 @@ export interface Comment {
   isPremium: boolean;
 }
 
-/**
- * `MessagesNewPoll` (chat) avisa al carrusel con este evento para que salte a
- * la encuesta. Declararlo evita el `as any` en addEventListener.
- */
-declare global {
-  interface WindowEventMap {
-    'focus-poll': CustomEvent<{ pollId: string }>;
-  }
-}
-
 export interface ActivePollMessage {
   id: string;
   title: string;

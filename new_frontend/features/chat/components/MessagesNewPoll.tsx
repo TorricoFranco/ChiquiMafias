@@ -3,6 +3,7 @@
 import React from "react";
 import { BarChart2, X, ChevronRight } from "lucide-react";
 import { ActivePollMessage } from "@/features/polls/types";
+import { useNavigationStore } from "@/store/useNavigationStore";
 
 interface MessageNewPollProps {
   poll: ActivePollMessage;
@@ -10,9 +11,11 @@ interface MessageNewPollProps {
 }
 
 export default function MessageNewPoll({ poll, onClose }: MessageNewPollProps) {
+  const openPollInFeed = useNavigationStore((state) => state.openPollInFeed);
+
   const handleVoteClick = () => {
-    const event = new CustomEvent('focus-poll', { detail: { pollId: poll.id } });
-    window.dispatchEvent(event);
+    // Va a la encuesta en Pronósticos, resaltada: no depende de que la barra derecha esté abierta.
+    openPollInFeed(poll.id, false);
     onClose();
   };
 

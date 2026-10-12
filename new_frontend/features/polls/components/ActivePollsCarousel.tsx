@@ -1,57 +1,60 @@
-import React, { useState, useEffect } from 'react';
+"use client";
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivePolls } from '../hooks/usePolls';
 import { PollCardResume } from './PollCardResume';
 
+/** Cuántas encuestas entran en el carrusel de la barra derecha. */
+const MAX_CAROUSEL_POLLS = 6;
+
 export const ActivePollsCarousel: React.FC = () => {
   const { data: polls, isLoading } = useActivePolls();
+  // El backend ya ordena: primero las que el usuario no votó, y después las más votadas.
+  const carouselPolls = useMemo(() => polls?.slice(0, MAX_CAROUSEL_POLLS), [polls]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Se pausa con el mouse encima o con el foco adentro (WCAG 2.2.2).
   const [isHovered, setIsHovered] = useState(false);
-  const [highlightPulse, setHighlightPulse] = useState(false);
+  const [hasFocus, setHasFocus] = useState(false);
 
   useEffect(() => {
-    if (!polls || polls.length <= 1 || isHovered) return;
+    const isPaused = isHovered || hasFocus;
+    if (!carouselPolls || carouselPolls.length <= 1 || isPaused) return;
 
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev === polls.length - 1 ? 0 : prev + 1));
+      setCurrentIndex((prev) => {
+        // Si la lista se achicó, se avanza desde el último índice válido.
+        const last = carouselPolls.length - 1;
+        const base = Math.min(prev, last);
+        return base === last ? 0 : base + 1;
+      });
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [polls, isHovered]);
-
-  useEffect(() => {
-    const handleFocusPoll = (e: CustomEvent) => {
-      const targetPollId = e.detail.pollId;
-      const index = polls?.findIndex(p => p.id === targetPollId);
-
-      if (index !== undefined && index !== -1) {
-        setCurrentIndex(index);
-        setHighlightPulse(true);
-        setTimeout(() => setHighlightPulse(false), 2000);
-      }
-    };
-
-    window.addEventListener('focus-poll', handleFocusPoll);
-    return () => window.removeEventListener('focus-poll', handleFocusPoll);
-  }, [polls])
+  }, [carouselPolls, isHovered, hasFocus]);
 
   if (isLoading) {
     return <div className="text-center text-[#c6c9ab] text-xs py-4">Cargando encuestas...</div>;
   }
 
-  if (!polls || polls.length === 0) {
+  if (!carouselPolls || carouselPolls.length === 0) {
     return null;
   }
 
-  const currentPoll = polls[currentIndex];
+  // Si la lista se achicó en una actualización, no apuntar más allá del final.
+  const safeIndex = Math.min(currentIndex, carouselPolls.length - 1);
+  const currentPoll = carouselPolls[safeIndex];
 
   return (
-    <motion.div
+    <div
       className="p-4 border-t border-[#454932] bg-[#1c1b1b] rounded-b-xl"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      animate={highlightPulse ? { boxShadow: "0px 0px 15px 0px rgba(210, 240, 0, 0.4)" } : { boxShadow: "none" }}
-      transition={{ duration: 0.3 }}
+      onFocus={() => setHasFocus(true)}
+      onBlur={(e) => {
+        // Solo se reanuda cuando el foco sale del carrusel, no cuando se mueve dentro.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHasFocus(false);
+      }}
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
@@ -61,13 +64,18 @@ export const ActivePollsCarousel: React.FC = () => {
           ENCUESTA DE LA TRIBUNA
         </h3>
 
-        {polls.length > 1 && (
-          <div className="flex gap-1">
-            {polls.map((_, idx) => (
-              <div
+        {carouselPolls.length > 1 && (
+          <div className="flex items-center gap-1">
+            {carouselPolls.map((_, idx) => (
+              <button
+                type="button"
                 key={idx}
+                aria-label={`Ver encuesta ${idx + 1} de ${carouselPolls.length}`}
+                aria-current={idx === safeIndex ? "true" : undefined}
                 onClick={() => setCurrentIndex(idx)}
-                className={`w-2 h-2 rounded-full cursor-pointer transition-all ${idx === currentIndex ? 'bg-[#d2f000]' : 'bg-[#454932] hover:bg-[#c6c9ab]'
+                className={`h-1.5 rounded-full cursor-pointer transition-all ${idx === safeIndex
+                    ? 'w-5 bg-[#d2f000]'
+                    : 'w-1.5 bg-[#454932] hover:bg-[#c6c9ab]'
                   }`}
               />
             ))}
@@ -88,6 +96,6 @@ export const ActivePollsCarousel: React.FC = () => {
           />
         </motion.div>
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 };
