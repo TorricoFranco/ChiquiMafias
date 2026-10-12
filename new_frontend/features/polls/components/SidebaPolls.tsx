@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Sparkles, PlusCircle } from "lucide-react";
 import { useActivePolls } from "@/features/polls/hooks/usePolls";
 import { PollCard } from "./PollCard";
 import { CreatePollModal } from "./CreatePollModal";
 import { useUserInventory } from "@/features/inventory/hooks/useInventory";
 import { POLL_FILTER_GROUPS } from "@/features/polls/constants/pollTypes";
+import { useNavigationStore } from "@/store/useNavigationStore";
 
 export const SidebarPolls = () => {
     const [activeFilter, setActiveFilter] = useState(POLL_FILTER_GROUPS[0].id);
@@ -20,10 +21,31 @@ export const SidebarPolls = () => {
     const pollTicketCount =
         inventory?.customPolls?.reduce((total, inv) => total + (inv.quantity ?? 0), 0) ?? 0;
 
+    const focusedPoll = useNavigationStore((state) => state.focusedPoll);
+    const clearFocusedPoll = useNavigationStore((state) => state.clearFocusedPoll);
+    // La encuesta que llegó desde el carrusel sigue activa (el feed arranca en "Todas").
+    const focusedExists = Boolean(focusedPoll && activePolls?.some((poll) => poll.id === focusedPoll.id));
+
     const activeGroup = POLL_FILTER_GROUPS.find((group) => group.id === activeFilter);
     const visiblePolls = activeGroup?.types
         ? activePolls?.filter((poll) => activeGroup.types!.includes(poll.type))
         : activePolls;
+
+    // Si la encuesta llegó desde el carrusel y ya no está activa, se descarta el enfoque.
+    useEffect(() => {
+        if (focusedPoll && !isLoading && !focusedExists) clearFocusedPoll();
+    }, [focusedPoll, focusedExists, isLoading, clearFocusedPoll]);
+
+    // La encuesta enfocada se lleva al centro de la pantalla y recibe el foco. El resalte lo apaga el store.
+    useEffect(() => {
+        if (!focusedPoll || !focusedExists) return;
+
+        const card = document.getElementById(`poll-${focusedPoll.id}`);
+        card?.scrollIntoView({ behavior: "smooth", block: "center" });
+        // La barra derecha se desmonta al cambiar de pestaña y el foco se pierde: se lo
+        // damos a la card para que el lector de pantalla anuncie la encuesta.
+        card?.focus({ preventScroll: true });
+    }, [focusedPoll, focusedExists]);
 
     return (
         <section className="flex flex-col gap-6">
@@ -107,7 +129,12 @@ export const SidebarPolls = () => {
                     </p>
                 )}
                 {visiblePolls?.map((poll) => (
-                    <PollCard key={poll.id} poll={poll} />
+                    <PollCard
+                        key={poll.id}
+                        poll={poll}
+                        highlight={focusedPoll?.id === poll.id}
+                        defaultCommentsOpen={focusedPoll?.id === poll.id && focusedPoll.openComments}
+                    />
                 ))}
             </div>
 

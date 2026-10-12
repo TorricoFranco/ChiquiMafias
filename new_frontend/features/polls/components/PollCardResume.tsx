@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, ThumbsUp, ArrowRight } from "lucide-react";
@@ -13,7 +15,7 @@ interface PollCardResumeProps {
 
 export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
     const { mutate: reactToPoll } = useReactToPoll();
-    const setActiveTab = useNavigationStore((state) => state.setActiveTab);
+    const openPollInFeed = useNavigationStore((state) => state.openPollInFeed);
 
     // Misma lógica de voto que el feed: login si no hay sesión, toast si el
     // backend rechaza y un solo voto en vuelo.
@@ -28,10 +30,11 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
 
     const typeMeta = getPollTypeMeta(poll.type);
     const isVotable = typeMeta.votable;
+    // Sin comentarios no hay nada que abrir: el botón se oculta en vez de no hacer nada.
+    const commentsEnabled = poll.commentsEnabled !== false;
 
-    const handleGoToPronosticos = () => {
-        setActiveTab("Pronósticos");
-    };
+    // Las dos llevan a la encuesta en Pronósticos; solo Comentar abre sus comentarios.
+    const handleOpenInFeed = (openComments: boolean) => openPollInFeed(poll.id, openComments);
 
     const handleLike = () => {
         reactToPoll({ pollId: poll.id, dto: { type: "LIKE" } });
@@ -97,26 +100,30 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleLike}
+                        aria-label={`Me gusta (${poll.likesCount || 0})`}
+                        aria-pressed={poll.userReaction === 'LIKE'}
                         className={`flex items-center gap-1.5 hover:bg-[#2a2a2a] p-1 rounded transition-colors ${poll.userReaction === 'LIKE' ? 'text-[#d2f000]' : 'text-[#909378] hover:text-[#d2f000]'}`}
                     >
                         <ThumbsUp className="w-3.5 h-3.5" />
                         <span className="text-[11px] font-medium">{poll.likesCount || 0}</span>
                     </button>
 
-                    <button
-                        onClick={handleGoToPronosticos}
-                        className="text-[#909378] hover:text-white transition-colors flex items-center gap-1.5 p-1 rounded hover:bg-[#2a2a2a] cursor-pointer"
-                    >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span className="text-[11px] font-medium">Comentar</span>
-                    </button>
+                    {commentsEnabled && (
+                        <button
+                            onClick={() => handleOpenInFeed(true)}
+                            className="text-[#909378] hover:text-white transition-colors flex items-center gap-1.5 p-1 rounded hover:bg-[#2a2a2a] cursor-pointer"
+                        >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span className="text-[11px] font-medium">Comentar</span>
+                        </button>
+                    )}
                 </div>
 
                 <button
-                    onClick={handleGoToPronosticos}
+                    onClick={() => handleOpenInFeed(false)}
                     className="flex items-center gap-1 text-[11px] font-bold text-[#d2f000] hover:text-white transition-colors cursor-pointer"
                 >
-                    Ver más <ArrowRight className="w-3 h-3" />3
+                    Ver más <ArrowRight className="w-3 h-3" />
                 </button>
             </div>
         </div>
