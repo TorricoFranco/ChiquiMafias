@@ -3,24 +3,28 @@ import { io, Socket } from 'socket.io-client';
 import { useUserStore } from '@/store/useUserStore';
 import { useLiveScores } from '../hooks/useFixture';
 import { formatToMapFixtureSocket } from '../utils/formatToMapFixtureSocket';
+import type { LeagueLiveUpdate, LiveResult } from '../types';
 
 export const useLeagueLive = (leagueId: string) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const { accessToken } = useUserStore(); 
 
   const { data: initialLive, isLoading } = useLiveScores();
-  const [liveResults, setLiveResults] = useState<Record<string, any>>(() =>
+  const [liveResults, setLiveResults] = useState<Record<string, LiveResult>>(() =>
     initialLive ? formatToMapFixtureSocket(initialLive) : {}
   );
 
-  useEffect(() => {
+  // Al llegar las live scores iniciales se mezclan sin pisar lo que ya llegó por socket. Se ajusta durante el render, sin efecto.
+  const [prevInitialLive, setPrevInitialLive] = useState(initialLive);
+  if (initialLive !== prevInitialLive) {
+    setPrevInitialLive(initialLive);
     if (initialLive) {
       setLiveResults((prev) => ({
         ...formatToMapFixtureSocket(initialLive),
         ...prev
       }));
     }
-  }, [initialLive]);
+  }
 
   useEffect(() => {
     if (!leagueId) return;
@@ -43,6 +47,7 @@ export const useLeagueLive = (leagueId: string) => {
       console.log(`❌ Desconectado del socket de ligas`);
     });
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- el socket es un recurso externo: su instancia tiene que quedar en estado
     setSocket(wsSocket);
 
     return () => {
@@ -53,11 +58,11 @@ export const useLeagueLive = (leagueId: string) => {
     };
   }, [accessToken, leagueId]);
 
-  const handleLeagueUpdate = useCallback((matches: Record<string, any>) => {
+  const handleLeagueUpdate = useCallback((matches: Record<string, LeagueLiveUpdate>) => {
     console.log('🏆 on_league_update payload:', matches); 
 
     setLiveResults((prev) => {
-      const newUpdates: Record<string, any> = {};
+      const newUpdates: Record<string, LiveResult> = {};
 
       Object.entries(matches).forEach(([id, live]) => {
         newUpdates[id] = {

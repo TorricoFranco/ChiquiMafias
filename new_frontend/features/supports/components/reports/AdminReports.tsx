@@ -7,6 +7,7 @@ import { ResolveReportModal } from './admin/ResolveReportModal';
 import { Pagination } from '../Pagination';
 
 import { useAdminReports, useAdminResolveReport } from '../../hooks/useSupports';
+import type { ReportStatus } from '../../types';
 
 export const AdminReports: React.FC = () => {
     const [reportStatusFilter, setReportStatusFilter] = useState<string>('ALL');
@@ -19,7 +20,7 @@ export const AdminReports: React.FC = () => {
 
     const apiStatus = reportStatusFilter === 'ALL' ? undefined : reportStatusFilter;
 
-    const { data: response, isLoading, isFetching } = useAdminReports(page, LIMIT, apiStatus as any);
+    const { data: response, isLoading, isFetching } = useAdminReports(page, LIMIT, apiStatus as ReportStatus | undefined);
 
     const reports = response?.data || [];
     const meta = response?.meta;
@@ -50,7 +51,7 @@ export const AdminReports: React.FC = () => {
                 onSuccess: () => {
                     setResolveModalReport(null);
                 },
-                onError: (error: any) => {
+                onError: (error: Error) => {
                     toast.error(error.message || 'No se pudo resolver el reporte');
                 },
             }

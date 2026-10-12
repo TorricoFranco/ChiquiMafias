@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supportApi } from '../api/supportsApi';
-import { ReportStatus, TicketStatus, TicketCategory, ResolveReportPayload, TicketMessagePayload } from '../types';
+import { AdminTicket, ReportStatus, TicketStatus, TicketCategory, ResolveReportPayload, TicketMessagePayload } from '../types';
 
 export const useMyTickets = () => {
     return useQuery({
@@ -101,7 +101,7 @@ export const useAdminReplyTicket = () => {
             await queryClient.cancelQueries({ queryKey: ['admin-ticket-details', ticketId] });
             const previousTicket = queryClient.getQueryData(['admin-ticket-details', ticketId]);
 
-            queryClient.setQueryData(['admin-ticket-details', ticketId], (old: any) => {
+            queryClient.setQueryData(['admin-ticket-details', ticketId], (old: AdminTicket | undefined) => {
                 if (!old) return old;
                 return {
                     ...old,

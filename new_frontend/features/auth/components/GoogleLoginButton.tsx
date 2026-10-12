@@ -18,7 +18,7 @@ export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps)
 
                 window.google.accounts.id.initialize({
                     client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-                    callback: async (response: any) => {
+                    callback: async (response: { credential: string }) => {
                         try {
                             const res = await fetch(
                                 `${process.env.NEXT_PUBLIC_API_URL}/auth/google`,

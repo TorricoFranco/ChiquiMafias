@@ -72,8 +72,10 @@ export const SubscriptionRewardModal: React.FC<RewardModalProps> = ({ data, onCl
     const name = useUserStore((state) => state.name);
     const displayName = username || name || 'Usuario';
 
+    // Arranca oculto y se muestra en el siguiente frame, para que la transición de entrada corra.
     useEffect(() => {
-        setShow(true);
+        const frame = requestAnimationFrame(() => setShow(true));
+        return () => cancelAnimationFrame(frame);
     }, []);
 
     const { coins, cosmetics = [] } = data.gifts;

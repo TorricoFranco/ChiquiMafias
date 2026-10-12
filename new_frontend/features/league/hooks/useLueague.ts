@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   TournamentType,
   ZoneType,
@@ -21,6 +21,7 @@ import {
 } from '@/features/fixture/hooks/useFixture';
 
 import { useFixtureWithLive } from '@/features/fixture/hooks/useFixtureWithLive';
+import type { MatchFixture } from '@/features/fixture/types';
 import { useStandings } from '@/features/standings/hooks/useStandings';
 import {
   processStandingsWithSimulations,
@@ -38,7 +39,7 @@ const PLAYOFF_LABELS: Record<string, { labelShort: string; labelFull: string }> 
 
 
 
-const enrichWithLive = <T extends { teamId: string }>(rows: T[], liveMatches: any[]): T[] => {
+const enrichWithLive = <T extends { teamId: string }>(rows: T[], liveMatches: MatchFixture[]): T[] => {
   if (!liveMatches || liveMatches.length === 0) return rows;
 
   return rows.map((row) => {
@@ -118,8 +119,18 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
     };
   }, [availableStagesData]);
 
-  useEffect(() => {
-    if (activeMatchdayData !== undefined && !selectedRound) {
+  // Sin ronda elegida, arranca en la fecha activa del torneo. Se ajusta durante el render (sin efecto), cuando cambia la fecha o la ronda.
+  const [prevRoundSync, setPrevRoundSync] = useState<{
+    matchday: typeof activeMatchdayData;
+    round: typeof selectedRound;
+  } | null>(null);
+  if (
+    prevRoundSync === null ||
+    prevRoundSync.matchday !== activeMatchdayData ||
+    prevRoundSync.round !== selectedRound
+  ) {
+    setPrevRoundSync({ matchday: activeMatchdayData, round: selectedRound });
+    if (activeMatchdayData !== undefined && selectedRound === null) {
       if (activeMatchdayData.active_matchday) {
         const isNumeric = !isNaN(Number(activeMatchdayData.active_matchday));
         setSelectedRound(
@@ -131,7 +142,7 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
         setSelectedRound(1);
       }
     }
-  }, [activeMatchdayData, selectedRound]);
+  }
 
   const currentRoundStr = selectedRound?.toString() || '1';
   const { matches: liveMatches, isLoading: isFixtureLoading } = useFixtureWithLive(

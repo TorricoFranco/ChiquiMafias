@@ -7,6 +7,7 @@ import { useTicketStore } from '@/store/useTicketStore';
 import { betsApi } from '../api/betsApi';
 import { getClosingInfo, useNow } from '../utils/closingTime';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errorMessage';
 
 interface MarketCardProps {
   market: Market;
@@ -77,9 +78,9 @@ export const MarketCard: React.FC<MarketCardProps> = ({
       setLocalSelectedOption(null);
       setBetAmount('');
       toast.success("¡Apuesta realizada con éxito!");
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      toast.error(error.message || 'Hubo un error al colocar la apuesta directa');
+      toast.error(getErrorMessage(error) || 'Hubo un error al colocar la apuesta directa');
     } finally {
       setIsSubmitting(false);
     }

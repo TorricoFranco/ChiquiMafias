@@ -49,7 +49,7 @@ export function useNotifications() {
                 Math.max(0, old - ids.length)
             );
 
-            queryClient.setQueryData(["notifications", "inbox", userId], (oldData: any) => {
+            queryClient.setQueryData(["notifications", "inbox", userId], (oldData: { pages: NotificationItem[][] } | undefined) => {
                 if (!oldData) return oldData;
                 return {
                     ...oldData,
@@ -67,7 +67,7 @@ export function useNotifications() {
         const handleIncomingNotification = (newNotif: NotificationItem) => {
             queryClient.setQueryData(["notifications", "unreadCount", userId], (old: number = 0) => old + 1);
             
-            queryClient.setQueryData(["notifications", "inbox", userId], (oldData: any) => {
+            queryClient.setQueryData(["notifications", "inbox", userId], (oldData: { pages: NotificationItem[][] } | undefined) => {
                 if (!oldData) return oldData;
                 const newPages = [...oldData.pages];
                 newPages[0] = [newNotif, ...newPages[0]];

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useGlobalSocket } from "@/context/SocketContext";
 import { useUserStore } from "@/store/useUserStore";
 import { apiFetch } from "@/lib/apiFetch";
+import type { GoalScoredPayload, MatchLiveUpdatePayload, StatsUpdatedPayload } from "@/features/matches/types";
 
 export interface MatchChatMessagePayload {
     messageId: string;
@@ -28,6 +29,18 @@ export interface PinnedMatchMegaphone {
     timestamp: number;
 }
 
+interface MegaphonePayload {
+    name: string;
+    message: string;
+    timestamp?: number;
+}
+
+interface WsExceptionPayload {
+    code?: string;
+    message?: string;
+    data?: { retryIn?: number };
+}
+
 export function useMatchSocket(matchId: string) {
     const socket = useGlobalSocket();
     const [messages, setMessages] = useState<MatchChatMessagePayload[]>([]);
@@ -38,20 +51,32 @@ export function useMatchSocket(matchId: string) {
     const [activeMegaphone, setActiveMegaphone] = useState<PinnedMatchMegaphone | null>(null);
     const [queuePosition, setQueuePosition] = useState<number | null>(null);
 
-    const [liveData, setLiveData] = useState<any>(null);
-    const [matchStats, setMatchStats] = useState<any>(null);
-    const [latestGoal, setLatestGoal] = useState<any>(null);
+    const [liveData, setLiveData] = useState<MatchLiveUpdatePayload | null>(null);
+    const [matchStats, setMatchStats] = useState<StatsUpdatedPayload | null>(null);
+    const [latestGoal, setLatestGoal] = useState<GoalScoredPayload | null>(null);
 
-    useEffect(() => {
-        if (!currentUserId || !matchId) {
+    // Sin sesión o sin partido no queda el chat ni el timeout del partido anterior. Se ajusta durante el render, sin efecto.
+    const chatEnabled = Boolean(currentUserId && matchId);
+    const [prevChatEnabled, setPrevChatEnabled] = useState<boolean | undefined>(undefined);
+    if (chatEnabled !== prevChatEnabled) {
+        setPrevChatEnabled(chatEnabled);
+        if (!chatEnabled) {
             setMessages([]);
             setTimeoutUntil(null);
-            return;
         }
+    }
+
+    // Al cambiar el socket se toma su estado de conexión. Se ajusta durante el render, sin efecto.
+    const [prevSocket, setPrevSocket] = useState<typeof socket | undefined>(undefined);
+    if (socket !== prevSocket) {
+        setPrevSocket(socket);
+        setConnected(socket?.connected ?? false);
+    }
+
+    useEffect(() => {
+        if (!currentUserId || !matchId) return;
 
         if (!socket) return;
-
-        setConnected(socket.connected);
 
         const checkMuteStatus = async () => {
             try {
@@ -88,7 +113,7 @@ export function useMatchSocket(matchId: string) {
             setQueuePosition(payload.position);
             setTimeout(() => setQueuePosition(null), 5000);
         };
-        const handleMegaphoneShow = (payload: any) => {
+        const handleMegaphoneShow = (payload: MegaphonePayload) => {
             setActiveMegaphone({
                 name: payload.name,
                 message: payload.message,
@@ -96,14 +121,14 @@ export function useMatchSocket(matchId: string) {
             });
         };
 
-        const handleMatchLiveUpdate = (payload: any) => setLiveData(payload);
-        const handleStatsUpdated = (payload: any) => setMatchStats(payload);
-        const handleGoalScored = (payload: any) => {
+        const handleMatchLiveUpdate = (payload: MatchLiveUpdatePayload) => setLiveData(payload);
+        const handleStatsUpdated = (payload: StatsUpdatedPayload) => setMatchStats(payload);
+        const handleGoalScored = (payload: GoalScoredPayload) => {
             setLatestGoal(payload);
             setTimeout(() => setLatestGoal(null), 10000);
         };
 
-        const handleWsException = (payload: any) => {
+        const handleWsException = (payload: WsExceptionPayload) => {
             console.error("🚨 Error del WebSocket:", payload)
             if (payload?.code === "RATE_LIMIT" && payload?.data?.retryIn) {
                 const penaltySeconds = payload.data.retryIn;

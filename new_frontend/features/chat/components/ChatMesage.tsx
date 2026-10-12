@@ -241,6 +241,7 @@ export default function ChatMessage({
                                 <img src={`/cosmetics/stickers/${stickerId}.webp`} alt="Sticker" className="w-full h-full object-contain" />
                             </div>
                         ) : (
+                            // eslint-disable-next-line react-hooks/static-components -- getChatBubbleComponent devuelve componentes estables del registro: no se recrean por render
                             <BannerContainer>
                                 <span className={clsx(
                                     "text-sm break-words block",
@@ -274,7 +275,7 @@ export default function ChatMessage({
                                     <select
                                         id={`${reportFieldId}-reason`}
                                         value={reportReason}
-                                        onChange={(e) => setReportReason(e.target.value as any)}
+                                        onChange={(e) => setReportReason(e.target.value as 'TOXIC_CHAT' | 'FRAUD' | 'BAD_BEHAVIOR' | 'OTHER')}
                                         className="w-full bg-[#2a2a2a] border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
                                     >
                                         <option value="TOXIC_CHAT">Chat Tóxico / Insultos</option>

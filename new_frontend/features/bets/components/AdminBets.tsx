@@ -48,7 +48,7 @@ export const AdminBets: React.FC = () => {
         toast.success('Mercado creado y publicado exitosamente');
         setIsCreateModalOpen(false);
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         toast.error(error.message || 'Ocurrió un error al crear el mercado');
       },
     });
@@ -70,7 +70,7 @@ export const AdminBets: React.FC = () => {
           );
           setSettleModalMarket(null);
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
           toast.error(error.message || 'Error al resolver el mercado');
         },
       }

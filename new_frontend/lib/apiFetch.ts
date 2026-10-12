@@ -107,8 +107,9 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
         accessToken = useUserStore.getState().accessToken;
     } else {
         try {
-            const { cookies } = require("next/headers");
-            accessToken = cookies().get("accessToken")?.value || null;
+            // cookies() es async en Next 16: sin await, .get() tira y el token nunca se leía en el servidor.
+            const { cookies } = await import("next/headers");
+            accessToken = (await cookies()).get("accessToken")?.value || null;
         } catch (error) {
             console.warn("No se pudo leer la cookie en el servidor");
         }
@@ -125,7 +126,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     options.headers = headers;
     options.credentials = "include";
 
-    let response = await fetch(url, options);
+    const response = await fetch(url, options);
 
     // Si la cuenta se suspende en medio de la sesión, el backend responde 403 USER_BANNED: mostramos la apelación.
     if (response.status === 403 && typeof window !== "undefined") {

@@ -7,6 +7,7 @@ import { authApi } from "@/features/auth/api/authApi";
 import TeamSelectorModal from "./TeamSelectorModal";
 import TermsCheckbox, { TERMS_REQUIRED_MESSAGE } from "./TermsCheckbox";
 import { CURRENT_TERMS_VERSION } from "@/features/auth/constants/terms";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 export default function OnboardingForm({ onComplete }: { onComplete: () => void }) {
     const [username, setUsername] = useState("");
@@ -56,8 +57,8 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
             });
 
             onComplete();
-        } catch (error: any) {
-            setErrorMessage(error.message || "Error de conexión con el servidor.");
+        } catch (error) {
+            setErrorMessage(getErrorMessage(error) || "Error de conexión con el servidor.");
         } finally {
             setIsLoading(false);
         }

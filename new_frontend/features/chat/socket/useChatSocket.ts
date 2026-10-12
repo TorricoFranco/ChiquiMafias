@@ -38,6 +38,24 @@ export interface SubscriptionGiftPayload {
   };
 }
 
+interface MegaphonePayload {
+  name: string;
+  message: string;
+  timestamp?: number;
+}
+
+interface WsExceptionPayload {
+  code?: string;
+  message?: string;
+  data?: { retryIn?: number };
+}
+
+interface PollShowPayload {
+  id: string;
+  title: string;
+  timestamp?: number;
+}
+
 export function useChatSocket() {
   const socket = useGlobalSocket();
   const [messages, setMessages] = useState<ChatMessagePayload[]>([]);
@@ -50,15 +68,25 @@ export function useChatSocket() {
   const [activePoll, setActivePoll] = useState<ActivePollMessage | null>(null);
   const [pendingGifts, setPendingGifts] = useState<SubscriptionGiftPayload | null>(null);
 
-  useEffect(() => {
+  // Sin sesión no queda el chat ni el timeout de la sesión anterior. Se ajusta durante el render, sin efecto.
+  const [prevUserId, setPrevUserId] = useState<typeof currentUserId | undefined>(undefined);
+  if (currentUserId !== prevUserId) {
+    setPrevUserId(currentUserId);
     if (!currentUserId) {
       setMessages([]);
       setTimeoutUntil(null);
     }
+  }
 
+  // Al cambiar el socket se toma su estado de conexión. Se ajusta durante el render, sin efecto.
+  const [prevSocket, setPrevSocket] = useState<typeof socket | undefined>(undefined);
+  if (socket !== prevSocket) {
+    setPrevSocket(socket);
+    setConnected(socket?.connected ?? false);
+  }
+
+  useEffect(() => {
     if (!socket) return;
-
-    setConnected(socket.connected);
 
     const checkMuteStatus = async () => {
       if (!currentUserId) return;
@@ -89,7 +117,7 @@ export function useChatSocket() {
       if (payload.userId === currentUserId) setTimeoutUntil(null);
     };
 
-    const handleMegaphoneShow = (payload: any) => {
+    const handleMegaphoneShow = (payload: MegaphonePayload) => {
       setActiveMegaphone({
         name: payload.name,
         message: payload.message,
@@ -102,7 +130,7 @@ export function useChatSocket() {
       setTimeout(() => setQueuePosition(null), 5000);
     };
 
-    const handleWsException = (payload: any) => {
+    const handleWsException = (payload: WsExceptionPayload) => {
       if (payload?.code === "RATE_LIMIT" && payload?.data?.retryIn) {
         const penaltySeconds = payload.data.retryIn;
         const newTimeout = Date.now() + penaltySeconds * 1000;
@@ -114,7 +142,7 @@ export function useChatSocket() {
       }
     };
 
-    const handlePollShow = (payload: any) => {
+    const handlePollShow = (payload: PollShowPayload) => {
       setActivePoll({
         id: payload.id,
         title: payload.title,

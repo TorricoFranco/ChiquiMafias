@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Flame, Bell, Gift, PlusCircle, ChevronDown, Menu, User, Zap, Settings } from 'lucide-react';
 import { useUserStore } from "@/store/useUserStore";
 import { useWallet } from "@/features/wallet/socket/useWalletSocket";
@@ -69,13 +70,13 @@ export const Header: React.FC<HeaderProps> = ({
                             <Menu className="w-6 h-6" />
                         </button>
 
-                        <a href="/" className="flex items-center gap-2 group">
+                        <Link href="/" className="flex items-center gap-2 group">
                             <img
                                 src="/logo/chiqui-mafias-logo.png"
                                 alt="Chiqui Mafias Logo"
                                 className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
                             />
-                        </a>
+                        </Link>
 
                         <nav aria-label="Vistas" className="hidden lg:flex items-center gap-6 ml-2">
                             <button

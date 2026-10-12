@@ -25,11 +25,12 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
         )
     ).sort((a, b) => a - b);
 
+    // El hook va antes del return temprano: si no, la cantidad de hooks cambia entre renders y React rompe.
+    const [currentRoundIdx, setCurrentRoundIdx] = useState(0);
+
     if (!pendingMatches || pendingMatches.length === 0 || availableRounds.length === 0) {
         return null;
     }
-
-    const [currentRoundIdx, setCurrentRoundIdx] = useState(0);
 
     const safeIdx = Math.min(currentRoundIdx, Math.max(0, availableRounds.length - 1));
     const activeRound = availableRounds[safeIdx] ?? availableRounds[0] ?? 1;

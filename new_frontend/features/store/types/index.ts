@@ -22,5 +22,5 @@ export interface StoreItem {
 export interface BuyItemResponse {
     status: 'success';
     message: string;
-    data: any; 
+    data: unknown;
 }

@@ -80,7 +80,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({
           <span className="text-[9px] uppercase font-bold text-red-400 block mb-0.5">
             Mensaje reportado en el chat:
           </span>
-          "{report.comment.text}"
+          &quot;{report.comment.text}&quot;
         </div>
       )}
 

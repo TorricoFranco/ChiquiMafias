@@ -24,6 +24,7 @@ export function useWallet() {
     useEffect(() => {
         if (!socket || !userId) return;
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial por fetch: loadInitialBalance activa el estado de carga y es el mecanismo de sincronización
         loadInitialBalance();
 
         const handleBalanceUpdate = (data: { balance: number }) => {

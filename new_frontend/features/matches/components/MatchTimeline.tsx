@@ -133,7 +133,7 @@ export const MatchTimeline: React.FC<MatchTimelineProps> = ({ events, homeTeam, 
         <div className="w-[10%] flex justify-center relative z-10 shrink-0">
           <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-[#242323] border border-[#3e3d3c] group-hover:border-[#d2f000] transition-colors shadow-md">
             <span className="text-[10px] font-mono font-bold text-[#d2f000]">
-              {ev.minute}'
+              {ev.minute}&apos;
             </span>
             {ev.extraMinute !== null && (
               <span className="absolute -top-3.5 text-[9px] font-mono font-bold text-[#c6c9ab] bg-[#1c1b1b] px-1 rounded-sm border border-[#2b2a2a]">

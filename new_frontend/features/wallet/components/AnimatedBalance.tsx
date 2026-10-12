@@ -25,6 +25,8 @@ export const AnimatedBalance: React.FC<AnimatedBalanceProps> = ({ balance, loadi
             const savedPrevBalance = localStorage.getItem('prePurchaseBalance');
 
             if (isMpSuccess && savedPrevBalance) {
+                // localStorage solo existe después de montar (leerlo en el init rompería la hidratación): se fija acá, una vez.
+                // eslint-disable-next-line react-hooks/set-state-in-effect -- sincronización con localStorage, ver el comentario de arriba
                 setDisplayBalance(Number(savedPrevBalance));
                 localStorage.removeItem('prePurchaseBalance');
             } else {

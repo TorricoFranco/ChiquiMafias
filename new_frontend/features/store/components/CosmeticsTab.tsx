@@ -55,7 +55,7 @@ export const CosmeticsTab: React.FC<CosmeticsTabProps> = ({
               key={tab.id}
               aria-pressed={cosmeticFilter === tab.id}
               onClick={() => {
-                setCosmeticFilter(tab.id as any);
+                setCosmeticFilter(tab.id as 'all' | 'permanent' | 'consumable');
                 setCosmeticSubtype('all');
               }}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${

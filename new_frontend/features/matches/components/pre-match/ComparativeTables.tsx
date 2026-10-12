@@ -1,9 +1,9 @@
 import React from 'react';
 import { Table as TableIcon } from 'lucide-react';
-import { Team } from '../../types';
+import { PreMatchResponse, TableEntry, Team } from '../../types';
 
 interface ComparativeTablesProps {
-    miniTable: any;
+    miniTable: PreMatchResponse['miniTable'];
     homeTeam: Team;
     awayTeam: Team;
 }
@@ -15,7 +15,7 @@ export const ComparativeTables: React.FC<ComparativeTablesProps> = ({ miniTable,
         return str.charAt(0).toUpperCase() + str.slice(1);
     };
 
-    const TeamRow = ({ data, targetTeam, isAverage = false }: { data: any, targetTeam: Team, isAverage?: boolean }) => {
+    const TeamRow = ({ data, targetTeam, isAverage = false }: { data: TableEntry | null | undefined, targetTeam: Team, isAverage?: boolean }) => {
         if (!data) return null;
 
         const isTarget = data.teamId === targetTeam.id || data.teamName === targetTeam.name;
@@ -31,7 +31,7 @@ export const ComparativeTables: React.FC<ComparativeTablesProps> = ({ miniTable,
                         {data.position || '-'}
                     </span>
                     <img 
-                        src={data.teamLogo} 
+                        src={data.teamLogo ?? undefined} 
                         alt={data.teamName} 
                         className={`w-4 h-4 object-contain ${!isTarget && 'opacity-60'}`} 
                     />
@@ -86,8 +86,8 @@ export const ComparativeTables: React.FC<ComparativeTablesProps> = ({ miniTable,
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {tablesConfig.map((config, index) => {
-                    const homeTeamsArray = miniTable?.[config.dataKey]?.home || [];
-                    const awayTeamsArray = miniTable?.[config.dataKey]?.away || [];
+                    const homeTeamsArray: TableEntry[] = miniTable?.[config.dataKey as 'tournament' | 'annual' | 'averages']?.home || [];
+                    const awayTeamsArray: TableEntry[] = miniTable?.[config.dataKey as 'tournament' | 'annual' | 'averages']?.away || [];
 
                     return (
                         <div key={index} className="bg-[#242323] p-4 rounded-xl border border-[#2b2a2a] flex flex-col h-full">
@@ -101,7 +101,7 @@ export const ComparativeTables: React.FC<ComparativeTablesProps> = ({ miniTable,
                                 
                                 {/* Bloque Local */}
                                 <div className="flex flex-col gap-1">
-                                    {homeTeamsArray.map((team: any, i: number) => (
+                                    {homeTeamsArray.map((team, i) => (
                                         <TeamRow 
                                             key={`home-${i}`} 
                                             data={team} 
@@ -121,7 +121,7 @@ export const ComparativeTables: React.FC<ComparativeTablesProps> = ({ miniTable,
                                 {/* Bloque Visitante */}
                                 <div className="flex flex-col gap-1">
 
-                                    {awayTeamsArray.map((team: any, i: number) => (
+                                    {awayTeamsArray.map((team, i) => (
                                         <TeamRow 
                                             key={`away-${i}`} 
                                             data={team} 

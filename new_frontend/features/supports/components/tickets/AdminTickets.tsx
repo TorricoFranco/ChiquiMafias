@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AdminTicket, TicketStatus } from '../../types';
+import { AdminTicket, TicketCategory, TicketStatus } from '../../types';
 import { TicketFilters } from './admin/TicketFilters';
 import { TicketListItem } from './admin/TicketListItem';
 import { TicketMessagesThread } from './admin/TicketMessagesThread';
@@ -28,7 +28,7 @@ export const AdminTickets: React.FC = () => {
     const { mutate: replyTicket, isPending: isReplying } = useAdminReplyTicket();
 
     const apiStatus = statusFilter === 'ALL' ? undefined : (statusFilter as TicketStatus);
-    const apiCategory = categoryFilter === 'ALL' ? undefined : (categoryFilter as any);
+    const apiCategory = categoryFilter === 'ALL' ? undefined : (categoryFilter as TicketCategory);
 
     const { data: response, isLoading, isFetching } = useAdminTickets(page, LIMIT, apiStatus, apiCategory);
 

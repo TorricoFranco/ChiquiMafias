@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useSyncExternalStore } from "react";
+
+// Sin suscripción real: useSyncExternalStore solo sirve acá para saber si ya se montó en el cliente.
+const noopSubscribe = () => () => {};
 import { createPortal } from "react-dom";
 import { useUserStore } from "@/store/useUserStore";
 import { useSubscriptions } from "@/features/subscriptions/hooks/useSubcriptions";
@@ -15,9 +18,8 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => setMounted(true), []);
+    // false en el servidor y true después de montar en el cliente (evita diferencias de hidratación).
+    const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
     const { cancelSubscription, isCanceling } = useSubscriptions();
 

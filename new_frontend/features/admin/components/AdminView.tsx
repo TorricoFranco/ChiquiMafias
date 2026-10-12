@@ -141,7 +141,7 @@ export const AdminView: React.FC = () => {
               role="tab"
               aria-selected={isActive}
               onClick={() => {
-                if (!isLocked) setActiveTab(tab.id as any);
+                if (!isLocked) setActiveTab(tab.id as 'polls' | 'bets' | 'support' | 'users');
               }}
               disabled={isLocked}
               className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 relative overflow-hidden ${isLocked

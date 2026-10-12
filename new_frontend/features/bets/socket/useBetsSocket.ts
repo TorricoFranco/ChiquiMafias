@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { useUserStore } from "@/store/useUserStore";
-import { Market, AdminMarket } from "../types";
+import { Market, AdminMarket, MarketOption } from "../types";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface PoolUpdatePayload {
@@ -44,6 +44,7 @@ export function useBetsSocket() {
             setConnected(false);
         });
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- el socket es un recurso externo: su instancia tiene que quedar en estado
         setSocket(wsSocket);
 
         return () => {
@@ -67,10 +68,10 @@ export function useBetsSocket() {
         const updateMarketsState = (oldMarkets: Market[] | AdminMarket[] | undefined) => {
             if (!oldMarkets) return oldMarkets;
 
-            return (oldMarkets as any[]).map((market) => {
+            return (oldMarkets as (Market | AdminMarket)[]).map((market) => {
                 if (market.id !== payload.marketId) return market;
 
-                const updatedOptions = market.options.map((opt: any) => {
+                const updatedOptions = (market.options as MarketOption[]).map((opt) => {
                     const updatedOption = payload.options?.find(({ id }) => id === opt.id);
                     if (updatedOption) {
                         return {

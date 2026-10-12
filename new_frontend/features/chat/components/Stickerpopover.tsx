@@ -22,12 +22,7 @@ export default function Stickerpopover({ onSelectSticker, onClose }: Stickerpopo
 
   const isItemOwned = (itemId: string) => {
     if (!inventory) return false;
-    if (Array.isArray(inventory)) {
-      return inventory.some((inv) => inv.itemId === itemId || inv.item?.id === itemId);
-    }
-    return (inventory.stickers ?? []).some(
-      (inv: any) => inv?.itemId === itemId || inv?.item?.id === itemId
-    );
+    return (inventory.stickers ?? []).some((inv) => inv.itemId === itemId || inv.item?.id === itemId);
   };
 
   useEffect(() => {
@@ -40,7 +35,7 @@ export default function Stickerpopover({ onSelectSticker, onClose }: Stickerpopo
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
-  const handleStickerClick = async (item: any) => {
+  const handleStickerClick = async (item: (typeof items)[number]) => {
     const isOwned = isItemOwned(item.id);
 
     if (isOwned) {

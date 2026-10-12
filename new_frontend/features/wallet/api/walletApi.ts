@@ -22,7 +22,7 @@ export const walletApi = {
     /**
    * Permite al presidente acreditar monedas a un usuario
    */
-    adminAddCoins: async (payload: AdminAddCoinsParams): Promise<any> => {
+    adminAddCoins: async (payload: AdminAddCoinsParams): Promise<unknown> => {
         const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/wallet/admin/add-coins`, {
             method: 'POST',
             headers: { "Content-Type": "application/json" },

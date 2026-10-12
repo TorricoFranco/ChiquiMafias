@@ -14,6 +14,7 @@ import { StoreItem } from '../types';
 import { useSubscriptions } from '@/features/subscriptions/hooks/useSubcriptions';
 import { SubscriptionTier, SubscriptionPlanDto } from '@/features/subscriptions/types';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import { getErrorMessage } from '@/lib/errorMessage';
 
 export const StoreView: React.FC = () => {
 
@@ -93,8 +94,8 @@ export const StoreView: React.FC = () => {
                 setItemToBuy(null);
                 setPurchaseSuccess(false);
             }, 1500);
-        } catch (error: any) {
-            setPurchaseError(error.message || 'Hubo un error al procesar la compra.');
+        } catch (error) {
+            setPurchaseError(getErrorMessage(error) || 'Hubo un error al procesar la compra.');
         }
     };
 
@@ -107,8 +108,8 @@ export const StoreView: React.FC = () => {
 
     const vipPlan = plans?.find((p: SubscriptionPlanDto) => p.tier === SubscriptionTier.TIER_3);
 
-    const globalPromoMessage = vipPlan?.pricing.discountPercentage > 0
-        ? vipPlan.pricing.promoMessage
+    const globalPromoMessage = (vipPlan?.pricing.discountPercentage ?? 0) > 0
+        ? vipPlan?.pricing.promoMessage
         : null;
 
     const globalExpiresAt = vipPlan?.pricing.expiresAt || null;

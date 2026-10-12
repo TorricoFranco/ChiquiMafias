@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTicketStore } from '@/store/useTicketStore';
 import { betsApi } from '@/features/bets/api/betsApi';
 import { useUserStore } from '@/store/useUserStore';
 import { Trash2, Receipt, ChevronUp, ChevronDown, AlertCircle, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errorMessage';
 
 export const TicketActive = () => {
     const [isOpenMobile, setIsOpenMobile] = useState(false);
@@ -15,13 +16,17 @@ export const TicketActive = () => {
 
     // En móvil la hoja no se abre sola: taparía los mercados y no dejaría sumar más selecciones.
     // La barra colapsada muestra el contador y se abre al tocarla.
-    useEffect(() => {
-        if (ticketItems.length > 0) {
+    // Con selecciones en el ticket se abre el panel de escritorio; sin ninguna se cierra la hoja móvil. Se ajusta durante el render, sin efecto.
+    const ticketCount = ticketItems.length;
+    const [prevTicketCount, setPrevTicketCount] = useState(ticketCount);
+    if (ticketCount !== prevTicketCount) {
+        setPrevTicketCount(ticketCount);
+        if (ticketCount > 0) {
             setIsDesktopOpen(true);
         } else {
             setIsOpenMobile(false);
         }
-    }, [ticketItems.length]);
+    }
 
     const totalBet = ticketItems.reduce((acc, item) => acc + (item.betAmount || 0), 0);
     const totalPotentialReturn = ticketItems.reduce(
@@ -45,8 +50,8 @@ export const TicketActive = () => {
             }
             toast.success('¡Apuestas confirmadas con éxito!');
             setIsOpenMobile(false);
-        } catch (error: any) {
-            toast.error(error.message || 'Hubo un error al colocar la apuesta');
+        } catch (error) {
+            toast.error(getErrorMessage(error) || 'Hubo un error al colocar la apuesta');
         } finally {
             setIsSubmitting(false);
         }

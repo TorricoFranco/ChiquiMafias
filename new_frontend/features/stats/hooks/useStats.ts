@@ -117,6 +117,12 @@ export function useTopChatters(limit = 10) {
 }
 
 type AnyLeaderboardItem = LeaderboardUserStats | TopActiveStreakUser | TopChatterUser;
+
+type SearchableLeaderboardItem = {
+  username?: string | null;
+  name?: string | null;
+  user?: { username?: string | null; name?: string | null } | null;
+};
 export function useSocialStats() {
   const queryClient = useQueryClient();
   const [activeCategory, setActiveCategory] = useState<LeaderboardCategory>('top-earners');
@@ -182,7 +188,9 @@ export function useSocialStats() {
   const filteredLeaderboard = useMemo(() => {
     if (!searchQuery.trim()) return rawLeaderboardData;
     const q = searchQuery.toLowerCase();
-    return rawLeaderboardData.filter((item: any) => {
+    // Cada leaderboard trae un shape distinto: la búsqueda lee estos campos opcionales de cualquiera de ellos.
+    return rawLeaderboardData.filter((raw) => {
+      const item = raw as SearchableLeaderboardItem;
       if (item.username?.toLowerCase().includes(q)) return true;
       if (item.name?.toLowerCase().includes(q)) return true;
       if (item.user?.username?.toLowerCase().includes(q)) return true;
