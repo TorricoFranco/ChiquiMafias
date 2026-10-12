@@ -37,7 +37,11 @@ export const ApprovePollModal: React.FC<ApprovePollModalProps> = ({ poll, onClos
                         <span className="text-[10px] text-[#909378] uppercase font-bold">Pregunta:</span>
                         <p className="font-bold text-xs text-[#e5e2e1] mt-0.5">{poll.title}</p>
                         <div className="flex items-center justify-between mt-1">
-                            <span className="text-[10px] text-[#d2f000]">Por: @{poll.user?.username}</span>
+                            <span className="text-[10px] text-[#d2f000]">
+                                {poll.isOfficial
+                                    ? 'Encuesta oficial'
+                                    : `Por: ${poll.user?.username ? `@${poll.user.username}` : poll.user?.name || 'usuario sin nombre'}`}
+                            </span>
                             <span className="text-[10px] font-mono font-bold text-[#c6c9ab]">Ícono: {poll.icon || 'FOOTBALL'}</span>
                         </div>
                     </div>

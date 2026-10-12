@@ -1,6 +1,7 @@
 import React from 'react';
 import { Flame, MessageSquare, ThumbsUp, XCircle } from 'lucide-react';
 import { AdminPollItem } from '../../types';
+import { PollAuthor } from '../PollAuthor';
 
 
 interface ActivePollCardProps {
@@ -29,6 +30,18 @@ export const ActivePollCard: React.FC<ActivePollCardProps> = ({ poll, onClosePol
                         {poll.description && (
                             <p className="text-xs text-[#c6c9ab]">{poll.description}</p>
                         )}
+                        <div className="mt-2">
+                            <PollAuthor
+                                author={poll.user}
+                                isOfficial={poll.isOfficial}
+                                size="sm"
+                                subtitle={
+                                    poll.isOfficial && poll.createdByAdmin
+                                        ? `Publicada por ${poll.createdByAdmin.username ? `@${poll.createdByAdmin.username}` : poll.createdByAdmin.name}`
+                                        : undefined
+                                }
+                            />
+                        </div>
                     </div>
 
                     <span className="text-[11px] font-mono text-[#d2f000] font-bold bg-[#131313] px-2.5 py-1 rounded-lg border border-[#353534] flex items-center gap-1">

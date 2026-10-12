@@ -1,4 +1,10 @@
-import type { Comment, PaginatedComments, Poll } from "@/features/polls/types";
+import type {
+  AdminPollItem,
+  Comment,
+  PaginatedComments,
+  Poll,
+  PollAuthor,
+} from "@/features/polls/types";
 import { nextId } from "./ids";
 
 export function buildPoll(overrides: Partial<Poll> = {}): Poll {
@@ -16,8 +22,10 @@ export function buildPoll(overrides: Partial<Poll> = {}): Poll {
     endsAt: "2030-05-12T18:00:00.000Z",
     icon: "⚽",
     type: "CLASSIC",
-    user: { id: "user-autor", username: "tribunero" },
+    isOfficial: false,
+    user: buildPollAuthor(),
     userVotedOptionId: null,
+    hasVoted: false,
     totalVotes: 3,
     likesCount: 4,
     dislikesCount: 1,
@@ -25,6 +33,28 @@ export function buildPoll(overrides: Partial<Poll> = {}): Poll {
     stats: { comments: 0, reactions: 5 },
     ...overrides,
   };
+}
+
+/** Autor de una encuesta de la comunidad, con equipo y suscripción como los manda el backend. */
+export function buildPollAuthor(overrides: Partial<PollAuthor> = {}): PollAuthor {
+  return {
+    id: "user-autor",
+    name: "Juan Tribunero",
+    username: "tribunero",
+    activeSubscriptionTier: null,
+    team: { id: "team-1", name: "Boca Juniors", badgeUrl: "/escudos/boca-juniors.webp" },
+    ...overrides,
+  };
+}
+
+/** Encuesta publicada por la moderación: no expone a ninguna persona. */
+export function buildOfficialPoll(overrides: Partial<Poll> = {}): Poll {
+  return buildPoll({ isOfficial: true, user: null, ...overrides });
+}
+
+/** Encuesta tal como la lista el panel de moderación (pendiente por defecto). */
+export function buildAdminPoll(overrides: Partial<AdminPollItem> = {}): AdminPollItem {
+  return { ...buildPoll(), status: "PENDING", ...overrides };
 }
 
 export function buildComment(overrides: Partial<Comment> = {}): Comment {

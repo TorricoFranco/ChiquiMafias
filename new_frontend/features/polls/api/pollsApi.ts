@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/apiFetch";
 import {
+    AdminPollItem,
     Poll,
     ProposePollDto,
     ApprovePollDto,
@@ -126,7 +127,7 @@ export const pollsApi = {
     // --- ADMINISTRACIÓN ---
 
     // Obtener propuestas de usuarios pendientes de moderación
-    getPendingPolls: async (): Promise<Poll[]> => {
+    getPendingPolls: async (): Promise<AdminPollItem[]> => {
         const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/polls/pending`);
         if (!response.ok) {
             throw new Error(`Error de privilegios al traer pendientes: ${response.status}`);
