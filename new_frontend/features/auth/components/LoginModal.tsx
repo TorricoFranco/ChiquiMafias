@@ -12,7 +12,7 @@ export default function LoginModal({
 }) {
     const [showOnboarding, setShowOnboarding] = useState(false);
 
-    const handleGoogleSuccess = (user: any) => {
+    const handleGoogleSuccess = (user: { isFirstLogin?: boolean }) => {
         if (user.isFirstLogin) {
             setShowOnboarding(true);
         } else {

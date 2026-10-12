@@ -69,11 +69,15 @@ export function ChatPanel({
     scrollToBottom();
   }, [messages]);
 
+  // Al quitarse el timeout se borra el contador. Se ajusta durante el render, sin efecto.
+  const [prevTimeoutUntil, setPrevTimeoutUntil] = useState(timeoutUntil);
+  if (timeoutUntil !== prevTimeoutUntil) {
+    setPrevTimeoutUntil(timeoutUntil);
+    if (!timeoutUntil) setTimeLeft(null);
+  }
+
   useEffect(() => {
-    if (!timeoutUntil) {
-      setTimeLeft(null);
-      return;
-    }
+    if (!timeoutUntil) return;
 
     const interval = setInterval(() => {
       const now = Date.now();

@@ -126,6 +126,7 @@ export const CosmeticCard: React.FC<CosmeticCardProps> = ({ item, onBuy, onEquip
             <>
               {previewWithActive && activeChatBubbleId ? (
                 <div className="w-full flex justify-center">
+                  {/* eslint-disable-next-line react-hooks/static-components -- getChatBubbleComponent devuelve componentes estables del registro: no se recrean por render */}
                   <ActiveChatBubble>
                     <span className={`text-sm font-bold drop-shadow ${nameColorStyle}`}>
                       Aguantee {teamName}!!
@@ -145,6 +146,7 @@ export const CosmeticCard: React.FC<CosmeticCardProps> = ({ item, onBuy, onEquip
 
           {item.type === 'CHAT_BUBBLE' && (
             <div className="w-full flex justify-center">
+              {/* eslint-disable-next-line react-hooks/static-components -- getChatBubbleComponent devuelve componentes estables del registro: no se recrean por render */}
               <ItemChatBubble>
                 <span className={`text-sm font-bold ${previewWithActive ? activeNameColorStyle : 'text-white'}`}>
                   Aguantee {teamName}!!

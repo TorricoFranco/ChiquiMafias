@@ -174,7 +174,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                             {isLive && score.elapsed && (
                                 <span className="text-xs font-mono font-bold text-red-400 flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                    {score.elapsed}'
+                                    {score.elapsed}&apos;
                                 </span>
                             )}
                         </div>
@@ -212,7 +212,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#242323] text-[#e5e2e1] border border-[#353534]"
                             >
                                 <span className="font-medium">{g.player}</span>
-                                <span className="text-[#8e9285] font-mono">{g.min}'</span>
+                                <span className="text-[#8e9285] font-mono">{g.min}&apos;</span>
                             </span>
                         ))}
                     </div>
@@ -226,7 +226,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#242323] text-[#e5e2e1] border border-[#353534]"
                             >
                                 <span className="font-medium">{g.player}</span>
-                                <span className="text-[#8e9285] font-mono">{g.min}'</span>
+                                <span className="text-[#8e9285] font-mono">{g.min}&apos;</span>
                             </span>
                         ))}
                     </div>

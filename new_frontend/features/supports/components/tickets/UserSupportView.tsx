@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   CreateTicketPayload,
   TicketMessagePayload,
@@ -51,12 +51,15 @@ export const UserSupportView: React.FC<UserSupportViewProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  useEffect(() => {
+  // Si llega una categoría por defecto, se abre el modal con ella. Se ajusta durante el render, sin efecto.
+  const [prevDefaultCategory, setPrevDefaultCategory] = useState<TicketCategory | undefined>(undefined);
+  if (defaultCategory !== prevDefaultCategory) {
+    setPrevDefaultCategory(defaultCategory);
     if (defaultCategory) {
       setCreateDefaultCategory(defaultCategory);
       setIsCreateModalOpen(true);
     }
-  }, [defaultCategory]);
+  }
 
   const handleCreateTicket = (payload: CreateTicketPayload) => {
     createTicketMutation.mutate(payload, {

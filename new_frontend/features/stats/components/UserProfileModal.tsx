@@ -38,7 +38,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, onClos
     teamBadge = user.user.team?.badgeUrl;
   } else {
     username = user.username || 'anonimo';
-    activeNameColorId = (user as any).activeNameColorId;
+    activeNameColorId = (user as { activeNameColorId?: string | null }).activeNameColorId;
     teamBadge = user.team?.badgeUrl;
   }
 

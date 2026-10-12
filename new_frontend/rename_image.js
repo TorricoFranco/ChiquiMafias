@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- script CJS suelto de un solo uso, no es código de la app */
 const fs = require('fs');
 const path = require('path');
 

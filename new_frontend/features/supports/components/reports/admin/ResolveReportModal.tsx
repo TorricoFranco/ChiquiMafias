@@ -101,7 +101,7 @@ export const ResolveReportModal: React.FC<ResolveReportModalProps> = ({
                     key={act.id}
                     type="button"
                     aria-pressed={resolveAction === act.id}
-                    onClick={() => setResolveAction(act.id as any)}
+                    onClick={() => setResolveAction(act.id as 'BAN' | 'MUTE' | 'WARN' | 'UNBAN')}
                     className={`p-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                       resolveAction === act.id
                         ? 'bg-red-500/20 border-red-500 text-red-300'

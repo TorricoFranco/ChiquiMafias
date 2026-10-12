@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGlobalSocket } from '@/context/SocketContext';
+import type { MatchDetails, MatchEvent, MatchLiveUpdatePayload, MatchStatus, StatsUpdatedPayload, TimelineUpdatedPayload } from '../types';
+
+// El evento crudo de la API trae `time`, que no es parte del tipo de la app: se guarda con esa forma.
+type RawTimelineEvent = MatchEvent & { time?: { elapsed?: number | null } };
 
 export const useMatchLive = (leagueId: string, season: string, matchId: string) => {
   const socket = useGlobalSocket();
@@ -15,11 +19,11 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
 
     const queryKey = ['matchDetail', leagueId, season, matchId];
 
-    const updateCache = (updater: (old: any) => any) => {
-      queryClient.setQueryData(queryKey, updater);
+    const updateCache = (updater: (old: MatchDetails | undefined) => MatchDetails | undefined) => {
+      queryClient.setQueryData<MatchDetails>(queryKey, updater);
     };
 
-    const handleMatchLiveUpdate = (payload: any) => {
+    const handleMatchLiveUpdate = (payload: MatchLiveUpdatePayload) => {
       console.log('⚽ match_live_update payload:', payload);
       updateCache((prev) => {
         if (!prev) return prev;
@@ -33,30 +37,30 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
           },
           metadata: {
             ...prev.metadata,
-            status: payload.status ?? prev.metadata.status,
+            status: (payload.status as MatchStatus) ?? prev.metadata.status,
           },
         };
       });
     };
 
-    const handleTimelineEventsUpdate = (payload: any) => {
+    const handleTimelineEventsUpdate = (payload: TimelineUpdatedPayload) => {
       console.log('📅 timeline_updated payload:', payload);
       updateCache((prev) => {
         if (!prev) return prev;
-        const apiEvent = payload.lastEvent;
+        const apiEvent = payload.lastEvent as RawTimelineEvent | null;
         if (!apiEvent) return prev;
         
         const eventId = apiEvent.id || `${apiEvent.time?.elapsed}-${apiEvent.team?.id}-${apiEvent.type}`;
-        if (prev.events?.some((e: any) => e.id === eventId)) return prev;
+        if (prev.events?.some((e) => e.id === eventId)) return prev;
         
-        const updatedEvents = [...(prev.events || []), { ...apiEvent, id: eventId }].sort(
+        const updatedEvents = ([...(prev.events || []), { ...apiEvent, id: eventId }] as RawTimelineEvent[]).sort(
           (a, b) => (b.minute || b.time?.elapsed || 0) - (a.minute || a.time?.elapsed || 0),
         );
         return { ...prev, events: updatedEvents };
       });
     };
 
-    const handleStatsUpdate = (payload: any) => {
+    const handleStatsUpdate = (payload: StatsUpdatedPayload) => {
       console.log('📈 stats_updated payload:', payload);
       updateCache((prev) => {
         if (!prev) return prev;

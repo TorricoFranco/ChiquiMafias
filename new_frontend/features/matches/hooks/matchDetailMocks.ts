@@ -318,11 +318,11 @@ export const MOCK_PRE_MATCH: PreMatchResponse = {
         draws: 84,
         total: 261,
         lastMatches: [
-            { id: 'h1', date: '21/04/2024', homeTeam: 'River Plate', awayTeam: 'Boca Juniors', homeScore: 2, awayScore: 3, tournament: 'Copa de la Liga' },
-            { id: 'h2', date: '25/02/2024', homeTeam: 'River Plate', awayTeam: 'Boca Juniors', homeScore: 1, awayScore: 1, tournament: 'Copa de la Liga' },
-            { id: 'h3', date: '01/10/2023', homeTeam: 'Boca Juniors', awayTeam: 'River Plate', homeScore: 0, awayScore: 2, tournament: 'Copa de la Liga' },
-            { id: 'h4', date: '07/05/2023', homeTeam: 'River Plate', awayTeam: 'Boca Juniors', homeScore: 1, awayScore: 0, tournament: 'Liga Profesional' },
-            { id: 'h5', date: '11/09/2022', homeTeam: 'Boca Juniors', awayTeam: 'River Plate', homeScore: 1, awayScore: 0, tournament: 'Liga Profesional' },
+            { fixture: { id: 1, date: '2024-04-21T20:00:00Z', venue: { name: 'Monumental', city: 'Buenos Aires' }, status: { short: 'FT' } }, teams: { home: { id: 435, name: 'River Plate', logo: '/escudos-api/435.webp' }, away: { id: 451, name: 'Boca Juniors', logo: '/escudos-api/451.webp' } }, goals: { home: 2, away: 3 } },
+            { fixture: { id: 2, date: '2024-02-25T20:00:00Z', venue: { name: 'Monumental', city: 'Buenos Aires' }, status: { short: 'FT' } }, teams: { home: { id: 435, name: 'River Plate', logo: '/escudos-api/435.webp' }, away: { id: 451, name: 'Boca Juniors', logo: '/escudos-api/451.webp' } }, goals: { home: 1, away: 1 } },
+            { fixture: { id: 3, date: '2023-10-01T20:00:00Z', venue: { name: 'La Bombonera', city: 'Buenos Aires' }, status: { short: 'FT' } }, teams: { home: { id: 451, name: 'Boca Juniors', logo: '/escudos-api/451.webp' }, away: { id: 435, name: 'River Plate', logo: '/escudos-api/435.webp' } }, goals: { home: 0, away: 2 } },
+            { fixture: { id: 4, date: '2023-05-07T20:00:00Z', venue: { name: 'Monumental', city: 'Buenos Aires' }, status: { short: 'FT' } }, teams: { home: { id: 435, name: 'River Plate', logo: '/escudos-api/435.webp' }, away: { id: 451, name: 'Boca Juniors', logo: '/escudos-api/451.webp' } }, goals: { home: 1, away: 0 } },
+            { fixture: { id: 5, date: '2022-09-11T20:00:00Z', venue: { name: 'La Bombonera', city: 'Buenos Aires' }, status: { short: 'FT' } }, teams: { home: { id: 451, name: 'Boca Juniors', logo: '/escudos-api/451.webp' }, away: { id: 435, name: 'River Plate', logo: '/escudos-api/435.webp' } }, goals: { home: 1, away: 0 } },
         ],
     },
     form: {

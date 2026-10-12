@@ -1,9 +1,9 @@
 import React from 'react';
 import { History } from 'lucide-react';
-import { Team } from '../../types';
+import { PreMatchResponse, Team } from '../../types';
 
 interface HeadToHeadProps {
-    history: any;
+    history: PreMatchResponse['history'];
     homeTeam: Team;
     awayTeam: Team;
 }
@@ -74,7 +74,7 @@ export const HeadToHead: React.FC<HeadToHeadProps> = ({ history, homeTeam, awayT
 
             {/* Últimos Partidos */}
             <div className="flex flex-col gap-2">
-                {history.lastMatches.map((m: any) => {
+                {history.lastMatches.map((m) => {
                     const homeScore = m.goals.home;
                     const awayScore = m.goals.away;
                     const matchHomeTeam = m.teams.home.name;

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useYearlyCalendar } from './useFixture';
 import { useLeagueLive } from '../socket/useFixtureSocket';
+import type { MatchFixture } from '../types';
 
 export const useCalendarWithLive = (season: string, leagueId: string) => {
   const {
@@ -16,7 +17,7 @@ export const useCalendarWithLive = (season: string, leagueId: string) => {
   const mergedCalendar = useMemo(() => {
     if (!calendarData) return null;
 
-    const updatedCalendarRecord: Record<string, any[]> = {};
+    const updatedCalendarRecord: Record<string, MatchFixture[]> = {};
 
     Object.entries(calendarData.calendar).forEach(([dateString, matches]) => {
       updatedCalendarRecord[dateString] = matches.map(match => {

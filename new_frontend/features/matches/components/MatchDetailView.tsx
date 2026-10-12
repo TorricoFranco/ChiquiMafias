@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useMatch } from '../hooks/useMatch';
 import { MatchHeader } from './MatchHeader';
 import { MatchStatusBanner } from './MatchStatusBanner';
@@ -36,18 +36,15 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
         matchDetails?.metadata?.status?.toUpperCase() || ''
     );
 
-    const [activeTab, setActiveTab] = useState<MatchTabKey>(
+    const [selectedTab, setActiveTab] = useState<MatchTabKey>(
         isNotStarted && !hasLineups ? 'pre-partido' : 'resumen'
     );
 
-    useEffect(() => {
-        if (!isNotStarted && activeTab === 'pre-partido') {
-            setActiveTab('resumen');
-        }
-        if (isFinished && activeTab === 'chat') {
-            setActiveTab('resumen');
-        }
-    }, [isNotStarted, isFinished, activeTab]);
+    // Pre-partido deja de existir al arrancar el partido y el chat al terminar: en ese caso se muestra resumen. Derivado, sin efecto.
+    const activeTab: MatchTabKey =
+        (!isNotStarted && selectedTab === 'pre-partido') || (isFinished && selectedTab === 'chat')
+            ? 'resumen'
+            : selectedTab;
 
     return (
         <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-12 px-2 md:px-0">
@@ -77,7 +74,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
                         Error al consultar el partido
                     </h2>
                     <p className="text-xs text-[#8e9285] max-w-md mx-auto mt-2 mb-6">
-                        {typeof error === 'string' ? error : (error as any)?.message || 'Error desconocido'}
+                        {typeof error === 'string' ? error : (error as { message?: string } | null)?.message || 'Error desconocido'}
                     </p>
                     <div className="flex items-center justify-center gap-3">
                         <button

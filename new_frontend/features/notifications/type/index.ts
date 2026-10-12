@@ -12,7 +12,7 @@ export interface NotificationItem {
         multiplier?: number;
         slug?: string;
         teamBadge?: string;
-        [key: string]: any;
+        [key: string]: unknown;
     } | null;
 }
 

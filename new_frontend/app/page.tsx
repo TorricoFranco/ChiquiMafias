@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -18,11 +18,12 @@ function HomeContent() {
   const activeSection = useNavigationStore((state) => state.activeTab);
   const setActiveSection = useNavigationStore((state) => state.setActiveTab);
 
-  useEffect(() => {
-    if (tabParam) {
-      setMainTab(tabParam);
-    }
-  }, [tabParam]);
+  // Sigue al ?tab= de la URL (botón atrás, logo). Se ajusta durante el render, sin efecto.
+  const [prevTabParam, setPrevTabParam] = useState(tabParam);
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam);
+    setMainTab(tabParam || "social");
+  }
 
   const handleTabChange = (tab: string) => {
     setMainTab(tab);

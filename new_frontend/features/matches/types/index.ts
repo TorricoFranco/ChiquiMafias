@@ -171,20 +171,26 @@ export interface MatchDetails {
 }
 
 // Pre-match Models
+// Forma real que devuelve el backend (matches.mappers): el partido va anidado en fixture/teams/goals.
 export interface MatchHistoryItem {
-  id: string;
-  date: string;
-  homeTeam: string;
-  awayTeam: string;
-  homeScore: number;
-  awayScore: number;
-  tournament: string;
+  fixture: {
+    id: number;
+    date: string;
+    venue: { name: string; city: string };
+    status: { short: string };
+  };
+  teams: {
+    home: { id: number; name: string; logo: string };
+    away: { id: number; name: string; logo: string };
+  };
+  goals: { home: number; away: number };
 }
 
 export interface TableEntry {
   position: number;
   teamId: string;
   teamName: string;
+  teamLogo?: string | null;
   played: number;
   points: number;
   goalDiff: number;
@@ -204,6 +210,7 @@ export interface PreMatchResponse {
     away: string; // e.g. "D-E-V-V-D"
   };
   miniTable: {
+    activeTournament?: 'apertura' | 'clausura';
     tournament: {
       home: TableEntry[];
       away: TableEntry[];
@@ -244,6 +251,14 @@ export interface TimelineUpdatedPayload {
   matchId: string;
   lastEvent: MatchEvent | null;
   totalEvents: number;
+}
+
+// Espejo de GoalScoredPayload (backend/src/types/socket-events.ts)
+export interface GoalScoredPayload {
+  matchId: string;
+  teamId?: string;
+  player?: string;
+  minute?: number;
 }
 
 export interface MatchLiveUpdatePayload {

@@ -112,7 +112,7 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({
       teamBadge = item.user.team?.badgeUrl;
     } else {
       username = item.username || 'anonimo';
-      activeNameColorId = (item as any).activeNameColorId;
+      activeNameColorId = (item as { activeNameColorId?: string | null }).activeNameColorId;
       teamBadge = item.team?.badgeUrl;
     }
 

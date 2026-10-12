@@ -46,6 +46,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         };
 
         newSocket.on("disconnect", handleDisconnect);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- el socket es un recurso externo: su instancia tiene que quedar en estado para el Provider
         setSocket(newSocket);
 
         return () => {
@@ -62,6 +63,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         // Ya conectado (o reconectando) con este token.
         if (handshakeToken(socket) === accessToken && socket.active) return;
 
+        // eslint-disable-next-line react-hooks/immutability -- socket.io-client exige mutar socket.auth antes de reconectar
         socket.auth = { ...socket.auth, token: accessToken };
 
         if (socket.connected) {

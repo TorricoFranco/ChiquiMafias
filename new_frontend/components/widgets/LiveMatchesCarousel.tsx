@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { MatchScorecard } from "./MatchScorecard";
+import type { MatchFixture } from "@/features/fixture/types";
 
 interface LiveMatchesCarouselProps {
-    matches: any[];
+    matches: MatchFixture[];
 }
 
 export const LiveMatchesCarousel: React.FC<LiveMatchesCarouselProps> = ({ matches }) => {

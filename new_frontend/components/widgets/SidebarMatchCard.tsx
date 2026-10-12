@@ -2,11 +2,11 @@
 
 import React from "react";
 import Link from "next/link";
-import { LeagueMatch } from "@/features/league/type";
+import { MatchFixture } from "@/features/fixture/types";
 import { formatMatchTime } from "@/features/league/utils/formatMatchTime";
 
 interface SidebarMatchCardProps {
-    match: LeagueMatch;
+    match: MatchFixture;
 }
 
 export const SidebarMatchCard: React.FC<SidebarMatchCardProps> = ({ match }) => {

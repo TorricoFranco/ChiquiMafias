@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Sliders, CheckCircle, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Market } from '../../types';
 
@@ -20,11 +20,14 @@ export const SettleMarketModal: React.FC<SettleMarketModalProps> = ({
     const [settleAction, setSettleAction] = useState<'SETTLED' | 'REFUNDED'>('SETTLED');
     const [selectedWinningOptionId, setSelectedWinningOptionId] = useState<string>('');
 
-    useEffect(() => {
+    // Al cambiar de mercado, la opción ganadora arranca en la primera. Se ajusta durante el render, sin efecto.
+    const [prevMarket, setPrevMarket] = useState<Market | undefined>(undefined);
+    if (market !== prevMarket) {
+        setPrevMarket(market);
         if (market.options.length > 0) {
             setSelectedWinningOptionId(market.options[0].id);
         }
-    }, [market]);
+    }
 
     const handleSettleConfirm = () => {
         if (settleAction === 'SETTLED' && !selectedWinningOptionId) {

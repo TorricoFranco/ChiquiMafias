@@ -2,12 +2,12 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { LeagueMatch } from "@/features/league/type";
+import { MatchFixture } from "@/features/fixture/types";
 import { translateStatus } from "@/features/league/utils/translateStatus";
 import { formatMatchTime } from "@/features/league/utils/formatMatchTime";
 
 interface MatchScorecardProps {
-  match: LeagueMatch;
+  match: MatchFixture & { minute?: string };
   odds?: { home: number; draw: number; away: number };
   selectedBetOption?: { matchId: string; option: "home" | "draw" | "away" } | null;
   onSelectOdds?: (matchId: string, option: "home" | "draw" | "away", oddsValue: number, teamName: string) => void;

@@ -1,5 +1,7 @@
-export const formatToMapFixtureSocket = (data: any[]) => {
-    return data.reduce((acc, match) => {
+import type { GetLiveScoresResponse, LiveResult } from '../types';
+
+export const formatToMapFixtureSocket = (data: GetLiveScoresResponse[]) => {
+    return data.reduce<Record<string, LiveResult>>((acc, match) => {
         acc[match.matchId] = {
             h: match.h,
             a: match.a,

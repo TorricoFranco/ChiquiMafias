@@ -23,7 +23,7 @@ export const storeApi = {
      * Realiza la compra segura de un artículo usando monedas del balance.
      * El backend restará el saldo y actualizará el inventario en una transacción.
      */
-    buyItem: async (itemId: string, quantity: number = 1): Promise<any> => {
+    buyItem: async (itemId: string, quantity: number = 1): Promise<BuyItemResponse> => {
         const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/store/buy/${itemId}`, {
             method: 'POST',
             headers: { "Content-Type": "application/json" },

@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/apiFetch";
+import type { SubscriptionPlanDto } from "@/features/subscriptions/types";
 import {
     SubscriptionDetailResponse,
     CheckoutSubscriptionResponse,
@@ -12,7 +13,7 @@ export const subscriptionApi = {
      * Obtiene la grilla informativa de planes con precios dinámicos
      * GET /subscriptions/plans
      */
-    getPlans: async (userTier: SubscriptionTier | null): Promise<any> => {
+    getPlans: async (userTier: SubscriptionTier | null): Promise<SubscriptionPlanDto[]> => {
         const url = userTier
             ? `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans?tier=${userTier}`
             : `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans`;

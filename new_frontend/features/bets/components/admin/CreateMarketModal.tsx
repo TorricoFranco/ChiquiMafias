@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, PlusCircle, Shield } from 'lucide-react';
-import { MarketType } from '../../types';
+import { MarketMetadata, MarketType } from '../../types';
 import { getTeamsList } from '@/data/teamData';
 import { TeamSelectorModalAPI } from '@/features/auth/components/TeamSelectorModalAPI';
 import { toDateTimeLocalValue } from '@/lib/dateTimeLocal';
@@ -13,7 +13,7 @@ interface CreateMarketModalProps {
         category: string;
         description: string;
         closesAt: string;
-        metadata?: any;
+        metadata?: MarketMetadata;
         options: {
             name: string;
             initialProb: number;
@@ -91,7 +91,7 @@ export const CreateMarketModal: React.FC<CreateMarketModalProps> = ({
         e.preventDefault();
         if (!title.trim() || options.some((o) => !o.name.trim())) return;
 
-        let metadata: any = undefined;
+        let metadata: MarketMetadata | undefined = undefined;
 
         if (type === 'MATCH') {
             const home = options[0];

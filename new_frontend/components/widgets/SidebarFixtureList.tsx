@@ -33,18 +33,18 @@ export const SidebarFixtureList = ({
     const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
     const tabsRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (calendarData?.availableDays?.length) {
+    // Al llegar un calendario nuevo, selecciona hoy (o el último día). Se ajusta durante el render, sin efecto.
+    const availableDays = calendarData?.availableDays;
+    const [prevAvailableDays, setPrevAvailableDays] = useState<typeof availableDays>(undefined);
+    if (availableDays !== prevAvailableDays) {
+        setPrevAvailableDays(availableDays);
+        if (availableDays?.length) {
             const todayKey = getFormattedDateKey(new Date());
-            const index = calendarData.availableDays.findIndex((day: string) => day >= todayKey);
+            const index = availableDays.findIndex((day: string) => day >= todayKey);
 
-            if (index !== -1) {
-                setSelectedDayIndex(index);
-            } else {
-                setSelectedDayIndex(calendarData.availableDays.length - 1);
-            }
+            setSelectedDayIndex(index !== -1 ? index : availableDays.length - 1);
         }
-    }, [calendarData?.availableDays]);
+    }
 
     // Scroll automático hacia la pestaña activa dentro de la barra
     useEffect(() => {
@@ -61,11 +61,11 @@ export const SidebarFixtureList = ({
             return { liveMatches: [], selectedDateMatches: [], displayDate: "" };
         }
         const allMatches = Object.values(calendarData.calendar).flat();
-        const live = allMatches.filter((m: any) => m.is_live);
+        const live = allMatches.filter((m) => m.is_live);
 
         const selectedDateKey = calendarData.availableDays[selectedDayIndex];
         const matchesForSelectedDate = calendarData.calendar[selectedDateKey] || [];
-        const selectedNotLive = matchesForSelectedDate.filter((m: any) => !m.is_live);
+        const selectedNotLive = matchesForSelectedDate.filter((m) => !m.is_live);
 
         const dateFormatter = new Intl.DateTimeFormat("es-AR", {
             weekday: "long",
@@ -177,7 +177,7 @@ export const SidebarFixtureList = ({
             {/* LISTA DE PARTIDOS DEL DÍA */}
             <div className="space-y-2.5">
                 {selectedDateMatches.length > 0 ? (
-                    selectedDateMatches.map((match: any) => (
+                    selectedDateMatches.map((match) => (
                         <SidebarMatchCard key={match.id} match={match} />
                     ))
                 ) : (

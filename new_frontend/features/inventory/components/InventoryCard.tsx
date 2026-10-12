@@ -104,6 +104,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
 
                     {item.type === 'CHAT_BUBBLE' && ChatBubblePreview && (
                         <div className="w-full flex justify-center">
+                            {/* eslint-disable-next-line react-hooks/static-components -- getChatBubbleComponent devuelve componentes estables del registro: no se recrean por render */}
                             <ChatBubblePreview>
                                 <span className="text-sm font-bold text-white">
                                     Aguantee {teamName}!!
