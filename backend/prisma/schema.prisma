@@ -355,15 +355,15 @@ enum SubscriptionTier {
 }
 
 model SubscriptionPlan {
-  id           String           @id @default(uuid())
-  tier         SubscriptionTier @unique
-  name         String
-  basePriceARS Float
-  storeDiscountPercentage Int @default(0)
-  benefits     String[]
-  isActive     Boolean          @default(true)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id                      String           @id @default(uuid())
+  tier                    SubscriptionTier @unique
+  name                    String
+  basePriceARS            Float
+  storeDiscountPercentage Int              @default(0)
+  benefits                String[]
+  isActive                Boolean          @default(true)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 
   @@map("subscription_plans")
 }
@@ -412,14 +412,14 @@ model ProcessedPayment {
 }
 
 model User {
-  id           String  @id @default(uuid())
-  name         String
-  email        String  @unique
-  googleId     String  @unique
-  username     String? @unique
-  isFirstLogin Boolean @default(true)
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  googleId        String    @unique
+  username        String?   @unique
+  isFirstLogin    Boolean   @default(true)
   termsAcceptedAt DateTime?
-  termsVersion String?
+  termsVersion    String?
 
   status     UserStatus @default(ACTIVE)
   mutedUntil DateTime?
@@ -437,7 +437,7 @@ model User {
   wallet        Wallet?
   votes         Vote[]
   bets          Bet[]
-  userStats       UserStats?
+  userStats     UserStats?
   notifications Notification[]
 
   hashedRefreshToken String?
@@ -451,10 +451,13 @@ model User {
 
   createdAt DateTime @default(now())
 
-  teamId    String?         @map("team_id")
-  team      FootballTeam?   @relation(fields: [teamId], references: [id])
-  inventory UserInventory[]
-  polls     Poll[]
+  teamId        String?         @map("team_id")
+  team          FootballTeam?   @relation(fields: [teamId], references: [id])
+  inventory     UserInventory[]
+  /// Encuestas que propuso gastando Tickets de Encuesta.
+  polls         Poll[]          @relation("PollProposer")
+  /// Encuestas oficiales que publicó desde el panel de moderación.
+  officialPolls Poll[]          @relation("PollOfficialAuthor")
 
   comments         Comment[]
   pollReactions    PollReaction[]
@@ -510,8 +513,15 @@ model Poll {
   ticketRefund    Json? // [{ itemId, quantity }]: de qué ítem salió cada ticket, para devolver el mismo
   commentsEnabled Boolean  @default(true)
 
+  /// true: la publicó la moderación desde el panel. false: la propuso un usuario con Tickets de Encuesta.
+  isOfficial Boolean @default(false)
+
   userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?   @relation("PollProposer", fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Qué moderador publicó la encuesta oficial. Queda para auditoría: nunca se expone en el endpoint público.
+  createdByAdminId String?
+  createdByAdmin   User?   @relation("PollOfficialAuthor", fields: [createdByAdminId], references: [id], onDelete: SetNull)
 
   reports   Report[]
   votes     Vote[]
@@ -519,12 +529,14 @@ model Poll {
   reactions PollReaction[]
 
   @@index([status, type])
+  // Postgres no indexa las FK solo: sin esto, borrar un moderador escanea toda la tabla.
+  @@index([createdByAdminId])
 }
 
 model Vote {
-  id     String @id @default(uuid())
-  pollId String
-  userId String
+  id            String  @id @default(uuid())
+  pollId        String
+  userId        String
   /// En RATING es la cantidad de estrellas (1-5); en RANKING, la opción que quedó primera.
   optionId      Int
   /// Solo RANKING: los optionId elegidos, en orden [1º, 2º, 3º].
@@ -542,9 +554,9 @@ model Comment {
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  pollId String
-  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  isPremium   Boolean  @default(false)
+  pollId    String
+  poll      Poll    @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  isPremium Boolean @default(false)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -689,20 +701,20 @@ enum BetStatus {
 }
 
 model UserStats {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  totalBetsPlaced     Int      @default(0)
-  totalBetsWon        Int      @default(0)
-  totalCoinsStaked    Int      @default(0)
-  totalCoinsWon       Int      @default(0)
-  
-  highestMultiplier   Float    @default(0) 
-  currentWinStreak    Int      @default(0) 
-  longestWinStreak    Int      @default(0) 
-  
-  updatedAt           DateTime @updatedAt
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalBetsPlaced  Int @default(0)
+  totalBetsWon     Int @default(0)
+  totalCoinsStaked Int @default(0)
+  totalCoinsWon    Int @default(0)
+
+  highestMultiplier Float @default(0)
+  currentWinStreak  Int   @default(0)
+  longestWinStreak  Int   @default(0)
+
+  updatedAt DateTime @updatedAt
 }
 
 // NOTIFICATIONS
@@ -781,15 +793,15 @@ enum DiscountScope {
 }
 
 model StoreItem {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  price       Int
-  type        ItemType
-  assetId     String   @unique
-  isActive    Boolean  @default(true)
-  isPurchasable Boolean        @default(true)
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  name          String
+  description   String
+  price         Int
+  type          ItemType
+  assetId       String   @unique
+  isActive      Boolean  @default(true)
+  isPurchasable Boolean  @default(true)
+  createdAt     DateTime @default(now())
 
   inventories UserInventory[]
   discounts   StoreDiscount[]
@@ -946,18 +958,18 @@ model CoinPack {
 }
 
 model CoinOrder {
-  id               String          @id @default(uuid())
-  userId           String
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  packId           String
-  pack             CoinPack        @relation(fields: [packId], references: [id])
-  status           CoinOrderStatus @default(PENDING)
-  finalPriceARS    Float
-  coinsToCredit    Int
-  mpExternalRef    String          @unique
-  mpPreferenceId   String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id             String          @id @default(uuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packId         String
+  pack           CoinPack        @relation(fields: [packId], references: [id])
+  status         CoinOrderStatus @default(PENDING)
+  finalPriceARS  Float
+  coinsToCredit  Int
+  mpExternalRef  String          @unique
+  mpPreferenceId String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([userId])
   @@index([mpExternalRef])

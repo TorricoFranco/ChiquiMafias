@@ -145,8 +145,11 @@ export class PollsController {
     status: 403,
     description: 'Prohibido (el usuario no tiene rol MODERATOR o superior).',
   })
-  async create(@Body() createPollDto: CreatePollDto) {
-    return this.pollsService.createPoll(createPollDto)
+  async create(
+    @Body() createPollDto: CreatePollDto,
+    @GetUser('id') adminId: string,
+  ) {
+    return this.pollsService.createPoll(createPollDto, adminId)
   }
 
   @Get('pending')

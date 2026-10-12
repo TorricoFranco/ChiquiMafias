@@ -25,6 +25,11 @@ import {
   buildRankingMatrix,
   buildRankingMatrixFromVotes,
 } from './utils/poll-ranking.util'
+import {
+  pollAdminSelect,
+  pollAuthorSelect,
+  resolvePollAuthor,
+} from './utils/poll-author.util'
 
 @Injectable()
 export class PollsService {
@@ -71,6 +76,7 @@ export class PollsService {
           ticketRefund: ticketRefund as unknown as Prisma.InputJsonValue,
           status: 'PENDING',
           icon: dto.icon || 'USER',
+          isOfficial: false,
           userId: userId,
         },
       })
@@ -150,20 +156,21 @@ export class PollsService {
   }
 
   async getPendingPolls() {
-    return this.prisma.poll.findMany({
+    const polls = await this.prisma.poll.findMany({
       where: { status: 'PENDING' },
       include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
+        user: { select: pollAuthorSelect },
+        createdByAdmin: { select: pollAdminSelect },
       },
       orderBy: {
         createdAt: 'asc',
       },
     })
+
+    return polls.map((poll) => ({
+      ...poll,
+      user: resolvePollAuthor(poll),
+    }))
   }
 
   async approvePoll(pollId: string, dto: ApprovePollDto) {
@@ -263,8 +270,12 @@ export class PollsService {
       })
     }
 
+    // Una encuesta oficial programada también queda PENDING, pero no gastó
+    // tickets de nadie: no hay nada que devolver.
     return {
-      message: 'Encuesta rechazada y consumible reembolsado al usuario.',
+      message: rejectedPoll.userId
+        ? 'Encuesta rechazada y consumible reembolsado al usuario.'
+        : 'Encuesta rechazada.',
     }
   }
 
@@ -297,7 +308,11 @@ export class PollsService {
     return [{ itemId: storeItem.id, quantity: poll.ticketCost }]
   }
 
-  async createPoll(dto: CreatePollDto) {
+  /**
+   * @param adminId moderador que la publica. Se guarda solo para auditoría: las
+   * encuestas oficiales no exponen ningún dato de la persona que las creó.
+   */
+  async createPoll(dto: CreatePollDto, adminId: string) {
     const type = dto.type ?? PollType.CLASSIC
     const rawOptions = dto.options ?? []
 
@@ -341,6 +356,8 @@ export class PollsService {
         startsAt: startsAtDate,
         endsAt: endsAtDate,
         icon: dto.icon,
+        isOfficial: true,
+        createdByAdminId: adminId,
       },
     })
 
@@ -360,18 +377,27 @@ export class PollsService {
   async getActivePolls(userId?: string, revealResults = false) {
     const polls = await this.prisma.poll.findMany({
       where: { status: 'ACTIVE' },
+      // Desempate estable: sin esto, dos encuestas con los mismos votos salen en
+      // el orden físico de las filas y las tarjetas se mueven en cada refetch.
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
         options: true,
+        status: true,
         createdAt: true,
+        startsAt: true,
         endsAt: true,
         icon: true,
         description: true,
         type: true,
         config: true,
         commentsEnabled: true,
-        user: { select: { id: true, username: true } },
+        isOfficial: true,
+        user: { select: pollAuthorSelect },
+        // Quién la publicó es solo para la moderación: si no la pide, no sale de
+        // la DB. Mismo criterio que `votes` y `reactions` acá abajo.
+        createdByAdmin: revealResults ? { select: pollAdminSelect } : false,
 
         _count: {
           select: {
@@ -403,7 +429,14 @@ export class PollsService {
 
     const pollsWithResults = await Promise.all(
       polls.map(async (poll) => {
-        const { votes, reactions, options, _count, ...pollData } = poll
+        const {
+          votes,
+          reactions,
+          options,
+          _count,
+          createdByAdmin,
+          ...pollData
+        } = poll
         const redisVotes = await redis.hgetall(`poll:${poll.id}:results`)
 
         // `votes` viene de un select condicional (false si no hay sesión), así
@@ -459,6 +492,9 @@ export class PollsService {
 
         return {
           ...pollData,
+          user: resolvePollAuthor(poll),
+          // Quién la publicó solo lo ve la moderación en su panel.
+          ...(revealResults ? { createdByAdmin } : {}),
           options: parsedOptions,
           hasVoted,
           userVotedOptionId,
@@ -476,7 +512,31 @@ export class PollsService {
       }),
     )
 
-    pollsWithResults.sort((a, b) => b.totalVotes - a.totalVotes)
+    // Primero lo que el usuario todavía puede votar ahora mismo, y dentro de
+    // cada grupo las más populares. Atrás quedan las ya votadas, las placas
+    // informativas (no se votan) y las que están ACTIVE pero fuera de su
+    // ventana: una aprobada con `startsAt` futuro no abrió todavía, y el cron
+    // de cierre puede tardar hasta un minuto en pasarlas a CLOSED.
+    const now = Date.now()
+    const pendingFirst = (poll: {
+      type: PollType
+      hasVoted: boolean
+      startsAt: Date | null
+      endsAt: Date | null
+    }) => {
+      const isOpen =
+        (!poll.startsAt || poll.startsAt.getTime() <= now) &&
+        (!poll.endsAt || poll.endsAt.getTime() > now)
+
+      return POLL_TYPE_RULES[poll.type].votable && !poll.hasVoted && isOpen
+        ? 0
+        : 1
+    }
+
+    pollsWithResults.sort(
+      (a, b) =>
+        pendingFirst(a) - pendingFirst(b) || b.totalVotes - a.totalVotes,
+    )
 
     return pollsWithResults
   }
@@ -605,6 +665,8 @@ export class PollsService {
         options: true,
         type: true,
         config: true,
+        isOfficial: true,
+        user: { select: pollAuthorSelect },
         votes: {
           select: { optionId: true, userId: true, ranking: true },
         },
@@ -632,6 +694,8 @@ export class PollsService {
         endsAt: poll.endsAt,
         type: poll.type,
         config: poll.config,
+        isOfficial: poll.isOfficial,
+        user: resolvePollAuthor(poll),
         options: parsedOptions,
         rankingResults:
           poll.type === 'RANKING'
