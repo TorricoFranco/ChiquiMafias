@@ -1,6 +1,6 @@
 - [Patrones de bug recurrentes](recurring-bug-patterns.md): Roles/Public, sanciones, sockets, TOCTOU, Redis en tx, `where` undefined, alta "una vigente", cron que borra el tier, P2002 amplio, inventario multi-fila
 - [Hechos de runtime verificados](verified-runtime-facts.md): guards WS, $executeRaw void, ioredis caído, Throttler, Discord, tipos de Wallet, DB de dev, tiempos de MP
-- [Decisiones de diseño confirmadas](confirmed-design-decisions.md): migraciones fuera de git, Redis como fuente de verdad de los votos, `startsAt` decorativo, costos por tipo de encuesta — no reportarlas como bug
+- [Decisiones de diseño confirmadas](confirmed-design-decisions.md): migraciones fuera de git, Redis como verdad de los votos, autor de encuestas, `publicUserSelect` ya público — no reportarlas como bug
 - [Decisiones bets/auth](design-decisions-bets-auth.md): liquidación automática (PEN/AET/PST) y hash de refresh sha256+bcrypt con fallback
 - [Deuda conocida](known-accepted-issues.md): processor decrement, settleMarket sin addCoins, isProduction fijo — no re-reportar salvo que empeore
 - [Sync de saldo en Redis](redis-balance-sync-pattern.md): SET absoluto post-commit con valor viejo pisa escrituras; Lua va adelante de la DB

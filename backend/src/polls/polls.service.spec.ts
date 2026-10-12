@@ -213,7 +213,25 @@ describe('PollsService', () => {
   })
 
   describe('getActivePolls', () => {
-    const activePoll = (votes: { optionId: number }[] = []) => ({
+    const author = {
+      id: 'user-autor',
+      name: 'Juan Tribunero',
+      username: 'tribunero',
+      activeNameColorId: null,
+      activeBannerId: null,
+      activeChatBubbleId: null,
+      activeSubscriptionTier: 'TIER_2',
+      team: {
+        id: 'team-1',
+        name: 'Boca Juniors',
+        badgeUrl: '/escudos/boca.webp',
+      },
+    }
+
+    const activePoll = (
+      votes: { optionId: number }[] = [],
+      overrides: Record<string, unknown> = {},
+    ) => ({
       id: 'poll-1',
       title: '¿Quién gana?',
       options: [
@@ -223,14 +241,19 @@ describe('PollsService', () => {
       type: 'CLASSIC',
       config: null,
       commentsEnabled: true,
+      status: 'ACTIVE',
       createdAt: new Date(),
-      endsAt: new Date(),
+      startsAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 86_400_000),
       icon: 'FOOTBALL',
       description: null,
-      user: { id: 'user-autor', username: 'tribunero' },
+      isOfficial: false,
+      user: author,
+      createdByAdmin: null,
       _count: { comments: 0, reactions: 0 },
       votes,
       reactions: [],
+      ...overrides,
     })
 
     it('Debe ocultar los votos por opción a quien todavía no votó, pero mostrar el total', async () => {
@@ -277,6 +300,187 @@ describe('PollsService', () => {
 
       expect(poll.options[0].votes).toBe(0)
       expect(poll.totalVotes).toBe(10)
+    })
+
+    it('Debe devolver al autor de una encuesta de la comunidad con su equipo y su tier', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([activePoll()])
+
+      const [poll] = await service.getActivePolls('user-1')
+
+      expect(poll.isOfficial).toBe(false)
+      expect(poll.user).toMatchObject({
+        name: 'Juan Tribunero',
+        username: 'tribunero',
+        activeSubscriptionTier: 'TIER_2',
+        team: { badgeUrl: '/escudos/boca.webp' },
+      })
+    })
+
+    it('Debe ocultar al moderador que publicó una encuesta oficial', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        activePoll([], {
+          isOfficial: true,
+          user: null,
+          createdByAdmin: { id: 'mod-1', name: 'Mod', username: 'mod' },
+        }),
+      ])
+
+      const [poll] = await service.getActivePolls('user-1')
+
+      expect(poll.user).toBeNull()
+      expect(poll).not.toHaveProperty('createdByAdmin')
+    })
+
+    it('Debe mostrarle a la moderación quién publicó la encuesta oficial', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        activePoll([], {
+          isOfficial: true,
+          user: null,
+          createdByAdmin: { id: 'mod-1', name: 'Mod', username: 'mod' },
+        }),
+      ])
+
+      const [poll] = await service.getActivePolls('mod-1', true)
+
+      expect(poll.createdByAdmin).toMatchObject({ username: 'mod' })
+    })
+
+    it('Debe nunca exponer al autor de una encuesta oficial que quedó con userId', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        activePoll([], { isOfficial: true }),
+      ])
+
+      const [poll] = await service.getActivePolls('user-1')
+
+      expect(poll.user).toBeNull()
+    })
+
+    it('Debe ordenar primero las que el usuario no votó y, dentro de cada grupo, las más votadas', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        activePoll([{ optionId: 1 }], { id: 'votada-popular' }),
+        activePoll([], { id: 'nueva-tranquila' }),
+        activePoll([], { id: 'nueva-popular' }),
+      ])
+      mockRedis.hgetall.mockImplementation((key: string) => {
+        if (key.includes('votada-popular')) return { '1': '40' }
+        if (key.includes('nueva-popular')) return { '1': '10' }
+        return { '1': '2' }
+      })
+
+      const polls = await service.getActivePolls('user-1')
+
+      expect(polls.map((poll) => poll.id)).toEqual([
+        'nueva-popular',
+        'nueva-tranquila',
+        'votada-popular',
+      ])
+    })
+
+    it('Debe dejar atrás una encuesta que todavía no abrió', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        activePoll([], {
+          id: 'programada',
+          startsAt: new Date(Date.now() + 86_400_000),
+        }),
+        activePoll([], { id: 'abierta' }),
+      ])
+      mockRedis.hgetall.mockImplementation((key: string) =>
+        key.includes('programada') ? { '1': '99' } : { '1': '1' },
+      )
+
+      const polls = await service.getActivePolls('user-1')
+
+      expect(polls.map((poll) => poll.id)).toEqual(['abierta', 'programada'])
+    })
+
+    it('Debe dejar atrás una encuesta que el cron todavía no cerró', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        activePoll([], {
+          id: 'vencida',
+          endsAt: new Date(Date.now() - 60_000),
+        }),
+        activePoll([], { id: 'abierta' }),
+      ])
+      mockRedis.hgetall.mockImplementation((key: string) =>
+        key.includes('vencida') ? { '1': '99' } : { '1': '1' },
+      )
+
+      const polls = await service.getActivePolls('user-1')
+
+      expect(polls.map((poll) => poll.id)).toEqual(['abierta', 'vencida'])
+    })
+
+    it('Debe dejar las placas informativas detrás de lo que todavía se puede votar', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        activePoll([], { id: 'placa', type: 'INFO', options: [] }),
+        activePoll([], { id: 'votable' }),
+      ])
+      mockRedis.hgetall.mockImplementation((key: string) =>
+        key.includes('placa') ? { '1': '99' } : { '1': '1' },
+      )
+
+      const polls = await service.getActivePolls('user-1')
+
+      expect(polls.map((poll) => poll.id)).toEqual(['votable', 'placa'])
+    })
+  })
+
+  describe('createPoll', () => {
+    it('Debe marcarla como oficial y guardar al moderador que la publicó', async () => {
+      const poll = await service.createPoll(
+        {
+          title: 'Encuesta de la casa',
+          options: [{ label: 'Sí' }, { label: 'No' }],
+          endsAt: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+        'mod-1',
+      )
+
+      expect(poll).toMatchObject({
+        isOfficial: true,
+        createdByAdminId: 'mod-1',
+        ticketCost: 0,
+        status: 'ACTIVE',
+      })
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'poll.created',
+        expect.objectContaining({ id: 'poll-1' }),
+      )
+    })
+
+    it('Debe rechazar un tipo que exige fecha de cierre sin endsAt', async () => {
+      await expect(
+        service.createPoll(
+          { title: 'Sin cierre', options: [{ label: 'Sí' }, { label: 'No' }] },
+          'mod-1',
+        ),
+      ).rejects.toThrow(BadRequestException)
+      expect(mockPrisma.poll.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getPendingPolls', () => {
+    it('Debe traer al proponente y ocultar al moderador de una oficial programada', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        {
+          id: 'propuesta',
+          isOfficial: false,
+          user: { id: 'user-1', name: 'Juan', username: 'juan' },
+          createdByAdmin: null,
+        },
+        {
+          id: 'programada',
+          isOfficial: true,
+          user: { id: 'mod-1', name: 'Mod', username: 'mod' },
+          createdByAdmin: { id: 'mod-1', name: 'Mod', username: 'mod' },
+        },
+      ])
+
+      const [propuesta, programada] = await service.getPendingPolls()
+
+      expect(propuesta.user).toMatchObject({ username: 'juan' })
+      expect(programada.user).toBeNull()
+      expect(programada.createdByAdmin).toMatchObject({ username: 'mod' })
     })
   })
 

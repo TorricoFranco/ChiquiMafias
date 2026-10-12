@@ -37,6 +37,13 @@ Agregado el 2026-10-11 (revisión del PR de tipos de encuesta):
 - Estado calculado desde Redis en el socket y desde la DB en el REST (`hasVoted`): si la key de Redis se pierde, los dos caminos se contradicen. El socket necesita el mismo fallback a la DB.
 - Movimientos de inventario sin auditoría: las monedas tienen `CoinTransaction`, los consumibles no tienen nada equivalente, así que un cobro o una devolución mal hecha no es reconstruible.
 
+Agregado el 2026-10-12 (revisión de encuestas oficiales vs comunidad):
+
+- Campo nuevo con `@default(...)` + backfill corrido a mano en la DB de dev: en prod el `migrate deploy` solo agrega la columna con el default y las filas viejas quedan clasificadas al revés (`Poll.isOfficial` false para todas las oficiales históricas). El `UPDATE` de backfill tiene que ir dentro del SQL de la migración, no en una consola de dev. Como las migraciones no viajan por git ([[confirmed-design-decisions]]), en todo PR de schema hay que preguntar explícitamente por el backfill además de por la migración.
+- Campo sensible que se trae en el `select` y se filtra después en JS (destructuring o spread condicional): funciona pero queda a un refactor de distancia de publicarse. El repo ya tiene el patrón bueno en la misma query (`votes: userId ? {...} : false`), así que el select condicional es la corrección natural y además ahorra el join.
+- Orden calculado en JS sobre un `findMany` sin `orderBy`: los empates (muy comunes con `totalVotes` 0) salen en orden de heap de Postgres y la lista se reacomoda entre refetches. Cualquier criterio de orden nuevo necesita un desempate estable (`createdAt`).
+- Listas "activas" que filtran solo por `status: 'ACTIVE'` e ignoran `startsAt`/`endsAt`: `approvePoll` acepta un `startsAt` futuro y pone ACTIVE igual, y el cron cierra con hasta 1 minuto de atraso, así que hay filas ACTIVE que `VoteService.loadVotablePoll` rechaza. Un ranking que asuma "ACTIVE = votable" las pone primeras y el voto falla.
+
 Ver también [[verified-runtime-facts]].
 
 **Why:** son errores silenciosos: compilan, los tests unitarios pasan y la ruta queda abierta, rota o gastando cuota.
