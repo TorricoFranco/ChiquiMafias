@@ -4,9 +4,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivePolls } from '../hooks/usePolls';
 import { PollCardResume } from './PollCardResume';
+import { PollCardResumeSkeleton } from './PollCardResumeSkeleton';
 
 /** Cuántas encuestas entran en el carrusel de la barra derecha. */
 const MAX_CAROUSEL_POLLS = 6;
+
+const heading = (
+  <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
+    <span className="material-symbols-outlined text-sm text-[#d2f000]">
+      how_to_vote
+    </span>
+    ENCUESTA DE LA TRIBUNA
+  </h3>
+);
 
 export const ActivePollsCarousel: React.FC = () => {
   const { data: polls, isLoading } = useActivePolls();
@@ -34,7 +44,15 @@ export const ActivePollsCarousel: React.FC = () => {
   }, [carouselPolls, isHovered, hasFocus]);
 
   if (isLoading) {
-    return <div className="text-center text-[#c6c9ab] text-xs py-4">Cargando encuestas...</div>;
+    return (
+      <div role="status" className="p-4 border-t border-[#454932] bg-[#1c1b1b] rounded-b-xl">
+        <div className="mb-3">{heading}</div>
+        <span className="sr-only">Cargando encuestas</span>
+        <PollCardResumeSkeleton />
+        {/* Reserva el lugar de los puntos, igual que cuando llegan los datos. */}
+        <div aria-hidden="true" className="mt-3 h-6" />
+      </div>
+    );
   }
 
   if (!carouselPolls || carouselPolls.length === 0) {
@@ -56,32 +74,7 @@ export const ActivePollsCarousel: React.FC = () => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHasFocus(false);
       }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
-          <span className="material-symbols-outlined text-sm text-[#d2f000]">
-            how_to_vote
-          </span>
-          ENCUESTA DE LA TRIBUNA
-        </h3>
-
-        {carouselPolls.length > 1 && (
-          <div className="flex items-center gap-1">
-            {carouselPolls.map((_, idx) => (
-              <button
-                type="button"
-                key={idx}
-                aria-label={`Ver encuesta ${idx + 1} de ${carouselPolls.length}`}
-                aria-current={idx === safeIndex ? "true" : undefined}
-                onClick={() => setCurrentIndex(idx)}
-                className={`h-1.5 rounded-full cursor-pointer transition-all ${idx === safeIndex
-                    ? 'w-5 bg-[#d2f000]'
-                    : 'w-1.5 bg-[#454932] hover:bg-[#c6c9ab]'
-                  }`}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <div className="mb-3">{heading}</div>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -96,6 +89,27 @@ export const ActivePollsCarousel: React.FC = () => {
           />
         </motion.div>
       </AnimatePresence>
+
+      {/* La fila siempre ocupa su lugar; con una sola encuesta queda vacía. */}
+      <div className="flex items-center justify-center mt-3 h-6">
+        {carouselPolls.length > 1 && carouselPolls.map((_, idx) => (
+          <button
+            type="button"
+            key={idx}
+            aria-label={`Ver encuesta ${idx + 1} de ${carouselPolls.length}`}
+            aria-current={idx === safeIndex ? "true" : undefined}
+            onClick={() => setCurrentIndex(idx)}
+            className="group flex items-center justify-center w-6 h-6 rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-[#d2f000] outline-offset-2"
+          >
+            <span
+              className={`block h-1.5 rounded-full transition-all ${idx === safeIndex
+                  ? 'w-5 bg-[#d2f000]'
+                  : 'w-1.5 bg-[#454932] group-hover:bg-[#c6c9ab]'
+                }`}
+            />
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
