@@ -1,5 +1,6 @@
 import { expect, test } from "../../../fixtures/test";
 import { buildMarket } from "../../../factories/bets";
+import { buildOfficialPoll, buildPoll } from "../../../factories/polls";
 import { buildMatchDetails, buildPreMatch } from "../../../factories/matches";
 import { buildCoinPack, buildStoreItem } from "../../../factories/store";
 import { mockAdminPanel } from "../../../support/admin";
@@ -19,10 +20,15 @@ test.describe("Accesibilidad (axe, WCAG 2.1 AA)", () => {
     session.loginAs("USER");
     const market = buildMarket();
     api.on("GET", "/bets/markets", [market]);
+    // Una de la comunidad (con autor y escudo) y una oficial: las dos cards del feed.
+    const poll = buildPoll({ title: "¿Quién gana el clásico?" });
+    const officialPoll = buildOfficialPoll({ title: "Encuesta de la casa" });
+    api.on("GET", "/polls/active", [poll, officialPoll]);
 
     await app.open();
     await app.goToSection("Pronósticos");
     await expect(page.getByRole("article", { name: market.title })).toBeVisible();
+    await expect(page.getByRole("article", { name: officialPoll.title })).toBeVisible();
 
     await expectNoSeriousA11yViolations(page, testInfo, "pronosticos");
   });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Clock, X, Check } from 'lucide-react';
 import { AdminPollItem } from '../../types';
+import { PollAuthor } from '../PollAuthor';
 
 
 export const PendingPollCard = ({ poll, onReject, onApprove }: { poll: AdminPollItem, onReject: (id: string) => void, onApprove: (poll: AdminPollItem) => void }) => (
@@ -8,19 +9,23 @@ export const PendingPollCard = ({ poll, onReject, onApprove }: { poll: AdminPoll
     <div className="flex flex-col gap-3">
       {/* Header Info */}
       <div className="flex justify-between items-start border-b border-[#353534] pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#2a2a2a] border border-[#353534] flex items-center justify-center font-bold text-xs text-[#d2f000]">
-            {poll.user?.username?.slice(0, 2).toUpperCase() || 'US'}
-          </div>
-          <div>
-            <span className="font-bold text-xs text-[#e5e2e1] block">@{poll.user?.username || 'Usuario'}</span>
-            <span className="text-[10px] text-[#909378]">El {new Date(poll.createdAt).toLocaleDateString()}</span>
-          </div>
-        </div>
-        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+        <PollAuthor
+          author={poll.user}
+          isOfficial={poll.isOfficial}
+          size="sm"
+          subtitle={`El ${new Date(poll.createdAt).toLocaleDateString()}`}
+        />
+        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 flex-shrink-0">
           <Clock className="w-3 h-3" /> PENDIENTE
         </span>
       </div>
+
+      {/* Una oficial programada también queda pendiente: la moderación sí ve quién la publicó. */}
+      {poll.isOfficial && poll.createdByAdmin && (
+        <span className="text-[10px] text-[#909378]">
+          Publicada por {poll.createdByAdmin.username ? `@${poll.createdByAdmin.username}` : poll.createdByAdmin.name}
+        </span>
+      )}
       
       {/* Poll Content */}
       <div>

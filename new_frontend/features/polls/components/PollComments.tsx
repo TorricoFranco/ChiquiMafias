@@ -50,7 +50,7 @@ export const PollComments = ({ pollId }: { pollId: string }) => {
                             <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                     <span className={`font-bold ${c.isPremium ? 'text-[#d2f000]' : 'text-[#e5e2e1]'}`}>
-                                        @{c.user.username}
+                                        @{c.user.username || "anónimo"}
                                     </span>
                                     {c.isPremium && (
                                         <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded font-black tracking-wider bg-[#d2f000] text-[#191e00]">

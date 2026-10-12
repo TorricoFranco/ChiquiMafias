@@ -6,6 +6,7 @@ import { getPollTypeMeta } from "@/features/polls/constants/pollTypes";
 import { formatTimeAgo, formatTimeLeft } from "../utils/timeUtils";
 import { PollBody } from "./bodies/PollBody";
 import { PollComments } from "./PollComments";
+import { PollAuthor } from "./PollAuthor";
 
 export const PollCard = ({ poll }: { poll: Poll }) => {
     const [showComments, setShowComments] = useState(false);
@@ -24,24 +25,27 @@ export const PollCard = ({ poll }: { poll: Poll }) => {
     const commentsCount = poll.stats?.comments || 0;
     const meta = getPollTypeMeta(poll.type);
     const commentsEnabled = poll.commentsEnabled !== false;
+    // Las encuestas de un suscriptor se destacan con un anillo lima, igual que sus
+    // comentarios. No tocan el fondo: el <article> ya fija `bg-[#1c1b1b]`, y dos
+    // `bg-*` en la misma clase los resuelve el orden del CSS generado.
+    const isSubscriberPoll = !poll.isOfficial && Boolean(poll.user?.activeSubscriptionTier);
+    const cardAccent = isSubscriberPoll ? `${meta.cardClass} ring-1 ring-[#d2f000]/40` : meta.cardClass;
 
     return (
-        <article aria-label={poll.title} className={`bg-[#1c1b1b] border rounded-xl p-5 flex flex-col gap-4 shadow-sm transition-colors ${meta.cardClass}`}>
+        <article aria-label={poll.title} className={`bg-[#1c1b1b] border rounded-xl p-5 flex flex-col gap-4 shadow-sm transition-colors ${cardAccent}`}>
 
             {/* Header de la Card */}
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#2a2a2a] overflow-hidden border border-[#353534] flex-shrink-0">
-                    <img src={poll.user?.avatarUrl || `https://ui-avatars.com/api/?name=${poll.user?.username || 'U'}&background=2a2a2a&color=e5e2e1`} alt={poll.user?.username || "Anónimo"} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[#e5e2e1]">@{poll.user?.username || "usuario_anonimo"}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold tracking-wider uppercase bg-[#2a2a2a] text-[#c6c9ab]">HINCHA</span>
-                    </div>
-                    <span className="text-[11px] text-[#909378]">
-                        {formatTimeAgo(poll.createdAt)} {meta.votable && !socketStats.connected && "(Desconectado)"}
-                    </span>
-                </div>
+                <PollAuthor
+                    author={poll.user}
+                    isOfficial={poll.isOfficial}
+                    subtitle={
+                        <>
+                            {formatTimeAgo(poll.createdAt)}
+                            {meta.votable && !socketStats.connected && " (Desconectado)"}
+                        </>
+                    }
+                />
                 <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wider uppercase flex-shrink-0 ${meta.chipClass}`}>
                     {meta.chipLabel}
                 </span>

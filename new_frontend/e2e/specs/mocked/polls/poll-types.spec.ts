@@ -90,7 +90,8 @@ test.describe("Tipos de encuesta", () => {
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("PREDICCIÓN");
     await expect(card.getByRole("button", { name: "Empate" })).toBeVisible();
-    await expect(card.getByRole("img", { name: "Escudo de Boca" })).toBeVisible();
+    // Exacto: el autor de la encuesta también tiene escudo ("Escudo de Boca Juniors").
+    await expect(card.getByRole("img", { name: "Escudo de Boca", exact: true })).toBeVisible();
   });
 
   test("un facto se vota con dos botones y después invita a los comentarios", async ({ app, page, api, session, socket }) => {

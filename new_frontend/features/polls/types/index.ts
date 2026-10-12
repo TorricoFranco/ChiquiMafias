@@ -1,3 +1,4 @@
+import type { SubscriptionTier } from "@/types/user";
 
 export interface PollOption {
   id: number;
@@ -41,6 +42,31 @@ export type PollConfigInput = Pick<PollConfig, 'layout'>;
  */
 export type PollRankingResults = Record<string, number[]>;
 
+/**
+ * Autor de una encuesta de la comunidad, tal como lo manda `pollAuthorSelect`
+ * del backend. En una encuesta oficial llega `null`: la moderación no se expone.
+ */
+export interface PollAuthor {
+  id: string;
+  name: string;
+  username: string | null;
+  /** El backend nunca manda `NONE`: sin suscripción es `null`. */
+  activeSubscriptionTier: Exclude<SubscriptionTier, "NONE"> | null;
+  activeNameColorId?: string | null;
+  team?: {
+    id: string;
+    name: string;
+    badgeUrl: string;
+  } | null;
+}
+
+/** Moderador que publicó una encuesta oficial. Solo llega en el panel de moderación. */
+export interface PollAdmin {
+  id: string;
+  name: string;
+  username: string | null;
+}
+
 export interface Poll {
   id: string;
   title: string;
@@ -54,14 +80,15 @@ export interface Poll {
   type: PollType;
   config?: PollConfig | null;
   commentsEnabled?: boolean;
+  /** `true` si la publicó la moderación; `false` si la propuso un usuario con un Ticket de Encuesta. */
+  isOfficial: boolean;
   userId?: string | null;
-  user?: {
-    id: string;
-    username: string;
-    avatarUrl?: string | null;
-  };
+  user?: PollAuthor | null;
+  /** Solo para la moderación: quién publicó la encuesta oficial. */
+  createdByAdmin?: PollAdmin | null;
   /** Cantidad de votantes. Llega siempre, incluso sin haber votado. */
   totalVotes?: number;
+  hasVoted?: boolean;
   userVotedOptionId?: number | null;
   /** Solo RANKING: el podio que armó el usuario, en orden. */
   userRanking?: number[] | null;
@@ -78,8 +105,9 @@ export interface Poll {
 }
 export interface CommentUser {
   id: string;
-  username: string;
-  avatarUrl?: string | null;
+  username: string | null;
+  activeNameColorId?: string | null;
+  activeChatBubbleId?: string | null;
 }
 
 export interface Comment {
@@ -200,11 +228,10 @@ export interface AdminPollItem {
   startsAt: string | null;
   endsAt: string | null;
   icon: string;
+  isOfficial: boolean;
   userId?: string | null;
-  user?: {
-    id: string;
-    username: string;
-  } | null;
+  user?: PollAuthor | null;
+  createdByAdmin?: PollAdmin | null;
   totalVotes?: number;
   likesCount?: number;
   dislikesCount?: number;
