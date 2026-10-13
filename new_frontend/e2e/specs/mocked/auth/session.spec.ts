@@ -92,6 +92,58 @@ test.describe("Sesión", () => {
     });
   });
 
+  test("Escape y el click afuera cierran el login, pero no el paso de perfil", { tag: "@p0" }, async ({ app, page, session, api }) => {
+    session.allowGoogleLogin({ isFirstLogin: true, username: null, team: null, teamId: null });
+    api.on("GET", "/teams", []);
+    await app.open();
+    const dialog = page.getByRole("dialog", { name: "Iniciá sesión o registrate" });
+
+    await app.loginButton.click();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(app.loginButton).toBeFocused();
+
+    await app.loginButton.click();
+    await page.mouse.click(4, 4);
+    await expect(dialog).toBeHidden();
+
+    await app.loginButton.click();
+    await page.getByRole("button", { name: GOOGLE_BUTTON_NAME }).click();
+    const onboarding = page.getByRole("dialog", { name: "Completá tu perfil" });
+    await expect(onboarding).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(onboarding).toBeVisible();
+  });
+
+  test("al pasar al paso de perfil, el foco queda en el diálogo", { tag: "@p0" }, async ({ app, page, session, api }) => {
+    session.allowGoogleLogin({ isFirstLogin: true, username: null, team: null, teamId: null });
+    api.on("GET", "/teams", []);
+    await app.open();
+
+    await app.loginButton.click();
+    await page.getByRole("button", { name: GOOGLE_BUTTON_NAME }).click();
+
+    await expect(page.getByRole("dialog", { name: "Completá tu perfil" })).toBeFocused();
+  });
+
+  test("con el selector de club abierto, el Tab no sale hacia la página de atrás", { tag: "@p0" }, async ({ app, page, session, api }) => {
+    session.allowGoogleLogin({ isFirstLogin: true, username: null, team: null, teamId: null });
+    api.on("GET", "/teams", [buildTeam({ name: "Racing Club" }), buildTeam({ name: "Chacarita Juniors", tier: 2 })]);
+    await app.open();
+
+    await app.loginButton.click();
+    await page.getByRole("button", { name: GOOGLE_BUTTON_NAME }).click();
+    const onboarding = page.getByRole("dialog", { name: "Completá tu perfil" });
+    await onboarding.getByRole("button", { name: /Seleccioná tu club/ }).click();
+    const selector = page.getByRole("dialog", { name: "Elegí tu Club" });
+    await expect(selector).toBeVisible();
+
+    for (let i = 0; i < 30; i++) {
+      await page.keyboard.press("Tab");
+      expect(await selector.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    }
+  });
+
   test("un usuario existente sin aceptación debe aceptar los términos para seguir", { tag: "@p0" }, async ({ app, page, session, api }) => {
     session.loginAs("USER", { username: "veterano", termsAcceptedAt: null });
     api.on("POST", "/users/accept-terms", () => ({
