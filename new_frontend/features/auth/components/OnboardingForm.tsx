@@ -66,14 +66,14 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
 
     return (
         <div className="flex flex-col gap-4">
-            <h2 className="text-white text-xl font-semibold">¡Bienvenido! Danos unos datos</h2>
+            <h2 className="font-headline text-xl font-black uppercase tracking-tight text-[#E5E2E1]">¡Bienvenido! Danos unos datos</h2>
 
             {/* INPUT DE USERNAME */}
             <div className="flex flex-col gap-1">
-                <label htmlFor="onboarding-username" className="text-xs text-gray-400">Nombre de Usuario</label>
+                <label htmlFor="onboarding-username" className="text-xs text-[#C6C9AB]">Nombre de Usuario</label>
                 <input
                     id="onboarding-username"
-                    className="p-2.5 rounded-xl bg-gray-800 text-white border border-transparent focus:outline-none focus:border-gray-600 transition text-sm"
+                    className="p-2.5 rounded-xl bg-[#1C1B1B] text-[#E5E2E1] border border-[#353534] focus:outline-none focus:border-[#D2F000] transition text-sm"
                     placeholder="Tu nombre de usuario"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -82,11 +82,11 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
 
             {/* SELECTOR DE EQUIPO */}
             <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400">Tu Equipo</label>
+                <label className="text-xs text-[#C6C9AB]">Tu Equipo</label>
                 <button
                     type="button"
                     onClick={() => setIsModalOpen(true)}
-                    className="w-full p-2.5 rounded-xl bg-gray-800 border border-transparent hover:border-gray-600 text-left flex items-center justify-between transition text-white text-sm min-h-[46px]"
+                    className="w-full p-2.5 rounded-xl bg-[#1C1B1B] border border-[#353534] hover:border-[#D2F000] text-left flex items-center justify-between transition text-[#E5E2E1] text-sm min-h-[46px]"
                 >
                     {selectedTeam ? (
                         <div className="flex items-center space-x-3">
@@ -95,12 +95,12 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
                                 alt={selectedTeam.name}
                                 className="w-6 h-6 object-contain"
                             />
-                            <span className="font-medium text-white">{selectedTeam.name}</span>
+                            <span className="font-medium text-[#E5E2E1]">{selectedTeam.name}</span>
                         </div>
                     ) : (
-                        <span className="text-gray-500">-- Seleccioná tu club --</span>
+                        <span className="text-[#909378]">-- Seleccioná tu club --</span>
                     )}
-                    <span className="text-xs text-sky-400 font-bold uppercase tracking-wider pl-2">Buscar</span>
+                    <span className="text-xs text-[#D2F000] font-bold uppercase tracking-wider pl-2">Buscar</span>
                 </button>
             </div>
 
@@ -108,7 +108,7 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
 
             {/* MENSAJE DE ERROR */}
             {errorMessage && (
-                <p role="alert" className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded-lg">
+                <p role="alert" className="text-xs text-[#FFB4AB] bg-[#D30017]/10 border border-[#D30017]/30 p-2 rounded-lg">
                     {errorMessage}
                 </p>
             )}
@@ -117,7 +117,7 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
             <button
                 onClick={handleSubmit}
                 disabled={isLoading}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 p-2.5 rounded-xl text-white font-semibold transition mt-2 text-sm"
+                className="bg-[#D2F000] hover:bg-[#B8D300] disabled:opacity-50 p-2.5 rounded-xl text-[#191E00] font-bold transition mt-2 text-sm"
             >
                 {isLoading ? "Guardando..." : "Empezar a chatear"}
             </button>
