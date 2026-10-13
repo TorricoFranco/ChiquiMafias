@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Coins, Flame, MessageCircle, Vote, X } from "lucide-react";
 import GoogleLoginButton from "./GoogleLoginButton";
@@ -31,15 +31,19 @@ export default function LoginModal({
     reason?: LoginModalReason;
 }) {
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const [error, setError] = useState("");
     const dialogRef = useRef<HTMLDivElement>(null);
 
-    const handleGoogleSuccess = (user: { isFirstLogin?: boolean }) => {
+    // Memoizados: los cambios propios del modal (error, paso) no redibujan el botón de Google. Si el padre pasa un onSuccess nuevo, sí lo redibuja (ver GoogleLoginButton).
+    const handleGoogleSuccess = useCallback((user: { isFirstLogin?: boolean }) => {
         if (user.isFirstLogin) {
             setShowOnboarding(true);
         } else {
             onSuccess();
         }
-    };
+    }, [onSuccess]);
+
+    const handleGoogleError = useCallback((message: string) => setError(message), []);
 
     // Al abrir: el foco entra al diálogo y la página de atrás no scrollea. Al cerrar, el foco vuelve al disparador.
     useEffect(() => {
@@ -148,7 +152,12 @@ export default function LoginModal({
                         </ul>
 
                         <div className="mt-6">
-                            <GoogleLoginButton onSuccess={handleGoogleSuccess} />
+                            {error && (
+                                <p role="alert" className="mb-3 rounded-lg border border-[#D30017]/30 bg-[#D30017]/10 p-2 text-xs text-[#FFB4AB]">
+                                    {error}
+                                </p>
+                            )}
+                            <GoogleLoginButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
                         </div>
 
                         <p className="mt-4 text-center text-xs text-[#909378]">

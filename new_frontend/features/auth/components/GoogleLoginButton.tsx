@@ -3,12 +3,22 @@
 import { useEffect, useRef } from "react";
 import { useUserStore } from "@/store/useUserStore";
 
+const GOOGLE_LOGIN_ERROR = "No pudimos iniciar sesión con Google. Probá de nuevo en un momento.";
+const GSI_UNAVAILABLE_ERROR = "No pudimos cargar el acceso con Google. Probá recargar la página.";
+const GSI_POLL_MS = 100;
+const GSI_TIMEOUT_MS = 5000;
+
 interface GoogleLoginButtonProps {
     onSuccess: (user: { id: string; name: string; isFirstLogin: boolean }) => void;
+    /** Recibe el mensaje a mostrar; "" lo limpia. */
+    onError?: (message: string) => void;
 }
 
-export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps) {
+export default function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps) {
     const buttonRef = useRef<HTMLDivElement>(null);
+    // Refs y no estado: sobreviven a los re-runs del efecto, así que el aviso de timeout no se reinicia.
+    const gsiWaitedMsRef = useRef(0);
+    const gsiUnavailableShownRef = useRef(false);
     const { setUserInfo } = useUserStore();
 
     useEffect(() => {
@@ -54,6 +64,7 @@ export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps)
 
                         } catch (error) {
                             console.error("Error al loguear con Google:", error);
+                            onError?.(GOOGLE_LOGIN_ERROR);
                         }
                     },
                 });
@@ -64,11 +75,24 @@ export default function GoogleLoginButton({ onSuccess }: GoogleLoginButtonProps)
                     size: "large",
                     shape: "pill",
                 });
+
+                // Google llegó después del aviso: lo sacamos. No toca otros errores (p. ej. un login fallido).
+                if (gsiUnavailableShownRef.current) {
+                    gsiUnavailableShownRef.current = false;
+                    onError?.("");
+                }
+            } else if (gsiWaitedMsRef.current < GSI_TIMEOUT_MS) {
+                // El sondeo sigue: si Google llega más tarde, el botón se dibuja igual.
+                gsiWaitedMsRef.current += GSI_POLL_MS;
+                if (gsiWaitedMsRef.current >= GSI_TIMEOUT_MS) {
+                    gsiUnavailableShownRef.current = true;
+                    onError?.(GSI_UNAVAILABLE_ERROR);
+                }
             }
-        }, 100);
+        }, GSI_POLL_MS);
 
         return () => clearInterval(interval);
-    }, [onSuccess, setUserInfo]);
+    }, [onSuccess, onError, setUserInfo]);
 
     return <div ref={buttonRef} className="flex justify-center w-full" />;
 }
