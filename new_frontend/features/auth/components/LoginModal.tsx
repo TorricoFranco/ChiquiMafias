@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Coins, Flame, MessageCircle, Vote, X } from "lucide-react";
 import GoogleLoginButton from "./GoogleLoginButton";
 import OnboardingForm from "./OnboardingForm";
+import type { LoginModalReason } from "@/types/user";
 
 const BENEFITS = [
     { icon: MessageCircle, text: "Chateá con la hinchada mientras se juega" },
@@ -14,12 +15,20 @@ const BENEFITS = [
 
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled])";
 
+// Textos que no prometen nada después del login: el envío de stickers no reenvía nada solo, y el voto no se repite.
+const REASON_COPY: Record<LoginModalReason, string> = {
+    chat: "Entrá para participar en el chat.",
+    poll: "Entrá para votar la encuesta.",
+};
+
 export default function LoginModal({
     onClose,
-    onSuccess
+    onSuccess,
+    reason,
 }: {
     onClose: () => void
     onSuccess: () => void;
+    reason?: LoginModalReason;
 }) {
     const [showOnboarding, setShowOnboarding] = useState(false);
     const dialogRef = useRef<HTMLDivElement>(null);
@@ -126,7 +135,7 @@ export default function LoginModal({
                             No te quedes <span className="text-[#D2F000]">afuera</span>
                         </h2>
                         <p className="mt-3 text-sm text-[#C6C9AB]">
-                            Entrá con Google y sumate a la conversación de la fecha.
+                            {reason ? REASON_COPY[reason] : "Entrá con Google y sumate a la conversación de la fecha."}
                         </p>
 
                         <ul className="mt-6 space-y-3 border-l-2 border-[#D2F000]/40 pl-4">

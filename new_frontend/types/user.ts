@@ -1,5 +1,7 @@
 export type Role = 'USER' | 'MODERATOR' | 'ADMIN' | 'PRESIDENT';
 export type SubscriptionTier = 'NONE' | 'TIER_1' | 'TIER_2' | 'TIER_3';
+/** Qué acción pidió el login: cambia el texto del cartel. */
+export type LoginModalReason = 'chat' | 'poll';
 
 export interface UserTeam {
     id: string;
@@ -41,13 +43,14 @@ export interface UserState {
     streakRewardClaimed: boolean;
     isBanned: boolean;
     isLoginModalOpen: boolean;
+    loginModalReason: LoginModalReason | null;
     isStreakModalOpen: boolean;
     activeNameColorId: string | null;
     activeBannerId: string | null;
     activeChatBubbleId: string | null;
 
 
-    setLoginModalOpen: (isOpen: boolean) => void;
+    setLoginModalOpen: (isOpen: boolean, reason?: LoginModalReason) => void;
     setBalance: (balance: number) => void;
     setIsBanned: (value: boolean) => void;
     setStreak: (currentStreak: number) => void;

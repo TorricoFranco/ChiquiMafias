@@ -228,7 +228,7 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
         </div>
       </div>
 
-      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={handleSend} />}
+      {showLogin && <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleSend} />}
       <UserProfileModal userId={selectedProfileId} onClose={() => setSelectedProfileId(null)} />
     </div>
   );

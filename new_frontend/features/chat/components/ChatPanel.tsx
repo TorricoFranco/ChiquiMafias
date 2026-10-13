@@ -303,7 +303,7 @@ export function ChatPanel({
       </div>
 
       {showLogin && (
-        <LoginModal onClose={() => setShowLogin(false)} onSuccess={handleSend} />
+        <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleSend} />
       )}
 
       <UserProfileModal

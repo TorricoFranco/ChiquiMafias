@@ -23,6 +23,7 @@ test.describe("Sesión", () => {
     await app.loginButton.click();
     const dialog = page.getByRole("dialog", { name: "Iniciá sesión o registrate" });
     await expect(dialog.getByRole("heading", { name: "No te quedes afuera" })).toBeVisible();
+    await expect(dialog).toContainText("sumate a la conversación de la fecha");
     await expect(dialog.getByRole("button", { name: GOOGLE_BUTTON_NAME })).toBeVisible();
 
     const box = await dialog.boundingBox();

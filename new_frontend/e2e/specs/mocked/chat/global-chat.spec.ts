@@ -41,7 +41,9 @@ test.describe("Chat de la tribuna", () => {
 
     await chat.send("Hola");
 
-    await expect(page.getByRole("dialog", { name: "Iniciá sesión" })).toBeVisible();
+    const login = page.getByRole("dialog", { name: "Iniciá sesión" });
+    await expect(login).toBeVisible();
+    await expect(login).toContainText("Entrá para participar en el chat.");
     expect(socket.emitted("send-message")).toHaveLength(0);
   });
 
