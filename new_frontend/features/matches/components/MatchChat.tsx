@@ -84,7 +84,8 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
   };
 
   const handleSend = async () => {
-    if (!id) {
+    // Se lee del store y no del render: tras el login el modal llama a un handleSend de antes, con id en null.
+    if (!useUserStore.getState().id) {
       setShowLogin(true);
       return;
     }
@@ -98,6 +99,11 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
 
     setInput("");
     setUseMegaphone(false);
+  };
+
+  const handleLoginSuccess = () => {
+    setShowLogin(false);
+    handleSend();
   };
 
   const handleSendSticker = (stickerAssetId: string) => {
@@ -228,7 +234,7 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
         </div>
       </div>
 
-      {showLogin && <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleSend} />}
+      {showLogin && <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleLoginSuccess} />}
       <UserProfileModal userId={selectedProfileId} onClose={() => setSelectedProfileId(null)} />
     </div>
   );
