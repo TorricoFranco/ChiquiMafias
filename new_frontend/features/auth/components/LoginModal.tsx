@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { Coins, Flame, MessageCircle, Vote, X } from "lucide-react";
 import GoogleLoginButton from "./GoogleLoginButton";
 import OnboardingForm from "./OnboardingForm";
@@ -11,6 +12,8 @@ const BENEFITS = [
     { icon: Flame, text: "Racha diaria: juntá Chiqui Coins entrando todos los días" },
 ];
 
+const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled])";
+
 export default function LoginModal({
     onClose,
     onSuccess
@@ -19,6 +22,7 @@ export default function LoginModal({
     onSuccess: () => void;
 }) {
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const dialogRef = useRef<HTMLDivElement>(null);
 
     const handleGoogleSuccess = (user: { isFirstLogin?: boolean }) => {
         if (user.isFirstLogin) {
@@ -28,13 +32,79 @@ export default function LoginModal({
         }
     };
 
+    // Al abrir: el foco entra al diálogo y la página de atrás no scrollea. Al cerrar, el foco vuelve al disparador.
+    useEffect(() => {
+        const previouslyFocused = document.activeElement as HTMLElement | null;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        dialogRef.current?.focus();
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            previouslyFocused?.focus();
+        };
+    }, []);
+
+    // Al pasar del login al onboarding se desmonta el botón de Google y el foco caía al body: lo llevamos al diálogo.
+    useEffect(() => {
+        if (showOnboarding) dialogRef.current?.focus();
+    }, [showOnboarding]);
+
+    // Escape cierra solo el paso de login: en el onboarding el usuario ya inició sesión y cerrarlo lo deja a medias.
+    // Tab no sale del diálogo mientras está abierto.
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && !showOnboarding) {
+                onClose();
+                return;
+            }
+            if (e.key !== "Tab" || !dialogRef.current) return;
+
+            // Con el selector de club abierto (diálogo anidado) el foco se queda dentro de él.
+            const scope = dialogRef.current.querySelector<HTMLElement>('[aria-modal="true"]') ?? dialogRef.current;
+            const focusable = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE));
+            if (focusable.length === 0) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement;
+
+            if (!scope.contains(active)) {
+                e.preventDefault();
+                (e.shiftKey ? last : first).focus();
+            } else if (e.shiftKey && (active === first || active === scope)) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && active === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [showOnboarding, onClose]);
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4">
-            <div
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget && !showOnboarding) onClose();
+            }}
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+        >
+            <motion.div
+                ref={dialogRef}
                 role="dialog"
+                tabIndex={-1}
                 aria-modal="true"
                 aria-label={showOnboarding ? "Completá tu perfil" : "Iniciá sesión o registrate"}
-                className="relative max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl border border-[#353534] bg-[#131313] p-6 shadow-2xl sm:max-w-md sm:rounded-2xl sm:p-8"
+                initial={{ opacity: 0, y: 32 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="relative max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl border border-[#353534] bg-[#131313] p-6 shadow-2xl outline-none sm:max-w-md sm:rounded-2xl sm:p-8"
             >
                 {!showOnboarding ? (
                     <>
@@ -86,7 +156,7 @@ export default function LoginModal({
                 ) : (
                     <OnboardingForm onComplete={onSuccess} />
                 )}
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     );
 }
