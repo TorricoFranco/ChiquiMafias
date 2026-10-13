@@ -66,7 +66,7 @@ export const usePollVote = (poll: Poll) => {
     const canVote = useCallback(() => {
         if (votedOptionId || isVoting) return false;
         if (!userId) {
-            useUserStore.getState().setLoginModalOpen(true);
+            useUserStore.getState().setLoginModalOpen(true, "poll");
             return false;
         }
         return true;

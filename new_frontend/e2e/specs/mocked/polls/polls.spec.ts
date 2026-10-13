@@ -42,7 +42,9 @@ test.describe("Encuestas de la tribuna", () => {
     await socket.waitForConnection();
     await page.getByRole("article", { name: poll.title }).getByRole("button", { name: "River" }).click();
 
-    await expect(page.getByRole("dialog", { name: "Iniciá sesión" })).toBeVisible();
+    const login = page.getByRole("dialog", { name: "Iniciá sesión" });
+    await expect(login).toBeVisible();
+    await expect(login).toContainText("Entrá para votar la encuesta.");
     expect(socket.emitted("castVote")).toHaveLength(0);
   });
 

@@ -19,6 +19,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     const isLoginModalOpen = useUserStore((state) => state.isLoginModalOpen);
     const setLoginModalOpen = useUserStore((state) => state.setLoginModalOpen);
+    const loginModalReason = useUserStore((state) => state.loginModalReason);
 
     const [loading, setLoading] = useState(true);
 
@@ -115,6 +116,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
                 <LoginModal
                     onClose={() => setLoginModalOpen(false)}
                     onSuccess={() => setLoginModalOpen(false)}
+                    reason={loginModalReason ?? undefined}
                 />
             )}
         </>

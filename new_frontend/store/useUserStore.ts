@@ -28,7 +28,11 @@ export const useUserStore = create<UserState>()(
         setIsStreakModalOpen: (isOpen: boolean) => set({ isStreakModalOpen: isOpen }),
 
         isLoginModalOpen: false,
-        setLoginModalOpen: (isOpen) => set({ isLoginModalOpen: isOpen }),
+        loginModalReason: null,
+        setLoginModalOpen: (isOpen, reason) => set({
+            isLoginModalOpen: isOpen,
+            loginModalReason: isOpen ? (reason ?? null) : null,
+        }),
 
         currentStreak: 0,
         streakRewardClaimed: true,
