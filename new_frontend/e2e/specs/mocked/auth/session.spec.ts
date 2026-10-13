@@ -17,6 +17,19 @@ test.describe("Sesión", () => {
     await expect(page.getByRole("dialog", { name: "Iniciá sesión" })).toBeVisible();
   });
 
+  test("el cartel de login invita a entrar y cabe en la pantalla", { tag: ["@p0", "@mobile"] }, async ({ app, page }) => {
+    await app.open();
+
+    await app.loginButton.click();
+    const dialog = page.getByRole("dialog", { name: "Iniciá sesión o registrate" });
+    await expect(dialog.getByRole("heading", { name: "No te quedes afuera" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: GOOGLE_BUTTON_NAME })).toBeVisible();
+
+    const box = await dialog.boundingBox();
+    expect(box?.x).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(page.viewportSize()?.width ?? 0);
+  });
+
   test("una sesión guardada se restaura con usuario y saldo", { tag: "@p0" }, async ({ app, session }) => {
     session.loginAs("USER", { username: "elmasgrande" }, { balance: 1500 });
 
