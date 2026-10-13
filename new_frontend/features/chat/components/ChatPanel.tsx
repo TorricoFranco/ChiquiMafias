@@ -106,7 +106,8 @@ export function ChatPanel({
   };
 
   const handleSend = async () => {
-    if (!id) {
+    // Se lee del store y no del render: tras el login el modal llama a un handleSend de antes, con id en null.
+    if (!useUserStore.getState().id) {
       setShowLogin(true);
       return;
     }
@@ -122,6 +123,11 @@ export function ChatPanel({
 
     setInput("");
     setUseMegaphone(false);
+  };
+
+  const handleLoginSuccess = () => {
+    setShowLogin(false);
+    handleSend();
   };
 
   const handleSendSticker = (stickerAssetId: string) => {
@@ -303,7 +309,7 @@ export function ChatPanel({
       </div>
 
       {showLogin && (
-        <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleSend} />
+        <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleLoginSuccess} />
       )}
 
       <UserProfileModal

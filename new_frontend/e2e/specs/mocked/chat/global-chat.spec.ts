@@ -3,6 +3,8 @@ import { buildChatMessage } from "../../../factories/chat";
 import { buildInventoryItem } from "../../../factories/store";
 import { ChatPanel } from "../../../pages/chat-panel";
 import { acceptNextDialog } from "../../../support/dialogs";
+import { buildTeam } from "../../../factories/teams";
+import { GOOGLE_BUTTON_NAME } from "../../../support/third-party";
 import type { SocketMock } from "../../../support/socket-io-mock";
 import type { ChatMessagePayload } from "@/features/chat/socket/useChatSocket";
 
@@ -45,6 +47,45 @@ test.describe("Chat de la tribuna", () => {
     await expect(login).toBeVisible();
     await expect(login).toContainText("Entrá para participar en el chat.");
     expect(socket.emitted("send-message")).toHaveLength(0);
+  });
+
+  test("un visitante que entra con Google desde el chat ve su mensaje enviado y el login cerrado", { tag: "@p0" }, async ({ app, page, session }) => {
+    session.allowGoogleLogin({ username: "hincha_de_siempre" });
+    const chat = new ChatPanel(page);
+    await app.open();
+
+    await chat.send("Hola tribuna");
+    await page.getByRole("button", { name: GOOGLE_BUTTON_NAME }).click();
+
+    await expect(page.getByRole("dialog", { name: "Iniciá sesión" })).toBeHidden();
+    await expect(chat.input).toHaveValue("");
+  });
+
+  test("un visitante que completa el perfil desde el chat ve el login cerrado", { tag: "@p0" }, async ({ app, page, session, api }) => {
+    session.allowGoogleLogin({ isFirstLogin: true, username: null, team: null, teamId: null });
+    const racing = buildTeam({ name: "Racing Club" });
+    api.on("GET", "/teams", [racing]);
+    api.on("PUT", "/users/complete-profile", () => ({
+      ...session.user,
+      username: "academia1903",
+      isFirstLogin: false,
+      termsAcceptedAt: "2026-10-08T12:00:00.000Z",
+      team: { id: racing.id, name: racing.name, slug: "racing-club", badgeUrl: racing.badgeUrl },
+    }));
+    const chat = new ChatPanel(page);
+    await app.open();
+
+    await chat.send("Hola tribuna");
+    await page.getByRole("button", { name: GOOGLE_BUTTON_NAME }).click();
+    const onboarding = page.getByRole("dialog", { name: "Completá tu perfil" });
+    await onboarding.getByLabel("Nombre de Usuario").fill("academia1903");
+    await onboarding.getByRole("button", { name: /Seleccioná tu club/ }).click();
+    await page.getByRole("dialog", { name: "Elegí tu Club" }).getByRole("button", { name: "Racing Club" }).click();
+    await onboarding.getByRole("checkbox", { name: /Soy mayor de 18 años/ }).check();
+    await onboarding.getByRole("button", { name: "Empezar a chatear" }).click();
+
+    await expect(onboarding).toBeHidden();
+    await expect(chat.input).toHaveValue("");
   });
 
   test("el mensaje se corta en 100 caracteres", async ({ app, page, session }) => {
