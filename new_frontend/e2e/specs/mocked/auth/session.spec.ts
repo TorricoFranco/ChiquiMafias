@@ -93,6 +93,48 @@ test.describe("Sesión", () => {
     });
   });
 
+  test("si el backend rechaza el login con Google, el modal avisa y sigue abierto", { tag: "@p0" }, async ({ app, page, api }) => {
+    api.on("POST", "/auth/google", { message: "Token inválido" }, { status: 500 });
+    await app.open();
+
+    await app.loginButton.click();
+    await page.getByRole("button", { name: GOOGLE_BUTTON_NAME }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Iniciá sesión o registrate" });
+    await expect(dialog.getByRole("alert")).toContainText("No pudimos iniciar sesión con Google");
+    await expect(dialog).toBeVisible();
+  });
+
+  test("si el script de Google no carga, avisa en vez de quedarse esperando", { tag: "@p0" }, async ({ app, page }) => {
+    await page.route("https://accounts.google.com/gsi/client", (route) => route.abort());
+    await app.open();
+
+    await app.loginButton.click();
+
+    const dialog = page.getByRole("dialog", { name: "Iniciá sesión o registrate" });
+    await expect(dialog.getByRole("alert")).toContainText("No pudimos cargar el acceso con Google", { timeout: 10_000 });
+  });
+
+  test("si Google carga después del aviso, el botón aparece y el aviso se va", { tag: "@p0" }, async ({ app, page }) => {
+    let releaseGoogle: () => void = () => {};
+    const googleReady = new Promise<void>((resolve) => {
+      releaseGoogle = resolve;
+    });
+    await page.route("https://accounts.google.com/gsi/client", async (route) => {
+      await googleReady;
+      await route.fallback();
+    });
+    await app.open();
+
+    await app.loginButton.click();
+    const dialog = page.getByRole("dialog", { name: "Iniciá sesión o registrate" });
+    await expect(dialog.getByRole("alert")).toContainText("No pudimos cargar el acceso con Google", { timeout: 10_000 });
+
+    releaseGoogle();
+    await expect(dialog.getByRole("button", { name: GOOGLE_BUTTON_NAME })).toBeVisible();
+    await expect(dialog.getByRole("alert")).toBeHidden();
+  });
+
   test("Escape y el click afuera cierran el login, pero no el paso de perfil", { tag: "@p0" }, async ({ app, page, session, api }) => {
     session.allowGoogleLogin({ isFirstLogin: true, username: null, team: null, teamId: null });
     api.on("GET", "/teams", []);
