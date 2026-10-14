@@ -13,12 +13,15 @@ import { ClaimRewardsBanner, ClaimRewardsNotice } from "./ClaimewardsBanner";
 import { AdminView } from "@/features/admin/components/AdminView";
 import { UserSupportView } from "@/features/supports/components/tickets/UserSupportView";
 import { useNavigationStore } from "@/store/useNavigationStore";
+import { useUserStore } from "@/store/useUserStore";
+import { LoginPrompt } from "@/features/auth/components/LoginPrompt";
 import { SocialStatsView } from "@/features/stats/components/SocialStatsView";
 import { SidebarFixtureList } from "@/components/widgets/SidebarFixtureList";
 
 
 export const SocialView = () => {
   const activeTab = useNavigationStore((state) => state.activeTab);
+  const userId = useUserStore((state) => state.id);
 
   const showRightSidebar = ["Chat", "Mi Perfil",].includes(activeTab);
 
@@ -42,7 +45,15 @@ export const SocialView = () => {
         </div>
 
         {activeTab === "Mi Perfil" && (
-          <ProfilePanel />
+          userId ? (
+            <ProfilePanel />
+          ) : (
+            <LoginPrompt
+              title="Entrá para ver tu perfil"
+              description="Tu usuario, tu cuadro, tus cosméticos y tu inventario te esperan del otro lado."
+              reason="profile"
+            />
+          )
         )}
 
         {activeTab === "Tienda" && (
@@ -83,9 +94,17 @@ export const SocialView = () => {
         )}
 
         {activeTab === "Soporte" && (
-          <div className="p-6 w-full max-w-7xl mx-auto flex flex-col h-full">
-            <UserSupportView />
-          </div>
+          userId ? (
+            <div className="p-6 w-full max-w-7xl mx-auto flex flex-col h-full">
+              <UserSupportView />
+            </div>
+          ) : (
+            <LoginPrompt
+              title="Entrá para abrir un reclamo"
+              description="Necesitamos saber quién sos para seguir tu ticket y responderte."
+              reason="profile"
+            />
+          )
         )}
 
       </main>

@@ -37,7 +37,9 @@ test.describe("Packs de Chiqui-Coins (Mercado Pago)", () => {
     await store.openTab("packs");
     await store.card(pack.name).getByRole("button", { name: "Comprar" }).click();
 
-    await expect(page.getByText("Mercado Pago no respondió")).toBeVisible();
+    // El mensaje del backend no se muestra: el aviso es siempre el mismo.
+    await expect(page.getByText("No pudimos iniciar el pago. Probá de nuevo más tarde.")).toBeVisible();
+    await expect(page.getByText("Mercado Pago no respondió")).toBeHidden();
     await expect(page).toHaveURL(`${BASE_URL}/`);
   });
 

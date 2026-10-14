@@ -62,7 +62,8 @@ test.describe("Navegación en móvil", { tag: "@mobile-only" }, () => {
     await app.mobileTab("Tribuna").click();
 
     await expect(page).toHaveURL(`${BASE_URL}/?tab=social`);
-    await expect(new ChatPanel(page).input).toBeVisible();
+    // El log, no el input: sin sesión la barra de escritura no se renderiza.
+    await expect(new ChatPanel(page).log).toBeVisible();
     await expect(app.mobileTab("Tribuna")).toHaveAttribute("aria-current", "page");
   });
 

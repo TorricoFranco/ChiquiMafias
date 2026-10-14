@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUserStore } from "@/store/useUserStore";
 
 const GOOGLE_LOGIN_ERROR = "No pudimos iniciar sesión con Google. Probá de nuevo en un momento.";
@@ -20,6 +21,7 @@ export default function GoogleLoginButton({ onSuccess, onError }: GoogleLoginBut
     const gsiWaitedMsRef = useRef(0);
     const gsiUnavailableShownRef = useRef(false);
     const { setUserInfo } = useUserStore();
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -58,7 +60,15 @@ export default function GoogleLoginButton({ onSuccess, onError }: GoogleLoginBut
                                 termsVersion: data.user.termsVersion ?? null,
                                 accessToken: data.access_token,
                                 team: data.user.team,
+                                tier: data.user.activeSubscriptionTier || 'NONE',
+                                activeNameColorId: data.user.activeNameColorId || null,
+                                activeChatBubbleId: data.user.activeChatBubbleId || null,
+                                activeBannerId: data.user.activeBannerId || null,
                             });
+
+                            // Lo que se cargó como visitante depende del usuario (tienda, inventario,
+                            // planes): sin esto la tienda sigue mostrando el catálogo anónimo.
+                            await queryClient.invalidateQueries();
 
                             onSuccess(data.user);
 
@@ -92,7 +102,7 @@ export default function GoogleLoginButton({ onSuccess, onError }: GoogleLoginBut
         }, GSI_POLL_MS);
 
         return () => clearInterval(interval);
-    }, [onSuccess, onError, setUserInfo]);
+    }, [onSuccess, onError, setUserInfo, queryClient]);
 
     return <div ref={buttonRef} className="flex justify-center w-full" />;
 }

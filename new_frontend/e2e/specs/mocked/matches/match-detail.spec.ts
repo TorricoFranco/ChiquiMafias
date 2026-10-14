@@ -1,7 +1,7 @@
 import type { MatchDetails } from "@/features/matches/types";
 import { expect, test } from "../../../fixtures/test";
 import { buildMarket, buildMatchMarket } from "../../../factories/bets";
-import { buildChatMessage } from "../../../factories/chat";
+import { buildChatMessage, buildMatchChatMessage } from "../../../factories/chat";
 import { buildCalendar, buildMatchFixture } from "../../../factories/fixtures";
 import { buildMatchDetails, buildPreMatch } from "../../../factories/matches";
 import type { ApiMock } from "../../../support/api-mock";
@@ -194,5 +194,58 @@ test.describe("Chat del partido", () => {
       stickerId: null,
       useMegaphone: false,
     });
+  });
+
+  test("un visitante sin sesión ve el historial y los mensajes nuevos", { tag: "@p0" }, async ({ page, api, socket }) => {
+    const match = buildMatchDetails({ metadata: { status: "2H" }, score: { home: 1, away: 1, elapsed: 70 } });
+    mockMatch(api, match);
+    const chat = new ChatPanel(page);
+
+    socket.onEmit("join_match", (_data, ctx) =>
+      ctx.emit("match_chat_history", [
+        buildMatchChatMessage({ matchId: match.metadata.id, name: "Hincha Millonario", message: "Vamos River" }),
+      ]),
+    );
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await page.getByRole("tab", { name: "Chat en Vivo" }).click();
+
+    await expect(chat.message("Hincha Millonario")).toContainText("Vamos River");
+
+    await socket.emit("on-message", buildMatchChatMessage({
+      matchId: match.metadata.id,
+      name: "Bostero 12",
+      message: "Empatamos igual",
+    }));
+    await expect(chat.message("Bostero 12")).toContainText("Empatamos igual");
+
+    // Escribir, moderar y reportar piden sesión: el visitante solo lee.
+    await expect(chat.input).toBeHidden();
+    await expect(page.getByText("Estás mirando la tribuna. Entrá para escribir.")).toBeVisible();
+    await expect(
+      chat.message("Hincha Millonario").getByRole("button", { name: "Opciones del mensaje de Hincha Millonario" }),
+    ).toBeHidden();
+  });
+
+  test("los mensajes del chat global no se mezclan con los del partido", async ({ page, api, socket }) => {
+    const match = buildMatchDetails({ metadata: { status: "2H" } });
+    mockMatch(api, match);
+    const chat = new ChatPanel(page);
+
+    socket.onEmit("join_match", (_data, ctx) => ctx.emit("match_chat_history", []));
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await page.getByRole("tab", { name: "Chat en Vivo" }).click();
+
+    // El ChatGateway emite "on-message" a todos los sockets, sin matchId.
+    await socket.emit("on-message", buildChatMessage({ name: "Charlatán Global", message: "Hola tribuna" }));
+    await socket.emit("on-message", buildMatchChatMessage({
+      matchId: match.metadata.id,
+      name: "Hincha Del Partido",
+      message: "Qué partidazo",
+    }));
+
+    await expect(chat.message("Hincha Del Partido")).toContainText("Qué partidazo");
+    await expect(chat.message("Charlatán Global")).toBeHidden();
   });
 });

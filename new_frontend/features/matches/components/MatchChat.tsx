@@ -10,6 +10,7 @@ import { useMatchSocket } from "../socket/useMatchChatLive";
 import { useUserStore } from "@/store/useUserStore";
 import { useUserInventory } from "@/features/inventory/hooks/useInventory";
 import LoginModal from "@/features/auth/components/LoginModal";
+import { ChatLoginBar } from "@/features/chat/components/ChatLoginBar";
 import UserProfileModal from "@/features/profile/components/UserPublicProfileModal";
 import MegaphoneBanner from "@/features/chat/components/MegaphoneMessage";
 import Stickerpopover from "@/features/chat/components/Stickerpopover";
@@ -158,6 +159,8 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Escribir pide sesión; un visitante solo lee la tribuna del partido. */}
+      {!id ? <ChatLoginBar /> : (
       <div className="mt-3 flex flex-col space-y-2">
         {timeLeft !== null && (
           <div className="bg-red-900/30 border border-red-700 text-red-400 text-xs py-2 px-4 rounded-full text-center">
@@ -233,6 +236,7 @@ export function MatchChat({ matchId, className }: { matchId: string; className?:
           </button>
         </div>
       </div>
+      )}
 
       {showLogin && <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleLoginSuccess} />}
       <UserProfileModal userId={selectedProfileId} onClose={() => setSelectedProfileId(null)} />

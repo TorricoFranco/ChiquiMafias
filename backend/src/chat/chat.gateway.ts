@@ -53,6 +53,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const token = socket.handshake.auth?.token
       if (!token) {
         this.logger.log(`[Chat] Conexión anónima o sin token: ${socket.id}`)
+        // La tribuna se puede mirar sin cuenta: mandamos el historial igual.
+        // Escribir sigue pidiendo sesión (WsJwtGuard en 'send-message').
+        await this.sendGlobalHistory(socket)
         return
       }
 
@@ -107,13 +110,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.chatService.getConnectedClients(),
       )
 
-      const globalHistory = await this.redisService.redis.lrange(
-        'chat:global:history',
-        0,
-        -1,
-      )
-      const parsedHistory = globalHistory.map((msg) => JSON.parse(msg))
-      socket.emit('global_chat_history', parsedHistory)
+      await this.sendGlobalHistory(socket)
       socket.emit(
         'welcome-message',
         'Bienvenido a la tribuna central, paaaaadreee',
@@ -121,6 +118,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       console.error('Error en conexión ChatGateway:', error)
       socket.disconnect()
+    }
+  }
+
+  /**
+   * Historial del chat global. Es público: lo recibe cualquier socket, con sesión o sin ella.
+   * Nunca propaga el error: el catch de handleConnection desconecta, y un visitante sin token
+   * no reconecta solo (SocketContext solo reintenta con sesión), así que perdería el tiempo
+   * real de todo el namespace por un hipo de Redis o un mensaje corrupto.
+   */
+  private async sendGlobalHistory(socket: Socket) {
+    try {
+      const globalHistory = await this.redisService.redis.lrange(
+        'chat:global:history',
+        0,
+        -1,
+      )
+
+      const parsedHistory = globalHistory.flatMap((msg) => {
+        try {
+          return [JSON.parse(msg)]
+        } catch {
+          this.logger.warn('[Chat] Mensaje corrupto en el historial global')
+          return []
+        }
+      })
+
+      socket.emit('global_chat_history', parsedHistory)
+    } catch (error) {
+      // Sin emitir: el cliente conserva los mensajes que ya tenía.
+      this.logger.error('[Chat] No se pudo leer el historial global', error)
     }
   }
 
