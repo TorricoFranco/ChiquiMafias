@@ -55,8 +55,9 @@ export function useMatchSocket(matchId: string) {
     const [matchStats, setMatchStats] = useState<StatsUpdatedPayload | null>(null);
     const [latestGoal, setLatestGoal] = useState<GoalScoredPayload | null>(null);
 
-    // Sin sesión o sin partido no queda el chat ni el timeout del partido anterior. Se ajusta durante el render, sin efecto.
-    const chatEnabled = Boolean(currentUserId && matchId);
+    // El chat del partido se puede mirar sin sesión; sin partido no queda nada del anterior.
+    // Se ajusta durante el render, sin efecto.
+    const chatEnabled = Boolean(matchId);
     const [prevChatEnabled, setPrevChatEnabled] = useState<boolean | undefined>(undefined);
     if (chatEnabled !== prevChatEnabled) {
         setPrevChatEnabled(chatEnabled);
@@ -74,11 +75,13 @@ export function useMatchSocket(matchId: string) {
     }
 
     useEffect(() => {
-        if (!currentUserId || !matchId) return;
+        if (!matchId) return;
 
         if (!socket) return;
 
+        // El muteo es de la sesión: un visitante no lo consulta (la ruta pide JWT).
         const checkMuteStatus = async () => {
+            if (!currentUserId) return;
             try {
                 const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/moderation/status/${currentUserId}`);
                 if (res.ok) {
@@ -91,7 +94,9 @@ export function useMatchSocket(matchId: string) {
         };
         checkMuteStatus();
 
-        socket.emit('join_match', { matchId });
+        // Si todavía no está conectado, el join lo manda handleConnect: así no se duplican
+        // el join ni el match_chat_history, que reemplaza la lista entera.
+        if (socket.connected) socket.emit('join_match', { matchId });
 
         const handleConnect = () => {
             setConnected(true);
@@ -102,6 +107,8 @@ export function useMatchSocket(matchId: string) {
         const handleMatchHistory = (history: MatchChatMessagePayload[]) => setMessages(history);
 
         const handleOnMessage = (msg: MatchChatMessagePayload) => {
+            // El chat global emite "on-message" a todos los sockets, sin matchId: acá van solo los de este partido.
+            if (msg.matchId !== matchId) return;
             setMessages((prev) => [...prev, msg]);
         };
 

@@ -67,7 +67,7 @@ test.describe("Cosméticos y consumibles", () => {
     await expect(store.purchaseDialog).toBeHidden();
   });
 
-  test("si el backend rechaza la compra muestra el motivo en el modal", async ({ app, page, api }) => {
+  test("si el backend rechaza la compra avisa en el modal sin repetir su mensaje", async ({ app, page, api }) => {
     api.on("GET", "/store", [buildStoreItem({ name: "Burbuja Fuego", type: "CHAT_BUBBLE", assetId: "fireball" })]);
     api.on("POST", "/store/buy/:itemId", { statusCode: 409, message: "Ya tenés este artículo" }, { status: 409 });
     const store = new StorePage(page);
@@ -78,7 +78,9 @@ test.describe("Cosméticos y consumibles", () => {
     await store.card("Burbuja Fuego").getByRole("button", { name: "Comprar" }).click();
     await store.purchaseDialog.getByRole("button", { name: "Aceptar" }).click();
 
-    await expect(store.purchaseDialog.getByText("Ya tenés este artículo")).toBeVisible();
+    // El mensaje del backend no se muestra: el aviso es siempre el mismo.
+    await expect(store.purchaseDialog.getByText("No pudimos completar la compra. Probá de nuevo más tarde.")).toBeVisible();
+    await expect(store.purchaseDialog.getByText("Ya tenés este artículo")).toBeHidden();
   });
 
   test("lo permanente que ya tenés figura como adquirido", async ({ app, page, api }) => {

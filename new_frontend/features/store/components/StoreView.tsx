@@ -14,7 +14,6 @@ import { StoreItem } from '../types';
 import { useSubscriptions } from '@/features/subscriptions/hooks/useSubcriptions';
 import { SubscriptionTier, SubscriptionPlanDto } from '@/features/subscriptions/types';
 import { useNavigationStore } from '@/store/useNavigationStore';
-import { getErrorMessage } from '@/lib/errorMessage';
 
 export const StoreView: React.FC = () => {
 
@@ -53,7 +52,19 @@ export const StoreView: React.FC = () => {
     const { data: coinPacks } = useGetCoinPacks();
     const { mutateAsync: buyCoinPack } = useBuyCoinPack();
 
+    const setLoginModalOpen = useUserStore((state) => state.setLoginModalOpen);
+
+    // El catálogo se ve sin sesión, pero comprar la necesita: sin ella abrimos el login
+    // y no llamamos al backend, que igual respondería 401.
+    const requireSession = () => {
+        if (useUserStore.getState().id) return true;
+        setLoginModalOpen(true, "store");
+        return false;
+    };
+
     const handleSubscribe = (targetTier: SubscriptionTier, isUpgrade: boolean) => {
+        if (!requireSession()) return;
+
         if (isUpgrade) {
             startUpgrade(targetTier);
         } else {
@@ -62,14 +73,20 @@ export const StoreView: React.FC = () => {
     };
 
     const handleBuyCoinPack = async (packId: string) => {
+        if (!requireSession()) return;
+
         try {
             await buyCoinPack(packId);
         } catch (error) {
-            toast.error(error instanceof Error && error.message ? error.message : 'No pudimos iniciar el pago. Probá de nuevo.');
+            // El mensaje del backend no se muestra: puede traer detalles internos.
+            console.error('Error al iniciar el pago del pack:', error);
+            toast.error('No pudimos iniciar el pago. Probá de nuevo más tarde.');
         }
     };
 
     const handleBuyCosmetic = (item: StoreItem, quantity: number = 1) => {
+        if (!requireSession()) return;
+
         setItemToBuy(item);
         setQuantityToBuy(quantity);
         setPurchaseError(null);
@@ -95,7 +112,9 @@ export const StoreView: React.FC = () => {
                 setPurchaseSuccess(false);
             }, 1500);
         } catch (error) {
-            setPurchaseError(getErrorMessage(error) || 'Hubo un error al procesar la compra.');
+            // El mensaje del backend no se muestra: puede traer detalles internos.
+            console.error('Error al comprar el cosmético:', error);
+            setPurchaseError('No pudimos completar la compra. Probá de nuevo más tarde.');
         }
     };
 

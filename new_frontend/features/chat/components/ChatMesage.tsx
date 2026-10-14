@@ -7,6 +7,7 @@ import { getChatBubbleComponent } from "../config/chatBubbleRegistry";
 import { NAME_COLORS } from "../config/ColorsRegistry";
 import { useCreateReport } from "@/features/supports/hooks/useSupports";
 import { moderationApi } from "@/features/moderation/api/moderationApi";
+import { useUserStore } from "@/store/useUserStore";
 import { SystemRole, SubscriptionTier, TIER_UI_CONFIG, ROLE_UI_CONFIG } from "@/features/auth/constants/ROLES_SUBSCRIPTION";
 
 interface ChatMessageProps {
@@ -39,6 +40,7 @@ export default function ChatMessage({
 
     const activeColor = NAME_COLORS[nameColor || "default"] || NAME_COLORS.default;
     const BannerContainer = getChatBubbleComponent(chatBubbleId);
+    const currentUserId = useUserStore((state) => state.id);
     const isMod = currentRole === 'ADMIN' || currentRole === 'MODERATOR';
     const [showMenu, setShowMenu] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
@@ -180,8 +182,8 @@ export default function ChatMessage({
                             {variant === "global" && time && <span className="text-[10px] text-gray-600 ml-1 font-medium">{time}</span>}
                             {variant === "match" && teamName && <span className="text-[8px] text-gray-500 font-bold ml-1 uppercase tracking-wide">{teamName}</span>}
 
-                            {/* MENU */}
-                            {userId && (
+                            {/* MENU: moderar, borrar y reportar piden sesión; un visitante no ve el menú. */}
+                            {userId && currentUserId && (
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}

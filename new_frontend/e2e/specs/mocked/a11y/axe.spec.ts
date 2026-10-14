@@ -11,7 +11,8 @@ import { ChatPanel } from "../../../pages/chat-panel";
 test.describe("Accesibilidad (axe, WCAG 2.1 AA)", () => {
   test("home de un visitante", async ({ app, page }, testInfo) => {
     await app.open();
-    await expect(new ChatPanel(page).input).toBeVisible();
+    // El log, no el input: sin sesión la barra de escritura no se renderiza.
+    await expect(new ChatPanel(page).log).toBeVisible();
 
     await expectNoSeriousA11yViolations(page, testInfo, "home-visitante");
   });

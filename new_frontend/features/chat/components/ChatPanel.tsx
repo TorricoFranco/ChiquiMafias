@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronRight, Megaphone, Smile, X, Info } from "lucide-react";
 import ChatMessage from "./ChatMesage";
 import LoginModal from "@/features/auth/components/LoginModal";
+import { ChatLoginBar } from "./ChatLoginBar";
 import MegaphoneBanner from "./MegaphoneMessage";
 import MessageNewPoll from "./MessagesNewPoll";
 import Stickerpopover from "./Stickerpopover";
@@ -218,7 +219,8 @@ export function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Herramientas del Chat */}
+      {/* Herramientas del Chat: escribir pide sesión; un visitante solo lee. */}
+      {!id ? <ChatLoginBar /> : (
       <div className="mt-3 flex flex-col space-y-2">
         {timeLeft !== null && (
           <div className="bg-red-500/10 border border-red-500/40 text-red-400 text-xs py-2 px-4 rounded-full text-center shadow-[0_0_12px_rgba(239,68,68,0.08)]">
@@ -307,6 +309,7 @@ export function ChatPanel({
           </button>
         </div>
       </div>
+      )}
 
       {showLogin && (
         <LoginModal reason="chat" onClose={() => setShowLogin(false)} onSuccess={handleLoginSuccess} />
