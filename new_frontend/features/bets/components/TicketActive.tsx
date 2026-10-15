@@ -249,11 +249,11 @@ export const TicketActive = () => {
                 )}
             </div>
 
-            {/* VISTA MOBILE: solo con selecciones; bottom-16 la deja arriba de la MobileNav fija */}
+            {/* VISTA MOBILE: solo con selecciones; bottom-16 la deja arriba de la MobileNav fija. El contenedor no recibe clicks (su caja tapaba las cards de abajo con la hoja colapsada); la hoja sí, con pointer-events-auto. */}
             {ticketItems.length > 0 && (
-                <div className="block lg:hidden fixed bottom-16 left-0 right-0 z-40">
+                <div className="block lg:hidden fixed bottom-16 left-0 right-0 z-40 pointer-events-none">
                     <div
-                        className={`bg-[#1c1b1b] border-t border-[#353534] rounded-t-2xl transition-transform duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col ${isOpenMobile ? 'translate-y-0 h-[80vh]' : 'translate-y-[calc(100%-56px)]'
+                        className={`bg-[#1c1b1b] border-t border-[#353534] rounded-t-2xl transition-transform duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col pointer-events-auto ${isOpenMobile ? 'translate-y-0 h-[80vh]' : 'translate-y-[calc(100%-56px)]'
                             }`}
                     >
                         <button
