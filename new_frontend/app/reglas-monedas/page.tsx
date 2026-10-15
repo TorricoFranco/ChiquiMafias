@@ -18,19 +18,19 @@ export default function ReglasMonedasPage() {
       <LegalSection title="2. Cómo se obtienen y se usan">
         <p>
           Se obtienen con la recompensa diaria, la actividad en la plataforma, las suscripciones o la compra de
-          paquetes. Se usan para realizar pronósticos y para adquirir ítems de la tienda.
+          paquetes. Se usan para realizar apuestas y para adquirir ítems de la tienda.
         </p>
       </LegalSection>
-      <LegalSection title="3. Pronósticos (apuestas virtuales)">
+      <LegalSection title="3. Apuestas (apuestas virtuales)">
         <p>
-          Los pronósticos funcionan en modalidad pari-mutuel: las monedas apostadas forman un pozo que se reparte
+          Las apuestas funcionan en modalidad pari-mutuel: las monedas apostadas forman un pozo que se reparte
           entre quienes acertaron, en proporción a lo apostado. Si un mercado se anula, las monedas se devuelven.
         </p>
       </LegalSection>
       <LegalSection title="4. Compras y reembolsos">
         <p>
           Las compras de monedas se pagan con Mercado Pago. Si un pago es rechazado o se contracarga, las monedas
-          acreditadas por esa compra se descuentan de tu saldo. Las monedas ya gastadas en pronósticos o en la
+          acreditadas por esa compra se descuentan de tu saldo. Las monedas ya gastadas en apuestas o en la
           tienda no se reembolsan.
         </p>
       </LegalSection>
