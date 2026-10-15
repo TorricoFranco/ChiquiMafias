@@ -53,7 +53,7 @@ export const ClaimRewardsBanner = () => {
   );
 };
 
-// Aviso flotante para el resto de las pestañas: al tocarlo, lleva a Pronósticos,
+// Aviso flotante para el resto de las pestañas: al tocarlo, lleva a Comunidad,
 // donde está el banner completo para reclamar.
 export const ClaimRewardsNotice = () => {
   const { data: pending, isLoading } = usePendingRewards();
@@ -64,7 +64,7 @@ export const ClaimRewardsNotice = () => {
   return (
     <button
       type="button"
-      onClick={() => setActiveTab("Pronósticos")}
+      onClick={() => setActiveTab("Comunidad")}
       className="pointer-events-auto neon-glow flex items-center gap-2 max-w-[calc(100%-2rem)] bg-[#d2f000] hover:bg-[#B8D300] text-[#191e00] font-bold px-4 py-2 rounded-full text-xs shadow-lg cursor-pointer transition-all animate-fade-in"
     >
       <Coins className="w-4 h-4 flex-shrink-0 animate-bounce" />

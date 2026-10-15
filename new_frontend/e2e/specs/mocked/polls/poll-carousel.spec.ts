@@ -19,7 +19,7 @@ test.describe("Carrusel de encuestas de la barra derecha", () => {
     await expect(page.getByText("Encuesta 6 del carrusel")).toBeVisible();
   });
 
-  test("Comentar lleva a esa encuesta en Pronósticos con sus comentarios abiertos", async ({ app, page, api, session }) => {
+  test("Comentar lleva a esa encuesta en Comunidad con sus comentarios abiertos", async ({ app, page, api, session }) => {
     session.loginAs("USER");
     // Es la sexta del carrusel: en el feed queda debajo del pliegue, así que hay que scrollear.
     const others = Array.from({ length: 5 }, (_, index) => buildPoll({ title: `Encuesta ${index + 1} de relleno` }));
@@ -67,7 +67,7 @@ test.describe("Carrusel de encuestas de la barra derecha", () => {
 test.describe("Botón Votar del chat", () => {
   // La barra derecha arranca en Fixture y en celular no se ve: el botón tiene que llevar
   // a la encuesta igual, en escritorio y en celular.
-  test("lleva a la encuesta en Pronósticos aunque la barra derecha no esté en Apuestas", { tag: "@mobile" }, async ({ app, page, api, session, socket }) => {
+  test("lleva a la encuesta en Comunidad aunque la barra derecha no esté en Apuestas", { tag: "@mobile" }, async ({ app, page, api, session, socket }) => {
     session.loginAs("USER");
     const others = Array.from({ length: 6 }, (_, index) => buildPoll({ title: `Encuesta ${index + 1} del carrusel` }));
     const outside = buildPoll({ title: "La encuesta número siete" });

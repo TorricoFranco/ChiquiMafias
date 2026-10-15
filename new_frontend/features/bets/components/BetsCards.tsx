@@ -38,10 +38,10 @@ export const BetsCards = () => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="font-extrabold text-2xl md:text-3xl text-[#e5e2e1] tracking-tight uppercase flex items-center gap-2">
-            APUESTAS y ENCUESTAS
+            APUESTAS
           </h1>
           <p className="text-xs text-[#c6c9ab] mt-0.5">
-            Aposta tus Chiqui-Coins y vota en las encuestas para recibir recompensas.
+            Aposta tus Chiqui-Coins en los mercados abiertos.
           </p>
         </div>
       </div>

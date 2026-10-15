@@ -2,7 +2,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 export type Section =
   | "Chat"
-  | "Pronósticos"
+  | "Comunidad"
+  | "Apuestas"
   | "Tienda"
   | "Mi Perfil"
   | "Stats"
@@ -59,7 +60,7 @@ export class AppShell {
     await expect(this.menu).toBeVisible();
   }
 
-  mobileTab(label: "Vivo" | "Tribuna" | "Apuestas" | "Perfil") {
+  mobileTab(label: "Vivo" | "Tribuna" | "Comunidad" | "Apuestas" | "Perfil") {
     return this.mobileNav.getByRole("button", { name: label, exact: true });
   }
 }

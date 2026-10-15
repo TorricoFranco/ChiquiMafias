@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import SettingsPanel from "@/features/settings/components/SettingsPanel";
+import { usePendingRewards } from "@/features/polls/hooks/usePolls";
 import { useNavigationStore } from "@/store/useNavigationStore";
 import { useUserStore } from "@/store/useUserStore";
 
 const navItems: Array<{ name: string; icon: string; filled?: boolean }> = [
   { name: "Chat", icon: "forum" },
-  { name: "Pronósticos", icon: "casino" },
+  { name: "Comunidad", icon: "how_to_vote" },
+  { name: "Apuestas", icon: "casino" },
   { name: "Tienda", icon: "shopping_cart" },
   { name: "Mi Perfil", icon: "person" },
   { name: "Stats", icon: "bar_chart", filled: true },
@@ -17,11 +19,17 @@ const navItems: Array<{ name: string; icon: string; filled?: boolean }> = [
 
 export const SidebarNav = ({ onNavigate }: { onNavigate?: () => void } = {}) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const rewardHintId = useId();
 
   const activeTab = useNavigationStore((state) => state.activeTab);
   const setActiveTab = useNavigationStore((state) => state.setActiveTab);
 
   const userRole = useUserStore((state) => state.role);
+
+  const { data: pendingRewards } = usePendingRewards();
+  const userId = useUserStore((state) => state.id);
+  // Sin sesión no hay resalte: la cache de la query sobrevive al logout.
+  const hasPendingRewards = Boolean(userId) && (pendingRewards?.count ?? 0) > 0;
 
   const visibleNavItems = navItems.filter((item) => {
     if (item.name === "Admin") {
@@ -51,12 +59,15 @@ export const SidebarNav = ({ onNavigate }: { onNavigate?: () => void } = {}) => 
           {visibleNavItems.map((item) => {
             const isActive = activeTab === item.name || (item.name === "Ajustes" && isSettingsOpen);
             const isAdmin = item.name === "Admin";
+            // Recompensas de encuestas sin reclamar: Comunidad se resalta y pide el clic para cobrarlas.
+            const showRewardHint = item.name === "Comunidad" && hasPendingRewards;
 
             return (
               <div key={item.name} className="relative">
                 <button
                   onClick={() => handleTabClick(item.name)}
                   aria-current={isActive && item.name !== "Ajustes" ? "page" : undefined}
+                  aria-describedby={showRewardHint ? rewardHintId : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group text-left cursor-pointer ${isAdmin
                     ? isActive
                       ? "bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold border-l-4 border-yellow-200 shadow-lg shadow-amber-500/20"
@@ -64,7 +75,7 @@ export const SidebarNav = ({ onNavigate }: { onNavigate?: () => void } = {}) => 
                     : isActive
                       ? "bg-[#d2f000] text-[#5d6b00] font-bold border-l-4 border-[#b8d300] shadow-md"
                       : "text-[#c6c9ab] hover:bg-[#353534] hover:text-[#e5e2e1]"
-                    }`}
+                    }${showRewardHint ? " outline-2 outline-offset-4 outline-[#d2f000]" : ""}`}
                 >
                   <span
                     aria-hidden="true"
@@ -74,11 +85,27 @@ export const SidebarNav = ({ onNavigate }: { onNavigate?: () => void } = {}) => 
                   >
                     {item.icon}
                   </span>
-                  <span className="text-sm font-semibold">{item.name}</span>
+                  <span className="flex flex-col items-start">
+                    <span className="text-sm font-semibold">{item.name}</span>
+                    {showRewardHint && (
+                      <span
+                        aria-hidden="true"
+                        className={`text-[10px] font-bold ${isActive ? "text-[#191e00]" : "text-[#d2f000]"}`}
+                      >
+                        ¡Reclamá! +{pendingRewards?.potentialCoins} monedas
+                      </span>
+                    )}
+                  </span>
                 </button>
               </div>
             );
           })}
+          {/* Fuera del botón: si estuviera adentro, el nombre accesible dejaría de ser "Comunidad". */}
+          {hasPendingRewards && (
+            <span id={rewardHintId} className="sr-only">
+              Tenés recompensas para reclamar. Entrá a Comunidad y hacé clic en Reclamar.
+            </span>
+          )}
         </nav>
 
         <div className="px-4 mt-auto pt-4 border-t border-[#353534]/50">

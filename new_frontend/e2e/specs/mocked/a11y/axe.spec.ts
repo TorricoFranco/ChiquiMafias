@@ -17,21 +17,31 @@ test.describe("Accesibilidad (axe, WCAG 2.1 AA)", () => {
     await expectNoSeriousA11yViolations(page, testInfo, "home-visitante");
   });
 
-  test("pronósticos de un usuario logueado", async ({ app, page, api, session }, testInfo) => {
+  test("apuestas de un usuario logueado", async ({ app, page, api, session }, testInfo) => {
     session.loginAs("USER");
     const market = buildMarket();
     api.on("GET", "/bets/markets", [market]);
+
+    await app.open();
+    await app.goToSection("Apuestas");
+    await expect(page.getByRole("article", { name: market.title })).toBeVisible();
+
+    await expectNoSeriousA11yViolations(page, testInfo, "apuestas");
+  });
+
+  test("comunidad de un usuario logueado", async ({ app, page, api, session }, testInfo) => {
+    session.loginAs("USER");
     // Una de la comunidad (con autor y escudo) y una oficial: las dos cards del feed.
     const poll = buildPoll({ title: "¿Quién gana el clásico?" });
     const officialPoll = buildOfficialPoll({ title: "Encuesta de la casa" });
     api.on("GET", "/polls/active", [poll, officialPoll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
-    await expect(page.getByRole("article", { name: market.title })).toBeVisible();
+    await app.goToSection("Comunidad");
+    await expect(page.getByRole("article", { name: poll.title })).toBeVisible();
     await expect(page.getByRole("article", { name: officialPoll.title })).toBeVisible();
 
-    await expectNoSeriousA11yViolations(page, testInfo, "pronosticos");
+    await expectNoSeriousA11yViolations(page, testInfo, "comunidad");
   });
 
   test("tienda", async ({ app, page, api, session }, testInfo) => {

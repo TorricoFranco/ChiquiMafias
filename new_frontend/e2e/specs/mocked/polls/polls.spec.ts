@@ -10,7 +10,7 @@ test.describe("Encuestas de la tribuna", () => {
     socket.onEmit("castVote", () => ({ status: "ok" }));
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
     await card.getByRole("button", { name: "Boca" }).click();
 
@@ -28,7 +28,7 @@ test.describe("Encuestas de la tribuna", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     expect(await socket.waitForEmit("joinPoll")).toEqual({ pollId: poll.id });
   });
@@ -38,7 +38,7 @@ test.describe("Encuestas de la tribuna", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     await socket.waitForConnection();
     await page.getByRole("article", { name: poll.title }).getByRole("button", { name: "River" }).click();
 
@@ -55,7 +55,7 @@ test.describe("Encuestas de la tribuna", () => {
     socket.onEmit("castVote", () => ({ status: "error", message: "La encuesta ya cerró" }));
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     await page.getByRole("article", { name: poll.title }).getByRole("button", { name: "Boca" }).click();
 
     await expect(page.getByText("La encuesta ya cerró")).toBeVisible();
@@ -69,7 +69,7 @@ test.describe("Encuestas de la tribuna", () => {
     api.on("POST", "/polls/:id/react", { status: "ok" });
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     await page.getByRole("article", { name: poll.title }).getByRole("button", { name: "Me gusta (4)" }).click();
 
     await expect.poll(() => api.requests("GET", "/polls/active").length).toBeGreaterThan(1);
@@ -89,7 +89,7 @@ test.describe("Encuestas de la tribuna", () => {
     });
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
     await card.getByRole("button", { name: "0 Comentarios" }).click();
     await expect(card.getByText("Sé el primero en opinar...")).toBeVisible();
@@ -107,7 +107,7 @@ test.describe("Encuestas de la tribuna", () => {
     api.on("POST", "/polls/rewards/claim-all", { coinsAwarded: 150 });
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     await expect(page.getByText("¡Tenés recompensas sin reclamar!")).toBeVisible();
     await page.getByRole("button", { name: "Reclamar 150" }).click();
 
@@ -121,7 +121,7 @@ test.describe("Encuestas de la tribuna", () => {
     api.on("POST", "/polls/propose", buildPoll({ status: "PENDING" }));
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     await page.getByRole("button", { name: "Crear encuesta" }).click();
     const modal = page.getByRole("dialog", { name: "Desafiar a la Tribuna" });
     await modal.getByLabel("Pregunta principal *").fill("¿Vuelve Riquelme a jugar?");
@@ -138,7 +138,7 @@ test.describe("Encuestas de la tribuna", () => {
     session.loginAs("USER");
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     await expect(page.getByRole("button", { name: "Crear encuesta" })).toBeDisabled();
   });

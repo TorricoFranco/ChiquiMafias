@@ -34,7 +34,7 @@ export const SocialView = () => {
       <main className="flex-1 bg-[#131313] flex flex-col min-w-0 border-r border-[#353534] relative overflow-y-auto">
 
         {/* h-0: el aviso flota sobre el contenido sin empujarlo; sticky lo deja visible al scrollear */}
-        {activeTab !== "Pronósticos" && (
+        {activeTab !== "Comunidad" && (
           <div className="sticky top-3 z-20 h-0 overflow-visible flex justify-center pointer-events-none">
             <ClaimRewardsNotice />
           </div>
@@ -68,13 +68,20 @@ export const SocialView = () => {
           </div>
         )}
 
-        {activeTab === "Pronósticos" && (
+        {activeTab === "Comunidad" && (
+          <div className="p-6 pb-20 lg:pb-6 w-full max-w-[1350px] mx-auto transition-all duration-300">
+            <div className="flex flex-col gap-6 w-full min-w-0">
+              <ClaimRewardsBanner />
+              <SidebarPolls />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Apuestas" && (
           <div className="p-6 pb-20 lg:pb-6 w-full max-w-[1350px] mx-auto transition-all duration-300">
             <div className="flex flex-col lg:flex-row gap-6 items-start relative transition-all duration-300">
               <div className="flex-1 flex flex-col gap-6 w-full min-w-0 transition-all duration-300">
-                <ClaimRewardsBanner />
                 <BetsCards />
-                <SidebarPolls />
               </div>
               <TicketActive />
             </div>

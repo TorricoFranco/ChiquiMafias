@@ -33,7 +33,7 @@ test.describe("Puntuación con estrellas", () => {
     socket.onEmit("castVote", () => ({ status: "success" }));
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("PUNTUACIÓN");
@@ -59,7 +59,7 @@ test.describe("Puntuación con estrellas", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card.getByRole("button", { name: "1 estrella" })).toBeVisible();
@@ -73,7 +73,7 @@ test.describe("Ranking de podio", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("RANKING");
@@ -96,7 +96,7 @@ test.describe("Ranking de podio", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     const messi = card.getByRole("button", { name: "Messi" });
@@ -116,7 +116,7 @@ test.describe("Ranking de podio", () => {
     socket.onEmit("castVote", () => ({ status: "success" }));
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await card.getByRole("button", { name: "Riquelme" }).click();
@@ -145,7 +145,7 @@ test.describe("Ranking de podio", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("Podio de la tribuna");
@@ -173,7 +173,7 @@ test.describe("Ranking de podio", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("12 votos");
