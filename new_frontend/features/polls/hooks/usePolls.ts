@@ -33,8 +33,9 @@ export const usePollComments = (pollId: string, page: number = 1, limit: number 
 
 export const usePendingRewards = () => {
   const userId = useUserStore((state) => state.id);
+  // Por usuario: al cerrar sesión la cache no debe servir el conteo de la cuenta anterior.
   return useQuery({
-    queryKey: ['pending-rewards'],
+    queryKey: ['pending-rewards', userId],
     queryFn: pollsApi.getPendingRewards,
     staleTime: 1000 * 60,
     enabled: !!userId,
@@ -107,7 +108,7 @@ export const useClaimAllRewards = () => {
       const setBalance = useUserStore.getState().setBalance;
       setBalance(currentBalance + data.coinsAwarded);
 
-      queryClient.setQueryData(['pending-rewards'], { count: 0, potentialCoins: 0 });
+      queryClient.setQueryData(['pending-rewards', useUserStore.getState().id], { count: 0, potentialCoins: 0 });
       queryClient.invalidateQueries({ queryKey: ['pending-rewards'] });
     },
   });
