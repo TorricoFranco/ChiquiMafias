@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useUserStore } from '@/store/useUserStore';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errorMessage';
 import { pollsApi } from '../api/pollsApi';
 import { ApprovePollDto, CreateCommentDto, ProposePollDto, ReactDto } from '../types';
 
@@ -103,13 +105,24 @@ export const useClaimAllRewards = () => {
 
   return useMutation({
     mutationFn: pollsApi.claimAllRewards,
-    onSuccess: (data) => {
-      const currentBalance = useUserStore.getState().balance;
-      const setBalance = useUserStore.getState().setBalance;
-      setBalance(currentBalance + data.coinsAwarded);
+    // La cuenta se toma al disparar el claim: si cambia antes de la respuesta, el saldo de la nueva no se toca.
+    onMutate: () => ({ userId: useUserStore.getState().id }),
+    onSuccess: (data, _variables, context) => {
+      const { id, balance, setBalance } = useUserStore.getState();
+      if (context?.userId && id === context.userId) {
+        setBalance(balance + data.coinsAwarded);
+      }
 
-      queryClient.setQueryData(['pending-rewards', useUserStore.getState().id], { count: 0, potentialCoins: 0 });
+      queryClient.setQueryData(['pending-rewards', context?.userId], { count: 0, potentialCoins: 0 });
       queryClient.invalidateQueries({ queryKey: ['pending-rewards'] });
+    },
+    onError: (error, _variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['pending-rewards'] });
+      // Si cambió la cuenta, el aviso caería en la sesión equivocada.
+      if (useUserStore.getState().id !== context?.userId) return;
+      // Solo el mensaje de negocio (400) viene en español; red, 5xx o 429 muestran el texto por defecto.
+      const message = (error as { status?: number }).status === 400 ? getErrorMessage(error) : undefined;
+      toast.error(message || 'No se pudieron reclamar las recompensas');
     },
   });
 };

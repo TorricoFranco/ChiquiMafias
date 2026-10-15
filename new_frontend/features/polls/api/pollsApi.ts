@@ -119,7 +119,7 @@ export const pollsApi = {
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || 'Error al reclamar recompensas');
+            throw Object.assign(new Error(errorData.message || 'Error al reclamar recompensas'), { status: response.status });
         }
         return response.json();
     },
