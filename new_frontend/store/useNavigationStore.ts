@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 type StoreSubTab = 'suscripciones' | 'coins' | 'cosmeticos';
 
-/** Encuesta a la que el feed de Pronósticos tiene que llevar al entrar. */
+/** Encuesta a la que el feed de Comunidad tiene que llevar al entrar. */
 interface FocusedPoll {
     id: string;
     /** `true` si además hay que abrir sus comentarios (botón Comentar). */
@@ -18,7 +18,7 @@ interface NavigationState {
     focusedPoll: FocusedPoll | null;
     setActiveTab: (tab: string, subTab?: StoreSubTab) => void;
     setStoreSubTab: (subTab: StoreSubTab) => void;
-    /** Va a Pronósticos y enfoca esa encuesta. El enfoque se apaga solo al rato. */
+    /** Va a Comunidad y enfoca esa encuesta. El enfoque se apaga solo al rato. */
     openPollInFeed: (pollId: string, openComments: boolean) => void;
     clearFocusedPoll: () => void;
 }
@@ -36,7 +36,7 @@ export const useNavigationStore = create<NavigationState>((set) => ({
     openPollInFeed: (pollId, openComments) => {
         // Cada llamada crea un objeto nuevo, así que enfoca aunque sea la misma encuesta.
         const focus: FocusedPoll = { id: pollId, openComments };
-        set({ activeTab: "Pronósticos", focusedPoll: focus });
+        set({ activeTab: "Comunidad", focusedPoll: focus });
 
         // El timer vive en el store, no en el componente: si el feed se desmonta antes,
         // el enfoque igual se apaga y no queda una encuesta resaltada para la próxima vez.

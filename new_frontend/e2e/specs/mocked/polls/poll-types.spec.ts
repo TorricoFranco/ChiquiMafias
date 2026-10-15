@@ -19,7 +19,7 @@ test.describe("Tipos de encuesta", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("128 votos");
@@ -32,7 +32,7 @@ test.describe("Tipos de encuesta", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("128 votos");
@@ -57,7 +57,7 @@ test.describe("Tipos de encuesta", () => {
     socket.onEmit("castVote", () => ({ status: "success" }));
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("DUELO");
@@ -85,7 +85,7 @@ test.describe("Tipos de encuesta", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("PREDICCIÓN");
@@ -108,7 +108,7 @@ test.describe("Tipos de encuesta", () => {
     socket.onEmit("castVote", () => ({ status: "success" }));
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("DEBATE");
@@ -131,7 +131,7 @@ test.describe("Tipos de encuesta", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card).toContainText("INFO");
@@ -147,7 +147,7 @@ test.describe("Tipos de encuesta", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     const card = page.getByRole("article", { name: poll.title });
     await expect(card.getByRole("button", { name: "Me gusta (4)" })).toBeVisible();
@@ -168,7 +168,7 @@ test.describe("Tipos de encuesta", () => {
     api.on("GET", "/polls/active", [clasica, duelo]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
 
     await expect(page.getByRole("article", { name: clasica.title })).toBeVisible();
     await expect(page.getByRole("article", { name: duelo.title })).toBeVisible();

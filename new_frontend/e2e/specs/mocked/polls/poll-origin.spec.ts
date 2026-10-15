@@ -14,7 +14,7 @@ test.describe("Origen de las encuestas", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
 
     await expect(card.getByText("Oficial", { exact: true })).toBeVisible();
@@ -29,7 +29,7 @@ test.describe("Origen de las encuestas", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
 
     await expect(card.getByText("Comunidad", { exact: true })).toBeVisible();
@@ -48,7 +48,7 @@ test.describe("Origen de las encuestas", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
 
     await expect(card.getByText("PLATEÍSTA", { exact: true })).toBeVisible();
@@ -65,7 +65,7 @@ test.describe("Origen de las encuestas", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
 
     await expect(card.getByText("JU", { exact: true })).toBeVisible();
@@ -78,7 +78,7 @@ test.describe("Origen de las encuestas", () => {
     api.on("GET", "/polls/active", [poll]);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
 
     await expect(card.getByText("Autor no disponible", { exact: true })).toBeVisible();

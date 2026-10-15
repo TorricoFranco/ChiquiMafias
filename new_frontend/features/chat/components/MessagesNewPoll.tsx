@@ -14,7 +14,7 @@ export default function MessageNewPoll({ poll, onClose }: MessageNewPollProps) {
   const openPollInFeed = useNavigationStore((state) => state.openPollInFeed);
 
   const handleVoteClick = () => {
-    // Va a la encuesta en Pronósticos, resaltada: no depende de que la barra derecha esté abierta.
+    // Va a la encuesta en Comunidad, resaltada: no depende de que la barra derecha esté abierta.
     openPollInFeed(poll.id, false);
     onClose();
   };

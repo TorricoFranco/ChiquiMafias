@@ -13,7 +13,7 @@ test.describe("Ticket de apuestas", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
     await bets.option(market.title, "Boca").click();
 
     await expect(bets.option(market.title, "Boca")).toHaveAttribute("aria-pressed", "true");
@@ -32,7 +32,7 @@ test.describe("Ticket de apuestas", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
     await bets.option(market.title, "Boca").click();
 
     await expect(bets.ticket.getByText(/Saldo insuficiente/)).toBeVisible();
@@ -50,7 +50,7 @@ test.describe("Ticket de apuestas", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
     await bets.option(superclasico.title, "Boca").click();
     await bets.option(goleador.title, "Cavani").click();
     await bets.showTicket();
@@ -78,7 +78,7 @@ test.describe("Ticket de apuestas", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
     await bets.option(first.title, "Boca").click();
     await bets.option(second.title, "River").click();
     await bets.confirmButton.click();
@@ -94,7 +94,7 @@ test.describe("Ticket de apuestas", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
 
     await expect(bets.market(market.title).getByText("MERCADO CERRADO")).toBeVisible();
     await expect(bets.option(market.title, "Boca")).toBeDisabled();
@@ -107,7 +107,7 @@ test.describe("Ticket de apuestas", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
     await bets.filter(/Partidos \(1\)/).click();
 
     await expect(bets.market(match.title)).toBeVisible();
@@ -131,7 +131,7 @@ test.describe("Mercados en vivo", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
     await expect(bets.option(market.title, "Boca")).toContainText("2.10");
 
     await socket.emit(
@@ -151,7 +151,7 @@ test.describe("Mercados en vivo", () => {
     const bets = new BetsPage(page);
 
     await app.open();
-    await app.goToSection("Pronósticos");
+    await app.goToSection("Apuestas");
     await expect(bets.market(existing.title)).toBeVisible();
 
     await socket.emit("market_created", created, { nsp: "/bets" });

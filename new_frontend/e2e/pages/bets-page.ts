@@ -4,7 +4,7 @@ function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Sección Pronósticos: tarjetas de mercados y ticket de apuestas. */
+/** Sección Apuestas: tarjetas de mercados y ticket de apuestas. */
 export class BetsPage {
   readonly ticket: Locator;
   readonly confirmButton: Locator;

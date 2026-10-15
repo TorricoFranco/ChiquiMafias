@@ -33,7 +33,7 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
     // Sin comentarios no hay nada que abrir: el botón se oculta en vez de no hacer nada.
     const commentsEnabled = poll.commentsEnabled !== false;
 
-    // Las dos llevan a la encuesta en Pronósticos; solo Comentar abre sus comentarios.
+    // Las dos llevan a la encuesta en Comunidad; solo Comentar abre sus comentarios.
     const handleOpenInFeed = (openComments: boolean) => openPollInFeed(poll.id, openComments);
 
     const handleLike = () => {

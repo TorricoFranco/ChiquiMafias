@@ -59,7 +59,7 @@ test.describe("Smoke full-stack", () => {
       // El header arranca en 0 hasta que carga el wallet.
       await expect.poll(() => headerBalance(app), { timeout: 30_000 }).toBe(before);
 
-      await app.goToSection("Pronósticos");
+      await app.goToSection("Apuestas");
       await bets.option(title, "Sí").click();
       await bets.showTicket();
       await bets.amountFor("Sí").fill("100");

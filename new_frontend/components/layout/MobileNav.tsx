@@ -1,11 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useId } from "react";
+import { usePendingRewards } from "@/features/polls/hooks/usePolls";
+import { useUserStore } from "@/store/useUserStore";
 
 const TABS = [
   { section: "Vivo", label: "Vivo", icon: "live_tv", filled: true },
   { section: "Chat", label: "Tribuna", icon: "forum" },
-  { section: "Pronósticos", label: "Apuestas", icon: "payments" },
+  { section: "Comunidad", label: "Comunidad", icon: "how_to_vote" },
+  { section: "Apuestas", label: "Apuestas", icon: "payments" },
   { section: "Mi Perfil", label: "Perfil", icon: "account_circle" },
 ];
 
@@ -16,6 +19,12 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ activeSection, onSelect }) => {
+  const rewardHintId = useId();
+  const { data: pendingRewards } = usePendingRewards();
+  const userId = useUserStore((state) => state.id);
+  // Sin sesión no hay resalte: la cache de la query sobrevive al logout.
+  const hasPendingRewards = Boolean(userId) && (pendingRewards?.count ?? 0) > 0;
+
   return (
     <nav
       aria-label="Navegación principal"
@@ -23,14 +32,17 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeSection, onSelect })
     >
       {TABS.map((tab) => {
         const isActive = activeSection === tab.section;
+        // Recompensas de encuestas sin reclamar: Comunidad se resalta y pide el clic para cobrarlas.
+        const showRewardHint = tab.section === "Comunidad" && hasPendingRewards;
         return (
           <button
             key={tab.section}
             onClick={() => onSelect(tab.section)}
             aria-current={isActive ? "page" : undefined}
-            className={`flex flex-col items-center justify-center cursor-pointer transition-colors ${
+            aria-describedby={showRewardHint ? rewardHintId : undefined}
+            className={`relative flex flex-col items-center justify-center cursor-pointer transition-colors ${
               isActive ? "text-[#d2f000] font-bold" : "text-[#c6c9ab]"
-            }`}
+            }${showRewardHint ? " rounded-lg outline-2 outline-offset-2 outline-[#d2f000]" : ""}`}
           >
             <span
               aria-hidden="true"
@@ -40,9 +52,23 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeSection, onSelect })
               {tab.icon}
             </span>
             <span className="text-[10px]">{tab.label}</span>
+            {showRewardHint && (
+              <span
+                aria-hidden="true"
+                className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#d2f000] px-1.5 py-px text-[9px] font-black uppercase leading-tight text-[#191e00]"
+              >
+                ¡Reclamá!
+              </span>
+            )}
           </button>
         );
       })}
+      {/* Fuera de los botones: si estuviera adentro, el nombre accesible dejaría de ser "Comunidad". */}
+      {hasPendingRewards && (
+        <span id={rewardHintId} className="sr-only">
+          Tenés recompensas para reclamar. Entrá a Comunidad y hacé clic en Reclamar.
+        </span>
+      )}
     </nav>
   );
 };
