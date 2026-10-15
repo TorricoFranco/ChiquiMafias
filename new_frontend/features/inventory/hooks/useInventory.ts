@@ -5,7 +5,7 @@ import { useUserStore } from '@/store/useUserStore';
 export const useUserInventory = () => {
     const userId = useUserStore((state) => state.id);
     return useQuery({
-        queryKey: ['inventory'],
+        queryKey: ['inventory', userId],
         queryFn: inventoryApi.getUserInventory,
         enabled: !!userId,
         select: (data) => {
