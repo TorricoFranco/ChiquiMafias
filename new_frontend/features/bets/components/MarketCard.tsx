@@ -8,6 +8,8 @@ import { betsApi } from '../api/betsApi';
 import { getClosingInfo, useNow } from '../utils/closingTime';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errorMessage';
+import { MatchHeader } from './MatchHeader';
+import { getMatchHeader } from '../utils/matchHeader';
 
 interface MarketCardProps {
   market: Market;
@@ -89,6 +91,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   const totalPool = market.options?.reduce((sum, option) => sum + (option.totalStaked || 0), 0) || 0;
   const closing = getClosingInfo(market.closesAt, now);
   const isMatch = market.type === 'MATCH';
+  const matchHeader = isMatch ? getMatchHeader(market) : null;
   const categoryLabel = isMatch ? 'Fútbol argentino' : (market.category || 'Apuesta');
 
   return (
@@ -121,37 +124,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
           {market.title}
         </h3>
 
-        {isMatch && market.metadata?.homeTeam && market.metadata?.awayTeam && (
-          <div className="flex items-center justify-center gap-3 py-3 bg-[#131313] rounded-xl border border-[#353534]/60">
-            <div className="flex flex-col items-center gap-1.5 w-24">
-              <img
-                src={`/escudos-api/${market.metadata.homeTeam.logoUrl}.webp`}
-                alt={market.metadata.homeTeam.name}
-                className="w-12 h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
-                loading="lazy"
-              />
-              <span className="text-[11px] md:text-xs font-bold text-[#e5e2e1] text-center leading-tight">
-                {market.metadata.homeTeam.short}
-              </span>
-            </div>
-
-            <span className="text-[10px] font-black tracking-widest text-[#909378]">
-              VS
-            </span>
-
-            <div className="flex flex-col items-center gap-1.5 w-24">
-              <img
-                src={`/escudos-api/${market.metadata.awayTeam.logoUrl}.webp`}
-                alt={market.metadata.awayTeam.name}
-                className="w-12 h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
-                loading="lazy"
-              />
-              <span className="text-[11px] md:text-xs font-bold text-[#e5e2e1] text-center leading-tight">
-                {market.metadata.awayTeam.short}
-              </span>
-            </div>
-          </div>
-        )}
+        {matchHeader && <MatchHeader header={matchHeader} />}
 
         {market.description && market.description.trim() !== '' && (
           <p className="text-xs text-[#c6c9ab] leading-relaxed">
