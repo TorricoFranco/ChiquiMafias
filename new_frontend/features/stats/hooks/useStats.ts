@@ -1,7 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { statsApi } from '../api/statsApi';
-import { useUserStore } from '@/store/useUserStore';
 import {
   LeaderboardUserStats,
   TopActiveStreakUser,
@@ -11,8 +10,6 @@ import {
 
 export const STATS_KEYS = {
   all: ['stats'] as const,
-  me: () => [...STATS_KEYS.all, 'me'] as const,
-  user: (userId: string) => [...STATS_KEYS.all, 'user', userId] as const,
   topEarners: (limit: number) => [...STATS_KEYS.all, 'top-earners', limit] as const,
   topStreaks: (limit: number) => [...STATS_KEYS.all, 'top-streaks', limit] as const,
   highestMultipliers: (limit: number) => [...STATS_KEYS.all, 'highest-multipliers', limit] as const,
@@ -20,27 +17,6 @@ export const STATS_KEYS = {
   topStakers: (limit: number) => [...STATS_KEYS.all, 'top-stakers', limit] as const,
   global: () => [...STATS_KEYS.all, 'global'] as const,
 };
-
-export function useMyStats() {
-  const userId = useUserStore((state) => state.id);
-  return useQuery({
-    queryKey: STATS_KEYS.me(),
-    queryFn: statsApi.getMyStats,
-    staleTime: 1000 * 60 * 5,
-    enabled: !!userId,
-  });
-}
-
-export function useMyWinStreak() {
-  const userId = useUserStore((state) => state.id);
-  return useQuery({
-    queryKey: STATS_KEYS.me(),
-    queryFn: statsApi.getMyStats,
-    select: (data) => data.currentWinStreak,
-    staleTime: 1000 * 60 * 5,
-    enabled: !!userId,
-  });
-}
 
 export function useTopEarners(limit = 10) {
   return useQuery({
@@ -127,9 +103,7 @@ export function useSocialStats() {
   const [activeCategory, setActiveCategory] = useState<LeaderboardCategory>('top-earners');
   const [limit, setLimit] = useState<number>(10);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [justLeveledUp, setJustLeveledUp] = useState<boolean>(false);
 
-  const myStatsQuery = useMyStats();
   const globalStatsQuery = useGlobalStats();
 
   const getCategoryQueryKey = (cat: LeaderboardCategory, lim: number) => {
@@ -165,25 +139,6 @@ export function useSocialStats() {
   });
 
   const rawLeaderboardData = (activeLeaderboardQuery.data as AnyLeaderboardItem[]) || [];
-  const userStats = myStatsQuery.data || null;
-  const userMetrics = useMemo(() => {
-    if (!userStats) return null;
-    const winRate = userStats.totalBetsPlaced > 0
-      ? ((userStats.totalBetsWon / userStats.totalBetsPlaced) * 100).toFixed(1)
-      : '0.0';
-    const netProfit = userStats.totalCoinsWon - userStats.totalCoinsStaked;
-    const roi = userStats.totalCoinsStaked > 0
-      ? (((userStats.totalCoinsWon - userStats.totalCoinsStaked) / userStats.totalCoinsStaked) * 100).toFixed(1)
-      : '0.0';
-
-    return {
-      winRate: parseFloat(winRate),
-      netProfit,
-      roi: parseFloat(roi),
-      isProfitable: netProfit >= 0,
-    };
-  }, [userStats]);
-
   const filteredLeaderboard = useMemo(() => {
     if (!searchQuery.trim()) return rawLeaderboardData;
     const q = searchQuery.toLowerCase();
@@ -196,14 +151,6 @@ export function useSocialStats() {
     });
   }, [rawLeaderboardData, searchQuery]);
 
-  const triggerDopamineWin = useCallback(() => {
-
-    queryClient.invalidateQueries({ queryKey: STATS_KEYS.me() });
-
-    setJustLeveledUp(true);
-    setTimeout(() => setJustLeveledUp(false), 2500);
-  }, [queryClient]);
-
   const handleRefresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: STATS_KEYS.all }),
@@ -212,13 +159,11 @@ export function useSocialStats() {
     ]);
   };
 
-  const isLoading = myStatsQuery.isLoading || activeLeaderboardQuery.isLoading;
-  const isRefreshing = myStatsQuery.isFetching || activeLeaderboardQuery.isFetching;
+  const isLoading = activeLeaderboardQuery.isLoading;
+  const isRefreshing = activeLeaderboardQuery.isFetching;
 
   return {
     globalStats: globalStatsQuery.data || null,
-    userStats,
-    userMetrics,
     activeCategory,
     setActiveCategory,
     leaderboardData: filteredLeaderboard,
@@ -230,7 +175,5 @@ export function useSocialStats() {
     searchQuery,
     setSearchQuery,
     handleRefresh,
-    triggerDopamineWin,
-    justLeveledUp,
   };
 }

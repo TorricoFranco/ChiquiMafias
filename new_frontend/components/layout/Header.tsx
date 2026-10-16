@@ -2,14 +2,13 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Flame, Bell, Gift, PlusCircle, ChevronDown, Menu, User, Zap, Settings } from 'lucide-react';
+import { Flame, Bell, Gift, PlusCircle, ChevronDown, Menu, User, Settings } from 'lucide-react';
 import { useUserStore } from "@/store/useUserStore";
 import { useWallet } from "@/features/wallet/socket/useWalletSocket";
 import NotificationBell from '@/features/notifications/components/NotificationBell';
 import StreakModal from '@/features/streak/components/StreakModal';
 import { useUIStore } from '@/store/useUIStore';
 import { AnimatedBalance } from '@/features/wallet/components/AnimatedBalance';
-import { useMyWinStreak } from '@/features/stats/hooks/useStats';
 import { MobileMenu } from './MobileMenu';
 import { useNavigationStore } from '@/store/useNavigationStore';
 
@@ -42,8 +41,6 @@ export const Header: React.FC<HeaderProps> = ({
     const isStreakModalOpen = useUserStore((state) => state.isStreakModalOpen);
 
     const { balance, loading } = useWallet();
-
-    const { data: winStreak = 0 } = useMyWinStreak();
 
     const displayName = username ?? "Usuario";
     const avatarSrc = team?.badgeUrl ?? null;
@@ -115,18 +112,6 @@ export const Header: React.FC<HeaderProps> = ({
 
                         {isAuthenticated ? (
                             <>
-                                {winStreak > 0 && (
-                                    <div
-                                        className="hidden sm:flex bg-cyan-950/50 border border-cyan-400/40 px-3 py-1.5 rounded-full items-center gap-1.5 shadow-[0_0_12px_rgba(6,182,212,0.25)] animate-in fade-in zoom-in-95 duration-300"
-                                        title="Aciertos al hilo en apuestas consecutivas"
-                                    >
-                                        <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400 animate-pulse" />
-                                        <span className="font-black text-xs text-cyan-300 tracking-wide">
-                                            Aciertos al Hilo: <span className="font-mono text-cyan-400">x{winStreak}</span>
-                                        </span>
-                                    </div>
-                                )}
-
                                 <button
                                     onClick={() => setIsStreakModalOpen(true)}
                                     className="hidden sm:flex bg-[#2a2a2a] border border-[#353534] px-3 py-1.5 rounded-full items-center gap-2 hover:bg-[#353534] hover:border-[#d2f000]/40 transition-all cursor-pointer group"

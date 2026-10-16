@@ -8,10 +8,10 @@ import {
   TopChatterUser,
 } from '../types/';
 import { GlobalStatsBar } from './GlobalStatsBar';
-import { UserStatsHero } from './UserStatsHero';
 import { LeaderboardPodium } from './LeaderboardPodium';
 import { LeaderboardTable } from './LeaderboardTable';
-import { UserProfileModal } from './UserProfileModal';
+import UserPublicProfileModal from '@/features/profile/components/UserPublicProfileModal';
+import { useUserStore } from '@/store/useUserStore';
 import {
   Trophy,
   Flame,
@@ -85,6 +85,10 @@ const LEADERBOARD_CATEGORIES: LeaderboardMeta[] = [
   },
 ];
 
+/** El ranking trae el id con nombres distintos: `userId` en las stats de apuestas y `id` en el resto. */
+const getRankedUserId = (user: LeaderboardUserStats | TopActiveStreakUser | TopChatterUser) =>
+  'userId' in user ? user.userId : user.id;
+
 interface SocialStatsViewProps {
   onBackToTribuna?: () => void;
 }
@@ -92,8 +96,6 @@ interface SocialStatsViewProps {
 export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
   const {
     globalStats,
-    userStats,
-    userMetrics,
     activeCategory,
     setActiveCategory,
     leaderboardData,
@@ -105,12 +107,11 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
     searchQuery,
     setSearchQuery,
     handleRefresh,
-    justLeveledUp,
   } = useSocialStats();
 
-  const [selectedUser, setSelectedUser] = useState<
-    LeaderboardUserStats | TopActiveStreakUser | TopChatterUser | null
-  >(null);
+  // Perfil público del chat: el mismo modal que se abre desde el nombre en el chat.
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const currentUserId = useUserStore((state) => state.id) ?? undefined;
 
   // Active Category Meta
   const activeMeta =
@@ -176,21 +177,6 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
         </div>
       </div>
 
-      {/* 1. Personal Performance Hero ("Mi Resumen") */}
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-black uppercase tracking-wider text-[#c6c9ab] flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5 text-[#d2f000]" />
-            Mi Resumen Personal
-          </h3>
-        </div>
-        <UserStatsHero
-          userStats={userStats}
-          metrics={userMetrics}
-          justLeveledUp={justLeveledUp}
-        />
-      </section>
-
       {/* 3. Leaderboards / Rankings Section */}
       <section className="flex flex-col gap-5">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -247,7 +233,7 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
               <LeaderboardPodium
                 category={activeCategory}
                 items={podiumItems}
-                onSelectUser={(u) => setSelectedUser(u)}
+                onSelectUser={(u) => setSelectedUserId(getRankedUserId(u))}
               />
             )}
 
@@ -256,8 +242,8 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
               category={activeCategory}
               items={tableItems}
               startIndex={showPodium ? 3 : 0}
-              currentUserId={userStats?.userId || 'user-uuid-abc'}
-              onSelectUser={(u) => setSelectedUser(u)}
+              currentUserId={currentUserId}
+              onSelectUser={(u) => setSelectedUserId(getRankedUserId(u))}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               limit={limit}
@@ -284,8 +270,8 @@ export const SocialStatsView: React.FC<SocialStatsViewProps> = () => {
       </section>
 
       {/* User Inspection Modal */}
-      {selectedUser && (
-        <UserProfileModal user={selectedUser} onClose={() => setSelectedUser(null)} />
+      {selectedUserId && (
+        <UserPublicProfileModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
       )}
     </div>
   );

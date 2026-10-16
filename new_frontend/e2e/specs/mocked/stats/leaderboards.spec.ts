@@ -37,6 +37,5 @@ test.describe("Stats y rankings", () => {
     await app.goToSection("Stats");
 
     await expect(page.getByText("@el_rey").first()).toBeVisible();
-    expect(api.requests("GET", "/stats/me")).toHaveLength(0);
   });
 });

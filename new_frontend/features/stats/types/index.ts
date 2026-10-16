@@ -12,20 +12,6 @@ export interface PublicUser {
   } | null;
 }
 
-export interface UserStats {
-  id: string;
-  userId: string;
-  totalBetsPlaced: number;
-  totalBetsWon: number;
-  totalCoinsStaked: number;
-  totalCoinsWon: number;
-  highestMultiplier: number;
-  currentWinStreak: number;
-  longestWinStreak: number;
-  updatedAt?: string;
-  user?: PublicUser;
-}
-
 export interface LeaderboardUserStats {
   id: string;
   userId: string;
