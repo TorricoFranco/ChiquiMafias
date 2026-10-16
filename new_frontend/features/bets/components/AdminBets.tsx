@@ -41,7 +41,7 @@ export const AdminBets: React.FC = () => {
     category: string;
     description: string;
     closesAt: string;
-    options: { name: string; initialProb: number }[];
+    options: { name: string; initialProb: number; logoUrl?: string }[];
   }) => {
     createMarket.mutate(marketData, {
       onSuccess: () => {

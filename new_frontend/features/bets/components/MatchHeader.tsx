@@ -5,7 +5,7 @@ interface MatchHeaderProps {
   header: MatchHeaderData;
 }
 
-/** Escudo y sigla de un club en la cabecera "VS". */
+/** Escudo de un club en la cabecera "VS", con el nombre de la opción debajo. */
 const VersusTeam: React.FC<{ team: OptionTeam }> = ({ team }) => (
   <div className="flex flex-col items-center gap-1.5 w-24">
     <img
@@ -14,8 +14,8 @@ const VersusTeam: React.FC<{ team: OptionTeam }> = ({ team }) => (
       className="w-12 h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
       loading="lazy"
     />
-    <span className="text-[11px] md:text-xs font-bold text-[#e5e2e1] text-center leading-tight">
-      {team.short}
+    <span className="w-full text-[11px] md:text-xs font-bold text-[#e5e2e1] text-center leading-tight line-clamp-2 break-words">
+      {team.name}
     </span>
   </div>
 );

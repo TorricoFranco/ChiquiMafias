@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { X, PlusCircle, Shield } from 'lucide-react';
-import { MarketMetadata, MarketType } from '../../types';
+import { MarketType } from '../../types';
 import { getTeamsList } from '@/data/teamData';
 import { TeamSelectorModalAPI } from '@/features/auth/components/TeamSelectorModalAPI';
 import { toDateTimeLocalValue } from '@/lib/dateTimeLocal';
+
+// Nombres por defecto de las opciones: si el admin no los cambió, el club elegido los reemplaza.
+const PLACEHOLDER_NAME = /^(Local|Visitante|Nueva Opción \d+)$/;
 
 interface CreateMarketModalProps {
     onClose: () => void;
@@ -13,10 +16,10 @@ interface CreateMarketModalProps {
         category: string;
         description: string;
         closesAt: string;
-        metadata?: MarketMetadata;
         options: {
             name: string;
             initialProb: number;
+            logoUrl?: string;
         }[];
     }) => void;
 }
@@ -51,9 +54,11 @@ export const CreateMarketModal: React.FC<CreateMarketModalProps> = ({
 
         setOptions((prev) => {
             const copy = [...prev];
+            const current = copy[activeTeamIndex];
             copy[activeTeamIndex] = {
-                ...copy[activeTeamIndex],
-                name: name,
+                ...current,
+                // Si ya escribiste un nombre (por ejemplo un jugador), no lo pisa.
+                name: PLACEHOLDER_NAME.test(current.name.trim()) ? name : current.name,
                 badgeUrl: badgeUrl,
                 teamId: id,
             };
@@ -61,6 +66,12 @@ export const CreateMarketModal: React.FC<CreateMarketModalProps> = ({
         });
 
         setActiveTeamIndex(null);
+    };
+
+    const handleRemoveLogo = (index: number) => {
+        setOptions((prev) =>
+            prev.map((opt, i) => (i === index ? { ...opt, badgeUrl: undefined, teamId: undefined } : opt))
+        );
     };
 
     const handleAddOption = () => {
@@ -91,48 +102,17 @@ export const CreateMarketModal: React.FC<CreateMarketModalProps> = ({
         e.preventDefault();
         if (!title.trim() || options.some((o) => !o.name.trim())) return;
 
-        let metadata: MarketMetadata | undefined = undefined;
-
-        if (type === 'MATCH') {
-            const home = options[0];
-            const away = options[2];
-
-            // logoUrl es el id del club, como en los mercados del cron: MarketCard arma /escudos-api/<id>.webp.
-            const homeTeam = home?.teamId
-                ? {
-                    name: home.name,
-                    short: home.name.substring(0, 3).toUpperCase(),
-                    logoUrl: home.teamId,
-                }
-                : undefined;
-
-            const awayTeam = away?.teamId
-                ? {
-                    name: away.name,
-                    short: away.name.substring(0, 3).toUpperCase(),
-                    logoUrl: away.teamId,
-                }
-                : undefined;
-
-            if (homeTeam || awayTeam) {
-                metadata = {
-                    ...(homeTeam && { homeTeam }),
-                    ...(awayTeam && { awayTeam }),
-                };
-            }
-        }
-
         onCreate({
             title: title.trim(),
             category: category.trim(),
             type,
             description: description.trim(),
             closesAt: new Date(closesAt).toISOString(),
-            metadata,
-            // El DTO del backend solo acepta name e initialProb (forbidNonWhitelisted): el club va en metadata.
+            // Cada opción lleva su escudo. Ya no se manda metadata: se armaba por posición y perdía los demás escudos.
             options: options.map((opt) => ({
                 name: opt.name.trim(),
                 initialProb: Number(opt.initialProb) || 10,
+                logoUrl: opt.teamId,
             })),
         });
 
@@ -252,6 +232,18 @@ export const CreateMarketModal: React.FC<CreateMarketModalProps> = ({
                                             ) : (
                                                 <Shield className="w-4 h-4 text-[#909378] group-hover:text-[#d2f000]" />
                                             )}
+                                        </button>
+                                    )}
+
+                                    {type === 'MATCH' && opt.teamId && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveLogo(idx)}
+                                            aria-label={`Quitar escudo de la opción ${idx + 1}`}
+                                            title="Quitar escudo"
+                                            className="text-[#909378] hover:text-red-400 p-1 cursor-pointer shrink-0"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
                                         </button>
                                     )}
 
