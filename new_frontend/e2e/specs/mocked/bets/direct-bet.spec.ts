@@ -38,7 +38,8 @@ test.describe("Apuesta directa desde el carrusel del chat", () => {
     await card.getByLabel("Monto a apostar").fill("5000");
     await card.getByRole("button", { name: "Apostar" }).click();
 
-    await expect(page.getByText("Saldo insuficiente para esta apuesta")).toBeVisible();
+    // Acotado a la región de notificaciones: en dev, Next repite el mensaje en su overlay de errores.
+    await expect(page.getByRole("region", { name: "Notifications alt+T" }).getByText("Saldo insuficiente para esta apuesta")).toBeVisible();
   });
 
   test("con varios mercados se puede elegir cuál ver", async ({ app, page, api }) => {
