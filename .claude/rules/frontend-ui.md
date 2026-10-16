@@ -44,4 +44,11 @@ Los componentes usan **clases arbitrarias con hex** (`bg-[#131313]`, `text-[#D2F
 - Iconos: `lucide-react` (opción por defecto) o Material Symbols (`<span className="material-symbols-outlined">`) donde el componente ya los use.
 - Animaciones con `framer-motion`. Feedback con `toast` de `sonner`.
 
+## Datos de personas
+
+- En vistas de usuario común se muestra **solo el `@username`** de cualquier persona: nunca el correo y nunca el nombre completo (`name`), ni siquiera como fallback.
+- El correo no aparece en la UI de usuario común, ni siquiera en el propio perfil.
+- Las vistas de administración y moderación pueden mostrar el nombre real y el correo, pero solo dentro de vistas gateadas por rol (`ADMIN`, `MODERATOR`, `PRESIDENT`, según la pestaña).
+- Un componente compartido que necesite el nombre real recibe una prop explícita (por ejemplo `showRealName`) que solo pasan las vistas de admin. No lo decide por su cuenta.
+
 La spec completa de componentes (match cards, chat, barras de apuestas) está en `new_frontend/DESIGN.md`. Si `DESIGN.md` contradice al código existente, **gana el código**.

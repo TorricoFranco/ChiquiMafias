@@ -32,7 +32,6 @@ export const Header: React.FC<HeaderProps> = ({
     const id = useUserStore((state) => state.id);
     const isAuthenticated = !!id;
     const username = useUserStore((state) => state.username);
-    const name = useUserStore((state) => state.name);
     const currentStreak = useUserStore((state) => state.currentStreak);
     const team = useUserStore((state) => state.team);
     const tier = useUserStore((state) => state.tier);
@@ -46,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     const { data: winStreak = 0 } = useMyWinStreak();
 
-    const displayName = username ?? name ?? "Usuario";
+    const displayName = username ?? "Usuario";
     const avatarSrc = team?.badgeUrl ?? null;
     const tierLabel: Record<string, string> = {
         NONE: "HINCHA",

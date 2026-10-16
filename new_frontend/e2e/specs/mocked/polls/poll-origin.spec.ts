@@ -23,7 +23,7 @@ test.describe("Origen de las encuestas", () => {
     await expect(card.getByText("Juan Tribunero")).toHaveCount(0);
   });
 
-  test("una encuesta de la comunidad muestra el nombre, el escudo y el usuario del autor", async ({ app, page, api, session }) => {
+  test("una encuesta de la comunidad muestra solo el username del autor y su escudo", async ({ app, page, api, session }) => {
     session.loginAs("USER");
     const poll = buildPoll({ title: "¿Mejor refuerzo del mercado?" });
     api.on("GET", "/polls/active", [poll]);
@@ -33,8 +33,9 @@ test.describe("Origen de las encuestas", () => {
     const card = page.getByRole("article", { name: poll.title });
 
     await expect(card.getByText("Comunidad", { exact: true })).toBeVisible();
-    await expect(card.getByText("Juan Tribunero", { exact: true })).toBeVisible();
-    await expect(card.getByText("@tribunero")).toBeVisible();
+    // Vista común: ni el nombre real ni el @username repetido; el título es el username.
+    await expect(card.getByText("Juan Tribunero")).toHaveCount(0);
+    await expect(card.getByText("@tribunero", { exact: true })).toBeVisible();
     await expect(card.getByRole("img", { name: "Escudo de Boca Juniors", exact: true })).toBeVisible();
     await expect(card.getByText("Oficial", { exact: true })).toHaveCount(0);
   });
@@ -68,7 +69,7 @@ test.describe("Origen de las encuestas", () => {
     await app.goToSection("Comunidad");
     const card = page.getByRole("article", { name: poll.title });
 
-    await expect(card.getByText("JU", { exact: true })).toBeVisible();
+    await expect(card.getByText("TR", { exact: true })).toBeVisible();
     await expect(card.getByRole("img", { name: "Escudo de Boca Juniors", exact: true })).toHaveCount(0);
   });
 

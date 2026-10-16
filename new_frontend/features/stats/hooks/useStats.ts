@@ -120,8 +120,7 @@ type AnyLeaderboardItem = LeaderboardUserStats | TopActiveStreakUser | TopChatte
 
 type SearchableLeaderboardItem = {
   username?: string | null;
-  name?: string | null;
-  user?: { username?: string | null; name?: string | null } | null;
+  user?: { username?: string | null } | null;
 };
 export function useSocialStats() {
   const queryClient = useQueryClient();
@@ -192,9 +191,7 @@ export function useSocialStats() {
     return rawLeaderboardData.filter((raw) => {
       const item = raw as SearchableLeaderboardItem;
       if (item.username?.toLowerCase().includes(q)) return true;
-      if (item.name?.toLowerCase().includes(q)) return true;
       if (item.user?.username?.toLowerCase().includes(q)) return true;
-      if (item.user?.name?.toLowerCase().includes(q)) return true;
       return false;
     });
   }, [rawLeaderboardData, searchQuery]);
