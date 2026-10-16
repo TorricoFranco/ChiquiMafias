@@ -12,7 +12,7 @@ import { useNavigationStore } from "@/store/useNavigationStore";
 export const SidebarPolls = () => {
     const [activeFilter, setActiveFilter] = useState(POLL_FILTER_GROUPS[0].id);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const { data: activePolls, isLoading, isError } = useActivePolls();
+    const { data: activePolls, isLoading, isError, isFetching } = useActivePolls();
 
     const { data: inventory } = useUserInventory();
 
@@ -23,6 +23,7 @@ export const SidebarPolls = () => {
 
     const focusedPoll = useNavigationStore((state) => state.focusedPoll);
     const clearFocusedPoll = useNavigationStore((state) => state.clearFocusedPoll);
+    const markFocusApplied = useNavigationStore((state) => state.markFocusApplied);
     // La encuesta que llegó desde el carrusel sigue activa (el feed arranca en "Todas").
     const focusedExists = Boolean(focusedPoll && activePolls?.some((poll) => poll.id === focusedPoll.id));
 
@@ -31,10 +32,10 @@ export const SidebarPolls = () => {
         ? activePolls?.filter((poll) => activeGroup.types!.includes(poll.type))
         : activePolls;
 
-    // Si la encuesta llegó desde el carrusel y ya no está activa, se descarta el enfoque.
+    // Si la lista ya cargó y la encuesta enfocada no está, se descarta el enfoque. Mientras se refetchea, espera.
     useEffect(() => {
-        if (focusedPoll && !isLoading && !focusedExists) clearFocusedPoll();
-    }, [focusedPoll, focusedExists, isLoading, clearFocusedPoll]);
+        if (focusedPoll && !isLoading && !isFetching && !focusedExists) clearFocusedPoll();
+    }, [focusedPoll, focusedExists, isLoading, isFetching, clearFocusedPoll]);
 
     // La encuesta enfocada se lleva al centro de la pantalla y recibe el foco. El resalte lo apaga el store.
     useEffect(() => {
@@ -44,8 +45,11 @@ export const SidebarPolls = () => {
         card?.scrollIntoView({ behavior: "smooth", block: "center" });
         // La barra derecha se desmonta al cambiar de pestaña y el foco se pierde: se lo
         // damos a la card para que el lector de pantalla anuncie la encuesta.
-        card?.focus({ preventScroll: true });
-    }, [focusedPoll, focusedExists]);
+        if (!card) return;
+        card.focus({ preventScroll: true });
+        // Recién ahora la encuesta está en pantalla: arranca el reloj que apaga el resalte.
+        markFocusApplied();
+    }, [focusedPoll, focusedExists, markFocusApplied]);
 
     return (
         <section className="flex flex-col gap-6">

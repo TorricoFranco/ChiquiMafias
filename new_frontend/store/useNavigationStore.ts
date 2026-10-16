@@ -9,8 +9,16 @@ interface FocusedPoll {
     openComments: boolean;
 }
 
-/** Cuánto dura el resalte de la encuesta llevada desde el carrusel. */
+/** Cuánto dura el resalte de la encuesta llevada desde el carrusel o el chat. */
 const FOCUS_DURATION_MS = 2000;
+/** Cuánto espera el enfoque a que la encuesta aparezca en el feed antes de descartarse. */
+const FOCUS_WAIT_MS = 10_000;
+
+/**
+ * Timer del enfoque en curso. Vive en el store, no en el componente: si el feed se desmonta antes,
+ * el enfoque igual se apaga y no queda una encuesta resaltada para la próxima vez.
+ */
+let focusTimer: ReturnType<typeof setTimeout> | undefined;
 
 interface NavigationState {
     activeTab: string;
@@ -18,31 +26,41 @@ interface NavigationState {
     focusedPoll: FocusedPoll | null;
     setActiveTab: (tab: string, subTab?: StoreSubTab) => void;
     setStoreSubTab: (subTab: StoreSubTab) => void;
-    /** Va a Comunidad y enfoca esa encuesta. El enfoque se apaga solo al rato. */
+    /** Va a Comunidad y enfoca esa encuesta. Se descarta solo si nunca aparece o cuando termina el resalte. */
     openPollInFeed: (pollId: string, openComments: boolean) => void;
+    /** La encuesta ya está en pantalla y recibió el foco: recién ahí arranca el reloj del resalte. */
+    markFocusApplied: () => void;
     clearFocusedPoll: () => void;
 }
 
-export const useNavigationStore = create<NavigationState>((set) => ({
-    activeTab: "Chat",
-    storeSubTab: "suscripciones",
-    focusedPoll: null,
-    setActiveTab: (tab, subTab) =>
-        set((state) => ({
-            activeTab: tab,
-            storeSubTab: subTab ?? state.storeSubTab
-        })),
-    setStoreSubTab: (subTab) => set({ storeSubTab: subTab }),
-    openPollInFeed: (pollId, openComments) => {
-        // Cada llamada crea un objeto nuevo, así que enfoca aunque sea la misma encuesta.
-        const focus: FocusedPoll = { id: pollId, openComments };
-        set({ activeTab: "Comunidad", focusedPoll: focus });
-
-        // El timer vive en el store, no en el componente: si el feed se desmonta antes,
-        // el enfoque igual se apaga y no queda una encuesta resaltada para la próxima vez.
-        setTimeout(() => {
+export const useNavigationStore = create<NavigationState>((set, get) => {
+    const clearFocusAfter = (focus: FocusedPoll, delayMs: number) => {
+        clearTimeout(focusTimer);
+        focusTimer = setTimeout(() => {
             set((state) => (state.focusedPoll === focus ? { focusedPoll: null } : state));
-        }, FOCUS_DURATION_MS);
-    },
-    clearFocusedPoll: () => set({ focusedPoll: null }),
-}));
+        }, delayMs);
+    };
+
+    return {
+        activeTab: "Chat",
+        storeSubTab: "suscripciones",
+        focusedPoll: null,
+        setActiveTab: (tab, subTab) =>
+            set((state) => ({
+                activeTab: tab,
+                storeSubTab: subTab ?? state.storeSubTab
+            })),
+        setStoreSubTab: (subTab) => set({ storeSubTab: subTab }),
+        openPollInFeed: (pollId, openComments) => {
+            // Cada llamada crea un objeto nuevo, así que enfoca aunque sea la misma encuesta.
+            const focus: FocusedPoll = { id: pollId, openComments };
+            set({ activeTab: "Comunidad", focusedPoll: focus });
+            clearFocusAfter(focus, FOCUS_WAIT_MS);
+        },
+        markFocusApplied: () => {
+            const focus = get().focusedPoll;
+            if (focus) clearFocusAfter(focus, FOCUS_DURATION_MS);
+        },
+        clearFocusedPoll: () => set({ focusedPoll: null }),
+    };
+});

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGlobalSocket } from "@/context/SocketContext";
 import { useUserStore } from "@/store/useUserStore";
 import { apiFetch } from "@/lib/apiFetch";
@@ -58,6 +59,7 @@ interface PollShowPayload {
 
 export function useChatSocket() {
   const socket = useGlobalSocket();
+  const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessagePayload[]>([]);
   const [connected, setConnected] = useState(false);
   const { id: currentUserId } = useUserStore();
@@ -143,6 +145,8 @@ export function useChatSocket() {
     };
 
     const handlePollShow = (payload: PollShowPayload) => {
+      // La encuesta nueva puede no estar en la lista cacheada: se vuelve a pedir antes de votar.
+      queryClient.invalidateQueries({ queryKey: ["active-polls"] });
       setActivePoll({
         id: payload.id,
         title: payload.title,
@@ -181,7 +185,7 @@ export function useChatSocket() {
       socket.off("poll_show", handlePollShow);
       socket.off("subscription_gift_received", handleSubscriptionGift);
     };
-  }, [socket, currentUserId]);
+  }, [socket, currentUserId, queryClient]);
 
   const sendMessage = (
     body: string,
