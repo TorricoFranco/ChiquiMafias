@@ -71,7 +71,7 @@ export const SocialView = () => {
         {activeTab === "Comunidad" && (
           <div className="p-6 pb-20 lg:pb-6 w-full max-w-[1350px] mx-auto transition-all duration-300">
             <div className="flex flex-col gap-6 w-full min-w-0">
-              <ClaimRewardsBanner />
+              <ClaimRewardsBanner key={userId} />
               <SidebarPolls />
             </div>
           </div>

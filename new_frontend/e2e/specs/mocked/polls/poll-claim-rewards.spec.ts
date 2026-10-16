@@ -67,4 +67,38 @@ test.describe("Reclamar recompensas de encuestas", () => {
     await expect(page.getByText("¡Tenés recompensas sin reclamar!")).toBeHidden();
     await expect(app.balance).toContainText("500");
   });
+
+  test("el claim colgado de la cuenta anterior no bloquea el botón de la cuenta nueva", { tag: "@p0" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER", { username: "hincha_a" }, { balance: 1000 });
+    session.allowGoogleLogin({ username: "hincha_b" }, { balance: 500 });
+    api.on("GET", "/polls/rewards/pending", { count: 2, potentialCoins: 150 });
+
+    // El claim de A no responde hasta que el test lo libere al final.
+    let releaseClaim!: () => void;
+    const claimResponse = new Promise<void>((resolve) => {
+      releaseClaim = resolve;
+    });
+    api.handle("POST", "/polls/rewards/claim-all", async () => {
+      await claimResponse;
+      return { body: { coinsAwarded: 150 } };
+    });
+
+    await app.open();
+    await app.goToSection("Comunidad");
+    const claimSent = api.waitFor("POST", "/polls/rewards/claim-all");
+    await page.getByRole("button", { name: "Reclamar 150" }).click();
+    await claimSent;
+
+    await app.goToSection("Ajustes");
+    await page.getByRole("button", { name: "Cerrar Sesión" }).click();
+    await expect(app.loginButton).toBeVisible();
+
+    await app.loginButton.click();
+    await page.getByRole("button", { name: GOOGLE_BUTTON_NAME }).click();
+    await expect(page.getByText("¡Tenés recompensas sin reclamar!")).toBeVisible();
+
+    // El botón de la cuenta nueva sale habilitado: no hereda el "Reclamando..." de la cuenta anterior.
+    await expect(page.getByRole("button", { name: "Reclamar 150" })).toBeEnabled();
+    releaseClaim();
+  });
 });
