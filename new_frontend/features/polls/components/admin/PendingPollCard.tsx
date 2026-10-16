@@ -13,6 +13,7 @@ export const PendingPollCard = ({ poll, onReject, onApprove }: { poll: AdminPoll
           author={poll.user}
           isOfficial={poll.isOfficial}
           size="sm"
+          showRealName
           subtitle={`El ${new Date(poll.createdAt).toLocaleDateString()}`}
         />
         <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 flex-shrink-0">

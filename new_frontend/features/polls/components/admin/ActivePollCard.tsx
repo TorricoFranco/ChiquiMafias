@@ -35,6 +35,7 @@ export const ActivePollCard: React.FC<ActivePollCardProps> = ({ poll, onClosePol
                                 author={poll.user}
                                 isOfficial={poll.isOfficial}
                                 size="sm"
+                                showRealName
                                 subtitle={
                                     poll.isOfficial && poll.createdByAdmin
                                         ? `Publicada por ${poll.createdByAdmin.username ? `@${poll.createdByAdmin.username}` : poll.createdByAdmin.name}`

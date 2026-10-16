@@ -69,8 +69,7 @@ export const SubscriptionRewardModal: React.FC<RewardModalProps> = ({ data, onCl
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const username = useUserStore((state) => state.username);
-    const name = useUserStore((state) => state.name);
-    const displayName = username || name || 'Usuario';
+    const displayName = username || 'Usuario';
 
     // Arranca oculto y se muestra en el siguiente frame, para que la transición de entrada corra.
     useEffect(() => {

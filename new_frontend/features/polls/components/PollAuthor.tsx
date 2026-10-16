@@ -16,11 +16,13 @@ interface PollAuthorProps {
     /** Línea de abajo: "hace 2 h", el aviso de socket desconectado, etc. */
     subtitle?: React.ReactNode;
     size?: "md" | "sm";
+    /** Solo moderación: nombre real y @username. En vistas de usuario común se muestra solo el username. */
+    showRealName?: boolean;
 }
 
-/** Iniciales para quien todavía no eligió equipo. */
-const getInitials = (author: PollAuthorData) =>
-    (author.name || author.username || "?")
+/** Iniciales para quien todavía no eligió equipo. En vistas de usuario común salen del username. */
+const getInitials = (author: PollAuthorData, showRealName: boolean) =>
+    ((showRealName ? author.name || author.username : author.username) || "?")
         .trim()
         .slice(0, 2)
         .toUpperCase();
@@ -65,6 +67,7 @@ export const PollAuthor: React.FC<PollAuthorProps> = ({
     isOfficial,
     subtitle,
     size = "md",
+    showRealName = false,
 }) => {
     // Escudo que no se pudo cargar: se recuerda para caer a las iniciales sin reintentar.
     const [failedBadge, setFailedBadge] = useState<string | null>(null);
@@ -110,6 +113,9 @@ export const PollAuthor: React.FC<PollAuthorProps> = ({
         );
     }
 
+    // Vista común: solo el username. Moderación: nombre real y @username.
+    const title = showRealName ? author.name : author.username ? `@${author.username}` : "Usuario";
+    const details = showRealName ? [author.username && `@${author.username}`, subtitle] : [subtitle];
     const tier = author.activeSubscriptionTier
         ? TIER_UI_CONFIG[author.activeSubscriptionTier]
         : undefined;
@@ -131,12 +137,12 @@ export const PollAuthor: React.FC<PollAuthorProps> = ({
                         />
                     ) : (
                         <span className="text-[11px] font-bold text-[#c6c9ab]">
-                            {getInitials(author)}
+                            {getInitials(author, showRealName)}
                         </span>
                     )}
                 </div>
             }
-            name={author.name}
+            name={title}
             chips={
                 <>
                     <span className={`${ORIGIN_CHIP_CLASS} ${COMMUNITY_CHIP}`}>Comunidad</span>
@@ -153,7 +159,7 @@ export const PollAuthor: React.FC<PollAuthorProps> = ({
                     )}
                 </>
             }
-            details={[author.username && `@${author.username}`, subtitle]}
+            details={details}
             nameSize={nameSize}
         />
     );
