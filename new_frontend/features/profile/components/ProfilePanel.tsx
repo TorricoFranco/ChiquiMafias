@@ -9,6 +9,7 @@ import { useUserInventory, useEquipItem, useUnequipItem } from "@/features/inven
 import { EquipableType, InventoryItem } from "@/features/inventory/types";
 import { InventorySection } from "@/features/inventory/components/InventorySection";
 import { getBannerUrl } from '@/features/chat/config/BannersRegistry';
+import { NAME_COLORS } from '@/features/chat/config/ColorsRegistry';
 import { TIER_UI_CONFIG } from "@/features/auth/constants/ROLES_SUBSCRIPTION";
 import { useTeams } from "@/features/teams/hooks/useTeams";
 import { useUpdateProfile } from "@/features/profile/hooks/useUpdateProfile";
@@ -28,6 +29,9 @@ export const ProfilePanel = () => {
     const username = useUserStore((state) => state.username);
     const team = useUserStore((state) => state.team);
     const activeBannerIdUser = useUserStore((state) => state.activeBannerId);
+    const activeNameColorId = useUserStore((state) => state.activeNameColorId);
+    // Mismo color que el nombre en Stats y en el chat.
+    const activeNameColor = NAME_COLORS[activeNameColorId || "default"] || NAME_COLORS.default;
     const tier = useUserStore((state) => state.tier);
 
     const tierConfig = tier && tier !== "NONE"
@@ -231,7 +235,7 @@ export const ProfilePanel = () => {
                             </form>
                         ) : (
                             <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 drop-shadow-md min-w-0">
-                                <span className="truncate">{username}</span>
+                                <span className={`truncate ${activeNameColor.textClass}`}>{username}</span>
                                 <button
                                     ref={editButtonRef}
                                     type="button"
