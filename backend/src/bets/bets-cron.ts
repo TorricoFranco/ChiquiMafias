@@ -100,6 +100,7 @@ export class BetsCronService {
                   {
                     name: match.home_team.name,
                     initialProb: initialProbabilities.home,
+                    logoUrl: `${match.home_team.api_team_id}`,
                   },
                   {
                     name: DRAW_OPTION_NAME,
@@ -108,6 +109,7 @@ export class BetsCronService {
                   {
                     name: match.away_team.name,
                     initialProb: initialProbabilities.away,
+                    logoUrl: `${match.away_team.api_team_id}`,
                   },
                 ],
               },

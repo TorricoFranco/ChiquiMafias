@@ -10,6 +10,8 @@ import {
   IsEnum,
   IsOptional,
   IsObject,
+  Matches,
+  MaxLength,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { MarketType } from '@prisma/client'
@@ -62,6 +64,18 @@ class MarketOptionDto {
   @Min(0)
   @Max(100)
   initialProb!: number
+
+  // Es el id del escudo (api_team_id), no una URL: el front arma /escudos-api/<id>.webp.
+  @ApiProperty({
+    required: false,
+    description:
+      'Id numérico del escudo del club de esta opción (api_team_id). Sin valor, la opción no tiene escudo.',
+    example: '451',
+  })
+  @IsOptional()
+  @Matches(/^\d+$/, { message: 'El escudo debe ser el id numérico del club' })
+  @MaxLength(20)
+  logoUrl?: string
 }
 
 export class CreateMarketDto {
