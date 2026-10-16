@@ -1,24 +1,7 @@
 import { apiFetch } from "@/lib/apiFetch";
-import { UserStats, LeaderboardUserStats, TopChatterUser } from "../types/";
+import { LeaderboardUserStats, TopChatterUser } from "../types/";
 
 export const statsApi = {
-    /**
-     * Obtiene las estadísticas completas del usuario autenticado
-     */
-    getMyStats: async (): Promise<UserStats> => {
-        const res = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/stats/me`, {
-            method: 'GET',
-            headers: { "Content-Type": "application/json" },
-        });
-
-        if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            throw new Error(errorData.message || 'Error al obtener mis estadísticas');
-        }
-
-        return res.json();
-    },
-
     /**
      * Rankings públicos principales
      */

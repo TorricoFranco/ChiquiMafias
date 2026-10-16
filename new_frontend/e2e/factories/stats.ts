@@ -1,4 +1,4 @@
-import type { GlobalStats, LeaderboardUserStats, TopActiveStreakUser, UserStats } from "@/features/stats/types";
+import type { GlobalStats, LeaderboardUserStats, TopActiveStreakUser } from "@/features/stats/types";
 import type { CheckInResponse } from "@/features/streak/types";
 import { LOCAL_IMAGE, nextId } from "./ids";
 
@@ -9,7 +9,15 @@ export function buildGlobalStats(overrides: Partial<GlobalStats> = {}): GlobalSt
 /** Fila de los rankings de apuestas (`/stats/top-earners`, `top-streaks`, etc.). */
 export function buildLeaderboardEntry(username: string, overrides: Partial<LeaderboardUserStats> = {}): LeaderboardUserStats {
   return {
-    ...buildUserStats({ userId: nextId("user-ranking"), totalCoinsWon: 5000, totalBetsPlaced: 40, totalBetsWon: 22 }),
+    id: nextId("stats"),
+    userId: nextId("user-ranking"),
+    totalBetsPlaced: 40,
+    totalBetsWon: 22,
+    totalCoinsStaked: 0,
+    totalCoinsWon: 5000,
+    highestMultiplier: 0,
+    currentWinStreak: 0,
+    longestWinStreak: 0,
     user: { name: username, username, team: { id: "team-boca", name: "Boca Juniors", badgeUrl: LOCAL_IMAGE } },
     ...overrides,
   };
@@ -17,21 +25,6 @@ export function buildLeaderboardEntry(username: string, overrides: Partial<Leade
 
 export function buildTopActiveStreakUser(username: string, currentStreak: number): TopActiveStreakUser {
   return { id: nextId("user-streak"), username, name: username, currentStreak, team: { badgeUrl: LOCAL_IMAGE } };
-}
-
-export function buildUserStats(overrides: Partial<UserStats> = {}): UserStats {
-  return {
-    id: nextId("stats"),
-    userId: "user-1",
-    totalBetsPlaced: 0,
-    totalBetsWon: 0,
-    totalCoinsStaked: 0,
-    totalCoinsWon: 0,
-    highestMultiplier: 0,
-    currentWinStreak: 0,
-    longestWinStreak: 0,
-    ...overrides,
-  };
 }
 
 export function buildCheckIn(overrides: Partial<CheckInResponse> = {}): CheckInResponse {
