@@ -57,8 +57,17 @@ export const TicketActive = () => {
         }
     };
 
+    const oddsWarning = (
+        <div className="flex items-start gap-1.5 text-[11px] leading-snug text-[#ffb4ab] bg-[#ffb4ab]/10 p-2 rounded-lg border border-[#ffb4ab]/20">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+            <p>
+                <span className="font-bold uppercase">Aviso:</span> las cuotas no son fijas. Se calculan con el pozo, así que pueden cambiar mientras se apuesta, y el pago final depende del pozo al cerrar el mercado. Las cifras de arriba son una estimación.
+            </p>
+        </div>
+    );
+
     const renderContent = (isMobile = false) => (
-        <aside aria-label="Mi ticket" className={`w-full flex-shrink-0 bg-[#1c1b1b] border-[#353534] flex flex-col overflow-hidden ${isMobile ? 'border-none rounded-none h-full' : 'border rounded-xl max-h-[calc(100vh-220px)]'
+        <aside aria-label="Mi ticket" className={`w-full flex-shrink-0 bg-[#1c1b1b] border-[#353534] flex flex-col overflow-hidden ${isMobile ? 'border-none rounded-none h-full' : 'border rounded-xl h-[calc(100vh-220px)]'
             }`}>
             <div className="bg-[#131313] px-3 py-2.5 border-b border-[#353534] flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-[#e5e2e1] font-bold text-xs tracking-wider uppercase">
@@ -187,6 +196,8 @@ export const TicketActive = () => {
                     </div>
                 </div>
 
+                {isMobile && ticketItems.length > 0 && oddsWarning}
+
                 {!hasEnoughCoins && ticketItems.length > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px] text-[#ffb4ab] bg-[#ffb4ab]/10 p-2 rounded-lg border border-[#ffb4ab]/20">
                         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -200,7 +211,15 @@ export const TicketActive = () => {
                     </div>
                 )}
 
-                <button
+                <div className="relative group">
+                    {!isMobile && ticketItems.length > 0 && (
+                        <div className="absolute bottom-full left-0 right-0 pb-2 opacity-0 pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+                            <div className="bg-[#1c1b1b] rounded-lg shadow-[0_-8px_24px_rgba(0,0,0,0.5)]">
+                                {oddsWarning}
+                            </div>
+                        </div>
+                    )}
+                    <button
                     onClick={handleConfirmBets}
                     aria-label={isSubmitting ? undefined : `Confirmar (${totalBet})`}
                     disabled={ticketItems.length === 0 || !hasEnoughCoins || totalBet <= 0 || isSubmitting}
@@ -220,7 +239,8 @@ export const TicketActive = () => {
                             <span>{totalBet})</span>
                         </span>
                     )}
-                </button>
+                    </button>
+                </div>
             </div>
         </aside>
     );
