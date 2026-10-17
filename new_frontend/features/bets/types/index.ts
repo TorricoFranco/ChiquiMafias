@@ -20,6 +20,8 @@ export interface MarketOption {
   currentOdds?: number;
   initialProb?: number;
   totalStaked: number;
+  /** Id del escudo del club de la opción (`/escudos-api/<id>.webp`). Null o ausente: sin escudo. */
+  logoUrl?: string | null;
 }
 
 export interface Market {
@@ -59,6 +61,7 @@ export interface MarketOptionEntity {
   initialProb: number;
   totalStaked: number;
   currentOdds?: number;
+  logoUrl?: string | null;
 }
 
 export interface AdminMarket {
@@ -85,5 +88,5 @@ export interface CreateMarketPayload {
   metadata?: MarketMetadata;
   fixtureId?: number;
   closesAt: string;
-  options: { name: string; initialProb: number }[];
+  options: { name: string; initialProb: number; logoUrl?: string }[];
 }

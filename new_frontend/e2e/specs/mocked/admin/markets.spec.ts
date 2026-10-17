@@ -6,7 +6,7 @@ import { mockAdminPanel } from "../../../support/admin";
 /** Como el ValidationPipe del backend (forbidNonWhitelisted): rechaza campos que el DTO no declara. */
 function validateCreateMarket(req: MockRequest) {
   const body = req.body as { options: Record<string, unknown>[] };
-  const extra = body.options.flatMap((option) => Object.keys(option).filter((key) => !["name", "initialProb"].includes(key)));
+  const extra = body.options.flatMap((option) => Object.keys(option).filter((key) => !["name", "initialProb", "logoUrl"].includes(key)));
   if (extra.length > 0) {
     return { status: 400, body: { statusCode: 400, message: extra.map((key) => `property ${key} should not exist`) } };
   }
@@ -46,7 +46,7 @@ test.describe("Admin: mercados de apuestas", () => {
     });
   });
 
-  test("un mercado de partido con clubes manda los escudos en metadata y opciones válidas", { tag: "@p0" }, async ({ app, page, api }) => {
+  test("un mercado de partido manda el escudo de cada opción y no metadata", { tag: "@p0" }, async ({ app, page, api }) => {
     api.handle("POST", "/bets/admin/markets", validateCreateMarket);
 
     await app.open();
@@ -67,17 +67,44 @@ test.describe("Admin: mercados de apuestas", () => {
     await modal.getByRole("button", { name: "Crear Mercado" }).click();
 
     await expect(page.getByText("Mercado creado y publicado exitosamente")).toBeVisible();
-    expect(api.lastRequest("POST", "/bets/admin/markets")?.body).toMatchObject({
+    const body = api.lastRequest("POST", "/bets/admin/markets")?.body as Record<string, unknown>;
+    expect(body).toMatchObject({
       type: "MATCH",
-      metadata: {
-        homeTeam: { name: "Boca Juniors", short: "BOC", logoUrl: "451" },
-        awayTeam: { name: "River Plate", short: "RIV", logoUrl: "435" },
-      },
       options: [
-        { name: "Boca Juniors", initialProb: 33 },
+        { name: "Boca Juniors", initialProb: 33, logoUrl: "451" },
         { name: "Empate", initialProb: 34 },
-        { name: "River Plate", initialProb: 33 },
+        { name: "River Plate", initialProb: 33, logoUrl: "435" },
       ],
+    });
+    expect(body).not.toHaveProperty("metadata");
+  });
+
+  // Elegir el club no puede pisar el nombre que escribió el admin (por ejemplo, un jugador).
+  test("elegir un club no pisa el nombre que se escribió en la opción", { tag: "@p0" }, async ({ app, page, api }) => {
+    api.handle("POST", "/bets/admin/markets", validateCreateMarket);
+
+    await app.open();
+    await app.goToSection("Admin");
+    await page.getByRole("tab", { name: /Apuestas/ }).click();
+    await page.getByRole("button", { name: "Crear Mercado Manual" }).click();
+    const modal = page.getByRole("dialog", { name: "Crear Mercado de Apuestas" });
+    await modal.getByLabel("Título del Mercado *").fill("¿Quién marca primero?");
+    await modal.getByLabel("Tipo de Mercado").selectOption("MATCH");
+    await modal.getByRole("textbox", { name: "Opción 1" }).fill("Ronaldo Martinez");
+
+    await modal.getByRole("button", { name: "Asignar club a la opción 1" }).click();
+    const picker = page.getByRole("dialog", { name: "Elegí un Club" });
+    await picker.getByRole("textbox", { name: "Buscar club" }).fill("Vélez");
+    await picker.getByRole("button", { name: "Vélez Sarsfield" }).click();
+    await expect(picker).toBeHidden();
+
+    await expect(modal.getByRole("textbox", { name: "Opción 1" })).toHaveValue("Ronaldo Martinez");
+    await expect(modal.getByRole("button", { name: "Quitar escudo de la opción 1" })).toBeVisible();
+    await modal.getByRole("button", { name: "Crear Mercado" }).click();
+
+    await expect(page.getByText("Mercado creado y publicado exitosamente")).toBeVisible();
+    expect(api.lastRequest("POST", "/bets/admin/markets")?.body).toMatchObject({
+      options: [{ name: "Ronaldo Martinez", logoUrl: "438" }, { name: "Empate" }, { name: "Visitante" }],
     });
   });
 

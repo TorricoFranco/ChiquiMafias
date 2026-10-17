@@ -5,13 +5,11 @@ export interface OptionTeam {
   name: string;
   /** Id del escudo: se arma `/escudos-api/<logoUrl>.webp`, igual que en la metadata de los mercados. */
   logoUrl: string;
-  /** Sigla del club. Si no viene de la metadata, son las tres primeras letras, como las arma el admin. */
-  short: string;
 }
 
 export interface OptionEntry {
   option: MarketOption;
-  /** Null si la opción no es un club (por ejemplo "Empate"). */
+  /** Null si la opción no tiene escudo (por ejemplo "Empate" o un jugador). */
   team: OptionTeam | null;
 }
 
@@ -27,47 +25,40 @@ const teamIdByName = new Map<string, string>(
 );
 
 /**
- * Escudo de una opción. Busca primero en la metadata (home/away, como la guardan el cron y el admin)
- * y después por nombre en el listado de clubes: las opciones de un mercado con más de dos equipos
- * solo guardan el nombre. Si la opción no es un club, devuelve null.
+ * Escudo de una opción. Primero el que guardó el admin en la opción. Si no tiene, busca un club cuyo
+ * nombre coincida: con la metadata home/away en los mercados automáticos (los del cron, que la arman
+ * con los nombres reales) y con el listado de clubes en el resto. Los manuales no usan la metadata:
+ * el admin la armaba por posición y podía dejar un escudo pegado a un jugador.
  */
-const resolveOptionTeam = (option: MarketOption, metadata?: MarketMetadata | null): OptionTeam | null => {
-  const key = normalizeName(option.name);
+const resolveOptionTeam = (option: MarketOption, market: Market): OptionTeam | null => {
+  if (option.logoUrl) return { name: option.name, logoUrl: option.logoUrl };
 
-  const fromMetadata = [metadata?.homeTeam, metadata?.awayTeam].find(
-    (team) => team && normalizeName(team.name) === key
-  );
-  if (fromMetadata) {
-    return { name: option.name, logoUrl: fromMetadata.logoUrl, short: fromMetadata.short };
+  const key = normalizeName(option.name);
+  if (!market.isManual) {
+    const fromMetadata = [market.metadata?.homeTeam, market.metadata?.awayTeam].find(
+      (team): team is NonNullable<MarketMetadata['homeTeam']> => !!team && normalizeName(team.name) === key
+    );
+    if (fromMetadata) return { name: option.name, logoUrl: fromMetadata.logoUrl };
   }
 
   const logoUrl = teamIdByName.get(key);
-  return logoUrl ? { name: option.name, logoUrl, short: option.name.substring(0, 3).toUpperCase() } : null;
+  return logoUrl ? { name: option.name, logoUrl } : null;
 };
 
 /**
- * Qué dibuja la cabecera de un mercado MATCH, según cuántas opciones son clubes:
- * - tres o más: una fila con un escudo por opción, sin VS (equipos o "Empate" entre medio);
- * - dos (por ejemplo "Boca", "Empate", "River"): el VS entre esos dos escudos;
- * - menos de dos: el VS con home/away de la metadata, si la hay (opciones renombradas a mano).
+ * Qué dibuja la cabecera de un mercado MATCH, según cuántas opciones tienen escudo:
+ * - tres o más: una fila con un escudo por opción, sin VS (las opciones sin escudo muestran un ícono);
+ * - dos: el VS entre esos dos escudos, con el nombre de cada opción debajo;
+ * - menos de dos: no hay cabecera.
  */
 export const getMatchHeader = (market: Market): MatchHeaderData | null => {
   const entries: OptionEntry[] = (market.options ?? []).map((option) => ({
     option,
-    team: resolveOptionTeam(option, market.metadata),
+    team: resolveOptionTeam(option, market),
   }));
-  const clubs = entries.flatMap((entry) => (entry.team ? [entry.team] : []));
+  const withTeam = entries.flatMap((entry) => (entry.team ? [entry.team] : []));
 
-  if (clubs.length >= 3) return { kind: 'row', entries };
-  if (clubs.length === 2) return { kind: 'versus', home: clubs[0], away: clubs[1] };
-
-  const homeTeam = market.metadata?.homeTeam;
-  const awayTeam = market.metadata?.awayTeam;
-  if (!homeTeam || !awayTeam) return null;
-
-  return {
-    kind: 'versus',
-    home: { name: homeTeam.name, logoUrl: homeTeam.logoUrl, short: homeTeam.short },
-    away: { name: awayTeam.name, logoUrl: awayTeam.logoUrl, short: awayTeam.short },
-  };
+  if (withTeam.length >= 3) return { kind: 'row', entries };
+  if (withTeam.length === 2) return { kind: 'versus', home: withTeam[0], away: withTeam[1] };
+  return null;
 };

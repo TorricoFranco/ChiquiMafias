@@ -1,5 +1,5 @@
 import { expect, test } from "../../../fixtures/test";
-import { buildMatchMarket, buildOption } from "../../../factories/bets";
+import { buildMarket, buildMatchMarket, buildOption } from "../../../factories/bets";
 import { BetsPage } from "../../../pages/bets-page";
 
 test.describe("Cabecera de partidos con escudos", () => {
@@ -73,6 +73,60 @@ test.describe("Cabecera de partidos con escudos", () => {
     await expect(card.getByRole("img")).toHaveCount(2);
     await expect(card.getByRole("img", { name: "Boca Juniors", exact: true })).toBeVisible();
     await expect(card.getByRole("img", { name: "River Plate", exact: true })).toBeVisible();
+  });
+
+  test("un mercado manual muestra el escudo que tiene cada opción, aunque el nombre no sea un club", { tag: "@p0" }, async ({ app, page, api }) => {
+    const market = buildMarket({
+      title: "¿Quién marca primero?",
+      type: "MATCH",
+      isManual: true,
+      options: [
+        buildOption({ name: "Ronaldo Martinez", logoUrl: "435" }),
+        buildOption({ name: "Álex Arce", logoUrl: "436" }),
+        buildOption({ name: "Junior Marabel", logoUrl: "453" }),
+        buildOption({ name: "Huracán" }),
+      ],
+    });
+    api.on("GET", "/bets/markets", [market]);
+    const bets = new BetsPage(page);
+
+    await app.open();
+    await app.goToSection("Apuestas");
+    const card = bets.market(market.title);
+
+    await expect(card.getByRole("img", { name: "Ronaldo Martinez", exact: true })).toHaveAttribute("src", "/escudos-api/435.webp");
+    await expect(card.getByRole("img", { name: "Junior Marabel", exact: true })).toHaveAttribute("src", "/escudos-api/453.webp");
+    await expect(card.getByRole("img")).toHaveCount(4);
+    await expect(card.getByText("VS", { exact: true })).toHaveCount(0);
+  });
+
+  // Un mercado manual viejo con la metadata que armaba el admin por posición: los jugadores no tienen escudo.
+  test("un mercado manual con metadata de clubes no pinta escudos sobre jugadores", { tag: "@p0" }, async ({ app, page, api }) => {
+    const market = buildMarket({
+      title: "¿Qué jugador marcará primero?",
+      type: "MATCH",
+      isManual: true,
+      metadata: {
+        homeTeam: { name: "Ronaldo Martinez", short: "RON", logoUrl: "438" },
+        awayTeam: { name: "Huracán", short: "HUR", logoUrl: "445" },
+      },
+      options: [
+        buildOption({ name: "Ronaldo Martinez" }),
+        buildOption({ name: "Álex Arce" }),
+        buildOption({ name: "Huracán" }),
+        buildOption({ name: "Junior Marabel" }),
+      ],
+    });
+    api.on("GET", "/bets/markets", [market]);
+    const bets = new BetsPage(page);
+
+    await app.open();
+    await app.goToSection("Apuestas");
+    const card = bets.market(market.title);
+
+    await expect(card.getByRole("button", { name: /^Ronaldo Martinez / })).toBeVisible();
+    await expect(card.getByRole("img")).toHaveCount(0);
+    await expect(card.getByText("VS", { exact: true })).toHaveCount(0);
   });
 
   test("con dos opciones sigue mostrando el VS entre los dos escudos", { tag: "@p0" }, async ({ app, page, api }) => {

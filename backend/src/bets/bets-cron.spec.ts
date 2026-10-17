@@ -12,11 +12,13 @@ describe('BetsCronService', () => {
   const mockPrisma = {
     $transaction: jest.fn(),
     market: {
+      create: jest.fn(),
       findMany: jest.fn(),
       updateMany: jest.fn(),
     },
     matches: {
       findMany: jest.fn(),
+      update: jest.fn(),
     },
   }
 
@@ -79,6 +81,32 @@ describe('BetsCronService', () => {
     service = module.get<BetsCronService>(BetsCronService)
 
     jest.clearAllMocks()
+  })
+
+  describe('handleMarketAutoCreation', () => {
+    it('Debe guardar el escudo de local y visitante en sus opciones, y ninguno en el empate', async () => {
+      mockPrisma.matches.findMany.mockResolvedValue([
+        {
+          id: 'match-row-1',
+          api_fixture_id: 1001,
+          date: new Date(Date.now() + 2 * 60 * 60 * 1000),
+          home_team: { name: 'Boca Juniors', short_code: 'BOC', api_team_id: 451 },
+          away_team: { name: 'River Plate', short_code: 'RIV', api_team_id: 435 },
+        },
+      ])
+      mockPrisma.$transaction.mockImplementationOnce(async (cb: (tx: unknown) => unknown) => cb(mockPrisma))
+      mockPrisma.market.create.mockResolvedValue({ id: 'market-1', options: [] })
+
+      await service.handleMarketAutoCreation()
+
+      const created = mockPrisma.market.create.mock.calls[0][0].data.options.create
+      expect(created).toEqual([
+        { name: 'Boca Juniors', initialProb: 33, logoUrl: '451' },
+        { name: 'Empate', initialProb: 34 },
+        { name: 'River Plate', initialProb: 33, logoUrl: '435' },
+      ])
+      expect(created[1]).not.toHaveProperty('logoUrl')
+    })
   })
 
   describe('handleMarketLocking', () => {

@@ -155,6 +155,7 @@ export class BetsService {
             name: opt.name,
             initialProb: opt.initialProb,
             totalStaked: 0,
+            logoUrl: opt.logoUrl ?? null,
           })),
         },
       },

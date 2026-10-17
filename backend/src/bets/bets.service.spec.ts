@@ -8,6 +8,7 @@ import { RedisService } from '../redis/redis.service'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { getQueueToken } from '@nestjs/bullmq'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { CreateMarketDto } from './dto/create-market.dto'
 
 describe('BetsService', () => {
   let service: BetsService
@@ -19,6 +20,7 @@ describe('BetsService', () => {
       return callback(mockPrisma)
     }),
     market: {
+      create: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -47,6 +49,7 @@ describe('BetsService', () => {
   }
 
   const mockBetsGateway = {
+    emitMarketCreated: jest.fn(),
     emitMarketStatusChange: jest.fn(),
     emitPoolUpdate: jest.fn(),
   }
@@ -97,6 +100,41 @@ describe('BetsService', () => {
     prisma = module.get<PrismaService>(PrismaService)
 
     jest.clearAllMocks()
+  })
+
+  describe('createManualMarket', () => {
+    it('Debe guardar el escudo de cada opción tal como lo mandó el admin, y null cuando no viene', async () => {
+      mockPrisma.market.create.mockResolvedValue({
+        id: 'market-1',
+        title: 'Quién queda mejor posicionado',
+        type: 'MATCH',
+        status: 'OPEN',
+        closesAt: new Date('2026-11-01T20:00:00.000Z'),
+        options: [
+          { id: 'opt-1', name: 'Ronaldo Martinez', initialProb: 25, totalStaked: 0, logoUrl: '435' },
+          { id: 'opt-2', name: 'Huracán', initialProb: 25, totalStaked: 0, logoUrl: '445' },
+          { id: 'opt-3', name: 'Empate', initialProb: 50, totalStaked: 0, logoUrl: null },
+        ],
+      })
+
+      await service.createManualMarket({
+        title: 'Quién queda mejor posicionado',
+        type: 'MATCH',
+        closesAt: '2026-11-01T20:00:00.000Z',
+        options: [
+          { name: 'Ronaldo Martinez', initialProb: 25, logoUrl: '435' },
+          { name: 'Huracán', initialProb: 25, logoUrl: '445' },
+          { name: 'Empate', initialProb: 50 },
+        ],
+      } as CreateMarketDto)
+
+      const created = mockPrisma.market.create.mock.calls[0][0].data.options.create
+      expect(created).toEqual([
+        { name: 'Ronaldo Martinez', initialProb: 25, totalStaked: 0, logoUrl: '435' },
+        { name: 'Huracán', initialProb: 25, totalStaked: 0, logoUrl: '445' },
+        { name: 'Empate', initialProb: 50, totalStaked: 0, logoUrl: null },
+      ])
+    })
   })
 
   // suite de settleMarket
