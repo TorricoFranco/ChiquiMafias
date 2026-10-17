@@ -4,7 +4,9 @@ import React, { useEffect, useState } from "react";
 import { Sparkles, PlusCircle } from "lucide-react";
 import { useActivePolls } from "@/features/polls/hooks/usePolls";
 import { PollCard } from "./PollCard";
+import { PollCardSkeleton } from "./PollCardSkeleton";
 import { CreatePollModal } from "./CreatePollModal";
+import { LoadErrorState } from "@/components/ui/LoadErrorState";
 import { useUserInventory } from "@/features/inventory/hooks/useInventory";
 import { POLL_FILTER_GROUPS } from "@/features/polls/constants/pollTypes";
 import { useNavigationStore } from "@/store/useNavigationStore";
@@ -12,7 +14,9 @@ import { useNavigationStore } from "@/store/useNavigationStore";
 export const SidebarPolls = () => {
     const [activeFilter, setActiveFilter] = useState(POLL_FILTER_GROUPS[0].id);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const { data: activePolls, isLoading, isError, isFetching } = useActivePolls();
+    const { data: activePolls, isLoading, isError, isFetching, refetch } = useActivePolls();
+    // Con datos cacheados de una carga anterior se sigue mostrando la lista, aunque el refetch falle.
+    const hasListError = isError && !activePolls;
 
     const { data: inventory } = useUserInventory();
 
@@ -125,9 +129,22 @@ export const SidebarPolls = () => {
             </div>
 
             <div className="flex flex-col gap-6">
-                {isLoading && <p className="text-[#c6c9ab] text-center py-4">Cargando encuestas de la tribuna...</p>}
-                {isError && <p className="text-red-500 text-center py-4">Hubo un error al cargar las encuestas.</p>}
-                {!isLoading && !isError && visiblePolls?.length === 0 && (
+                {isLoading && (
+                    <div role="status" className="flex flex-col gap-6">
+                        <span className="sr-only">Cargando la tribuna</span>
+                        <PollCardSkeleton />
+                        <PollCardSkeleton />
+                    </div>
+                )}
+                {hasListError && (
+                    <LoadErrorState
+                        title="No pudimos cargar las encuestas"
+                        description="Revisá tu conexión y probá de nuevo."
+                        onRetry={() => refetch()}
+                        isRetrying={isFetching}
+                    />
+                )}
+                {!isLoading && !hasListError && visiblePolls?.length === 0 && (
                     <p className="text-[#c6c9ab] text-center py-4">
                         {activeGroup?.types ? "No hay encuestas de este tipo por ahora." : "No hay encuestas activas en este momento."}
                     </p>

@@ -2,14 +2,17 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { betsApi } from '@/features/bets/api/betsApi';
 import { MarketCard } from './MarketCard';
+import { MarketGridSkeleton } from './MarketGridSkeleton';
 import { Market } from '@/features/bets/types/index';
 import { useBetsSocket } from '../socket/useBetsSocket';
+import { LoadErrorState } from '@/components/ui/LoadErrorState';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export const BetsCards = () => {
   useBetsSocket();
   const [filter, setFilter] = useState<'all' | 'matches' | 'custom'>('all');
 
-  const { data: markets = [], isLoading } = useQuery<Market[]>({
+  const { data: markets = [], isLoading, isError, isFetching, refetch } = useQuery<Market[]>({
     queryKey: ["markets"],
     queryFn: betsApi.getActiveMarkets
   });
@@ -29,7 +32,13 @@ export const BetsCards = () => {
     return markets;
   }, [markets, filter, matches, customBets]);
 
-  if (isLoading) return <div className="text-[#c6c9ab]">Cargando mercados...</div>;
+  // Sin datos, el conteo de cada filtro no es un 0 que parezca real: mientras carga es un bloque que pulsa,
+  // y con error no se muestra.
+  const countBadge = (count: number) => {
+    if (isLoading) return <Skeleton className="inline-block h-3 w-6 ml-1.5 align-middle" />;
+    if (isError && markets.length === 0) return null;
+    return ` (${count})`;
+  };
 
   return (
     <section className="flex flex-col gap-5">
@@ -55,7 +64,7 @@ export const BetsCards = () => {
             : 'bg-[#1c1b1b] border border-[#353534] text-[#c6c9ab] hover:text-[#e5e2e1]'
             }`}
         >
-          Todos ({markets.length})
+          Todos{countBadge(markets.length)}
         </button>
         <button
           onClick={() => setFilter('matches')}
@@ -65,7 +74,7 @@ export const BetsCards = () => {
             }`}
         >
           <span aria-hidden="true" className="material-symbols-outlined text-base">sports_soccer</span>
-          Partidos ({matches.length})
+          Partidos{countBadge(matches.length)}
         </button>
         <button
           onClick={() => setFilter('custom')}
@@ -75,11 +84,20 @@ export const BetsCards = () => {
             }`}
         >
           <span aria-hidden="true" className="material-symbols-outlined text-base">emoji_events</span>
-          Especiales ({customBets.length})
+          Especiales{countBadge(customBets.length)}
         </button>
       </div>
 
-      {filteredMarkets.length === 0 ? (
+      {isLoading ? (
+        <MarketGridSkeleton />
+      ) : isError && markets.length === 0 ? (
+        <LoadErrorState
+          title="No pudimos cargar los mercados"
+          description="Revisá tu conexión y probá de nuevo."
+          onRetry={() => refetch()}
+          isRetrying={isFetching}
+        />
+      ) : filteredMarkets.length === 0 ? (
         <div className="text-center py-10 text-sm text-[#909378] bg-[#1c1b1b] rounded-xl border border-[#353534]">
           No hay mercados abiertos en esta categoría por ahora.
         </div>
