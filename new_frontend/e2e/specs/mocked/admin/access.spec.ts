@@ -22,20 +22,34 @@ test.describe("Acceso al panel de administración", () => {
     await expect(page.getByRole("tab", { name: /Soporte/ })).toBeEnabled();
     await expect(page.getByRole("tab", { name: /Apuestas/ })).toBeDisabled();
     await expect(page.getByRole("tab", { name: /Usuarios/ })).toBeDisabled();
+    await expect(page.getByRole("tab", { name: /Precios/ })).toBeDisabled();
     await expect(page.getByRole("tab", { name: /Apuestas/ })).toContainText("Solo Admin");
   });
 
-  for (const role of ["ADMIN", "PRESIDENT"] as const) {
-    test(`un ${role} tiene todas las secciones habilitadas`, async ({ app, page, api, session }) => {
-      session.loginAs(role);
-      mockAdminPanel(api);
+  test("un admin entra a todo menos precios", { tag: "@p0" }, async ({ app, page, api, session }) => {
+    session.loginAs("ADMIN");
+    mockAdminPanel(api);
 
-      await app.open();
-      await app.goToSection("Admin");
+    await app.open();
+    await app.goToSection("Admin");
 
-      for (const tab of [/Encuestas/, /Apuestas/, /Soporte/, /Usuarios/]) {
-        await expect(page.getByRole("tab", { name: tab })).toBeEnabled();
-      }
-    });
-  }
+    for (const tab of [/Encuestas/, /Apuestas/, /Soporte/, /Usuarios/]) {
+      await expect(page.getByRole("tab", { name: tab })).toBeEnabled();
+    }
+
+    await expect(page.getByRole("tab", { name: /Precios/ })).toBeDisabled();
+    await expect(page.getByRole("tab", { name: /Precios/ })).toContainText("Solo Presidente");
+  });
+
+  test("el presidente tiene todas las secciones habilitadas", async ({ app, page, api, session }) => {
+    session.loginAs("PRESIDENT");
+    mockAdminPanel(api);
+
+    await app.open();
+    await app.goToSection("Admin");
+
+    for (const tab of [/Encuestas/, /Apuestas/, /Soporte/, /Usuarios/, /Precios/]) {
+      await expect(page.getByRole("tab", { name: tab })).toBeEnabled();
+    }
+  });
 });

@@ -37,6 +37,7 @@ import { EmailModule } from './email/email.module'
 import { WebhookModule } from './webhook/webhook.module'
 import { CoinShopModule } from './coin-shop/coin-shop.module'
 import { StatsModule } from './stats/stats.module'
+import { PricingModule } from './pricing/pricing.module'
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { StatsModule } from './stats/stats.module'
     WebhookModule,
     CoinShopModule,
     StatsModule,
+    PricingModule,
   ],
   controllers: [AppController],
   providers: [

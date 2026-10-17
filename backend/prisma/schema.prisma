@@ -463,6 +463,8 @@ model User {
   pollReactions    PollReaction[]
   commentReactions CommentReaction[]
   coinOrders       CoinOrder[]
+  /// Cambios de precio que aplicó como presidente.
+  priceChanges     PriceChangeLog[]  @relation("PriceChanges")
 
   @@map("users")
 }
@@ -825,6 +827,45 @@ model StoreDiscount {
   createdAt DateTime @default(now())
 
   @@index([startDate, endDate])
+}
+
+/// Qué tipo de precio se cambió. `entityId` apunta a CoinPack, StoreItem o SubscriptionPlan.
+enum PricedEntity {
+  COIN_PACK
+  STORE_ITEM
+  SUBSCRIPTION_PLAN
+}
+
+/// En qué se expresa el precio: ARS para packs y planes, COINS para ítems de la tienda.
+enum PriceCurrency {
+  ARS
+  COINS
+}
+
+/// Auditoría de cambios de precio. Solo el PRESIDENT genera filas acá.
+/// Append-only: la app nunca la actualiza ni la borra.
+model PriceChangeLog {
+  id         String       @id @default(uuid())
+  entity     PricedEntity
+  entityId   String
+  /// Nombre de la entidad al momento del cambio: el ítem puede renombrarse o borrarse.
+  entityName String
+
+  oldPrice Float
+  newPrice Float
+  currency PriceCurrency
+
+  changedById       String?
+  changedBy         User?   @relation("PriceChanges", fields: [changedById], references: [id], onDelete: SetNull)
+  /// Snapshot del autor, para que el historial siga siendo legible si se borra el usuario.
+  changedByUsername String
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([entity, entityId])
+  @@index([changedById])
+  @@map("price_change_logs")
 }
 
 model UserInventory {

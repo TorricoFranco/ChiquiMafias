@@ -2,12 +2,17 @@ import { readdirSync } from 'fs'
 import { join } from 'path'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
 import { IS_PUBLIC_KEY } from './decorators/auth.decorator'
+import {
+  PRICE_FIELDS_KEY,
+  PriceFieldsConfig,
+} from './decorators/price-fields.decorator'
 import { ROLES_KEY } from './decorators/roles.decorator'
 import { TIERS_KEY } from './decorators/tiers.decorator'
+import { PriceFieldsGuard } from './guards/price-fields.guard'
 import { RolesGuard } from './guards/roles.guard'
 import { TiersGuard } from './guards/tiers.guard'
 
-// @Roles y @RequireTier son solo metadata: sin su guard no restringen nada.
+// @Roles, @RequireTier y @PriceFields son solo metadata: sin su guard no restringen nada.
 // Y con @Public() no hay request.user, así que RolesGuard rechaza siempre.
 // Este test recorre todos los controllers y gateways y falla en esos casos.
 
@@ -45,6 +50,9 @@ const findViolations = () => {
         const tier =
           getMetadata<string>(TIERS_KEY, handler) ??
           getMetadata<string>(TIERS_KEY, cls)
+        const priceFields =
+          getMetadata<PriceFieldsConfig>(PRICE_FIELDS_KEY, handler) ??
+          getMetadata<PriceFieldsConfig>(PRICE_FIELDS_KEY, cls)
 
         const isPublic =
           getMetadata<boolean>(IS_PUBLIC_KEY, handler) ??
@@ -59,6 +67,11 @@ const findViolations = () => {
         if (tier && !guards.includes(TiersGuard)) {
           violations.push(`${file} → ${name}: @RequireTier sin TiersGuard`)
         }
+        if (priceFields && !guards.includes(PriceFieldsGuard)) {
+          violations.push(
+            `${file} → ${name}: @PriceFields sin PriceFieldsGuard`,
+          )
+        }
       }
     }
   }
@@ -66,12 +79,12 @@ const findViolations = () => {
   return violations
 }
 
-describe('Cobertura de RolesGuard y TiersGuard', () => {
+describe('Cobertura de RolesGuard, TiersGuard y PriceFieldsGuard', () => {
   it('Debe encontrar controllers y gateways para revisar', () => {
     expect(targetFiles.length).toBeGreaterThan(0)
   })
 
-  it('Cada @Roles y @RequireTier debe tener su guard y no ser @Public()', () => {
+  it('Cada @Roles, @RequireTier y @PriceFields debe tener su guard y no ser @Public()', () => {
     expect(findViolations()).toEqual([])
   })
 })

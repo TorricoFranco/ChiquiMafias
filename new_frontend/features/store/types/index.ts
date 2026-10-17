@@ -1,4 +1,5 @@
-export type StoreItemType = 'NAME_COLOR' | 'BANNER' | 'STICKER_PACK' | 'MEGAPHONE' | 'CUSTOM_POLL' | 'CHAT_BUBBLE';
+// Espejo del enum ItemType de Prisma (backend/prisma/schema.prisma).
+export type StoreItemType = 'NAME_COLOR' | 'BANNER' | 'STICKER_PACK' | 'MEGAPHONE' | 'CUSTOM_POLL' | 'CHAT_BUBBLE' | 'BUFF';
 
 
 export interface StoreItem {

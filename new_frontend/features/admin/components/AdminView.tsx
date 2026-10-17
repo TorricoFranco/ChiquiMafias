@@ -8,23 +8,28 @@ import {
   LifeBuoy,
   Users,
   Lock,
+  Tag,
 } from 'lucide-react';
 
 import { AdminPolls } from '@/features/polls/components/AdminPolls';
 import { AdminBets } from '@/features/bets/components/AdminBets';
 import { AdminSupport } from '@/features/supports/components/AdminSupport';
 import { AdminUsers } from '@/features/users/components/AdminUsers';
+import { AdminPricing } from './AdminPricing';
 import { useAdminStats } from '@/features/users/hooks/useUsers';
 import { useUserStore } from '@/store/useUserStore';
 
+type AdminTabId = 'polls' | 'bets' | 'support' | 'users' | 'pricing';
+
 export const AdminView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'polls' | 'bets' | 'support' | 'users'>('polls');
+  const [activeTab, setActiveTab] = useState<AdminTabId>('polls');
 
   const { data: stats } = useAdminStats();
 
   const userRole = useUserStore((state) => state.role);
 
   const isSuperAdmin = userRole === 'ADMIN' || userRole === 'PRESIDENT';
+  const isPresident = userRole === 'PRESIDENT';
 
   const metrics = {
     pendingPolls: stats?.pendingPolls || 0,
@@ -33,7 +38,16 @@ export const AdminView: React.FC = () => {
     onlineUsers: stats?.onlineUsers || 0,
   };
 
-  const TABS = [
+  const TABS: {
+    id: AdminTabId;
+    label: string;
+    sub: string;
+    icon: React.ElementType;
+    badge?: string;
+    badgeColor: string;
+    requiresSuperAdmin: boolean;
+    requiresPresident: boolean;
+  }[] = [
     {
       id: 'polls',
       label: '1. Encuestas',
@@ -42,6 +56,7 @@ export const AdminView: React.FC = () => {
       badge: metrics.pendingPolls > 0 ? `${metrics.pendingPolls} PEND` : undefined,
       badgeColor: 'bg-amber-500 text-black',
       requiresSuperAdmin: false,
+      requiresPresident: false,
     },
     {
       id: 'bets',
@@ -51,6 +66,7 @@ export const AdminView: React.FC = () => {
       badge: `${metrics.openMarkets} OPEN`,
       badgeColor: 'bg-[#d2f000] text-[#191e00]',
       requiresSuperAdmin: true,
+      requiresPresident: false,
     },
     {
       id: 'support',
@@ -60,6 +76,7 @@ export const AdminView: React.FC = () => {
       badge: metrics.openTickets > 0 ? `${metrics.openTickets} URG` : undefined,
       badgeColor: 'bg-red-500 text-white',
       requiresSuperAdmin: false,
+      requiresPresident: false,
     },
     {
       id: 'users',
@@ -69,6 +86,16 @@ export const AdminView: React.FC = () => {
       badge: `${metrics.onlineUsers} ON`,
       badgeColor: 'bg-emerald-500 text-black',
       requiresSuperAdmin: true,
+      requiresPresident: false,
+    },
+    {
+      id: 'pricing',
+      label: '5. Precios',
+      sub: 'ChiquiCoins, Tienda & Subs',
+      icon: Tag,
+      badgeColor: 'bg-[#d2f000] text-[#191e00]',
+      requiresSuperAdmin: false,
+      requiresPresident: true,
     },
   ];
 
@@ -94,7 +121,7 @@ export const AdminView: React.FC = () => {
                 PANEL DE ADMINISTRACIÓN Y CONTROL
               </h1>
               <p className="text-xs text-[#c6c9ab] mt-0.5">
-                Módulo para moderación de encuestas, control de apuestas, atención de tickets y roles.
+                Módulo para moderación de encuestas, control de apuestas, atención de tickets, roles y precios.
               </p>
             </div>
           </div>
@@ -128,12 +155,14 @@ export const AdminView: React.FC = () => {
         </div>
       </div>
 
-      <div role="tablist" aria-label="Secciones de administración" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div role="tablist" aria-label="Secciones de administración" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
 
-          const isLocked = tab.requiresSuperAdmin && !isSuperAdmin;
+          const isLocked =
+            (tab.requiresSuperAdmin && !isSuperAdmin) ||
+            (tab.requiresPresident && !isPresident);
 
           return (
             <button
@@ -141,7 +170,7 @@ export const AdminView: React.FC = () => {
               role="tab"
               aria-selected={isActive}
               onClick={() => {
-                if (!isLocked) setActiveTab(tab.id as 'polls' | 'bets' | 'support' | 'users');
+                if (!isLocked) setActiveTab(tab.id);
               }}
               disabled={isLocked}
               className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 relative overflow-hidden ${isLocked
@@ -165,7 +194,7 @@ export const AdminView: React.FC = () => {
 
                 {isLocked ? (
                   <span className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20">
-                    Solo Admin
+                    {tab.requiresPresident ? 'Solo Presidente' : 'Solo Admin'}
                   </span>
                 ) : tab.badge && (
                   <span
@@ -209,6 +238,7 @@ export const AdminView: React.FC = () => {
         {activeTab === 'bets' && isSuperAdmin && <AdminBets />}
         {activeTab === 'support' && <AdminSupport />}
         {activeTab === 'users' && isSuperAdmin && <AdminUsers />}
+        {activeTab === 'pricing' && isPresident && <AdminPricing />}
       </div>
 
     </div>
