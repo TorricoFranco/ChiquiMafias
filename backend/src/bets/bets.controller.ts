@@ -15,6 +15,7 @@ import { SystemRole } from 'src/auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
+import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 
 @ApiTags('Bets (Apuestas)')
 @Controller('bets')
@@ -27,7 +28,9 @@ export class BetsController {
       'Devuelve todos los mercados de apuestas en estado OPEN, con sus opciones y probabilidades actuales (pari-mutuel).',
   })
   @ApiResponse({ status: 200, description: 'Lista de mercados activos.' })
+  // Sin sesión la grilla sigue pública; con token, el guard de estado aplica el ban igual.
   @Get('markets')
+  @OptionalAuth()
   async getMarkets() {
     return this.betsService.getActiveMarkets()
   }
