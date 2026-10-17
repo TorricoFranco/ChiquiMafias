@@ -1,5 +1,14 @@
+import type {
+  PriceChangeLogEntry,
+  PricingActiveDiscount,
+  PricingCoinPack,
+  PricingOverview,
+  PricingStoreItem,
+  PricingSubscriptionPlan,
+} from "@/features/admin/types";
 import type { AdminReport, AdminTicket, PaginatedResponse, TicketMessageEntity } from "@/features/supports/types";
 import type { PaginatedUsersResponse, UserEntity } from "@/features/users/types";
+import { SubscriptionTier } from "@/features/subscriptions/types";
 import { nextId } from "./ids";
 import { buildTicketMessage } from "./support";
 
@@ -63,6 +72,84 @@ export function buildAdminTicketDetails(ticket: AdminTicket, messages: TicketMes
     messages: messages.length
       ? messages
       : [buildTicketMessage({ ticketId: ticket.id, senderId: ticket.userId, message: "Compré un pack y no me llegaron.", sender: { id: ticket.userId, username: ticket.user.username, role: "USER" } })],
+  };
+}
+
+export function buildPricingCoinPack(overrides: Partial<PricingCoinPack> = {}): PricingCoinPack {
+  return {
+    id: nextId("pack"),
+    name: "Pack Hincha",
+    coinsAmount: 1000,
+    bonusCoins: 0,
+    priceARS: 1500,
+    isActive: true,
+    isPopular: false,
+    ...overrides,
+  };
+}
+
+export function buildPricingStoreItem(overrides: Partial<PricingStoreItem> = {}): PricingStoreItem {
+  return {
+    id: nextId("item"),
+    name: "Banner Bombonera",
+    type: "BANNER",
+    assetId: "bombonera",
+    price: 2000,
+    isActive: true,
+    isPurchasable: true,
+    ...overrides,
+  };
+}
+
+export function buildPricingPlan(overrides: Partial<PricingSubscriptionPlan> = {}): PricingSubscriptionPlan {
+  return {
+    id: nextId("plan"),
+    tier: SubscriptionTier.TIER_2,
+    name: "Plateísta",
+    basePriceARS: 4000,
+    isActive: true,
+    ...overrides,
+  };
+}
+
+export function buildPricingDiscount(overrides: Partial<PricingActiveDiscount> = {}): PricingActiveDiscount {
+  return {
+    id: nextId("discount"),
+    name: "Promo de la fecha",
+    percentage: 20,
+    scope: "ALL",
+    targetType: null,
+    targetItemId: null,
+    endDate: "2026-12-31T23:59:59.000Z",
+    ...overrides,
+  };
+}
+
+export function buildPriceChangeLogEntry(overrides: Partial<PriceChangeLogEntry> = {}): PriceChangeLogEntry {
+  return {
+    id: nextId("price-log"),
+    entity: "COIN_PACK",
+    entityId: "pack-1",
+    entityName: "Pack Hincha",
+    oldPrice: 1500,
+    newPrice: 2500,
+    currency: "ARS",
+    changedByUsername: "elpresidente",
+    createdAt: "2026-05-10T12:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** Respuesta de `GET /pricing/admin` (ya desenvuelta del `{ status, message, data }`). */
+export function buildPricingOverview(overrides: Partial<PricingOverview> = {}): PricingOverview {
+  return {
+    coinPacks: [buildPricingCoinPack()],
+    storeItems: [buildPricingStoreItem()],
+    subscriptionPlans: [buildPricingPlan()],
+    activeDiscounts: [],
+    recentChanges: [],
+    coinValueARS: 0.5,
+    ...overrides,
   };
 }
 

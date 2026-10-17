@@ -25,7 +25,9 @@ import { UpdateStoreItemDto } from './dto/update-store-item.dto'
 import { BuyItemDto } from './dto/buy-item.dto'
 import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 import { Roles } from 'src/auth/decorators/roles.decorator'
+import { PriceFields } from 'src/auth/decorators/price-fields.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
+import { PriceFieldsGuard } from 'src/auth/guards/price-fields.guard'
 import { SystemRole } from 'src/auth/enums/roles.enum'
 
 @ApiTags('Store (Tienda de cosméticos)')
@@ -91,15 +93,23 @@ export class StoreController {
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Crear un ítem de la tienda (solo ADMIN)' })
+  @ApiOperation({
+    summary: 'Crear un ítem de la tienda (solo PRESIDENT)',
+    description:
+      'Fija el precio en monedas del ítem, así que es exclusivo del presidente. El resto de los campos de un ítem existente los sigue editando un ADMIN.',
+  })
   @ApiResponse({ status: 201, description: 'Ítem creado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el presidente puede definir precios.',
+  })
   @ApiResponse({
     status: 409,
     description: 'Ya existe un ítem con ese assetId/tipo.',
   })
   @Post('item')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.PRESIDENT)
   async createStoreItem(@Body() dto: CreateStoreItemDto) {
     const item = await this.storeService.createStoreItem(dto)
     return {
@@ -111,13 +121,20 @@ export class StoreController {
 
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Crear varios ítems de la tienda en una sola llamada (solo ADMIN)',
+    summary:
+      'Crear varios ítems de la tienda en una sola llamada (solo PRESIDENT)',
+    description:
+      'Hace upsert, o sea que también reescribe el precio de los ítems que ya existen: es un cambio masivo de precios y por eso queda reservado al presidente.',
   })
   @ApiBody({ type: [CreateStoreItemDto] })
   @ApiResponse({ status: 201, description: 'Resultado del proceso masivo.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el presidente puede definir precios.',
+  })
   @Post('item/bulk')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.PRESIDENT)
   async createStoreItemsBulk(
     @Body(new ParseArrayPipe({ items: CreateStoreItemDto }))
     dtos: CreateStoreItemDto[],
@@ -131,13 +148,22 @@ export class StoreController {
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Actualizar un ítem de la tienda (solo ADMIN)' })
+  @ApiOperation({
+    summary: 'Actualizar un ítem de la tienda (solo ADMIN, sin el precio)',
+    description:
+      'El precio (`price`) **no se cambia acá con ningún rol**: su única vía es `PATCH /pricing/store-items/:id`, que registra el cambio en la auditoría. Mandarlo devuelve 403.',
+  })
   @ApiParam({ name: 'id', description: 'ID del ítem a actualizar' })
   @ApiResponse({ status: 200, description: 'Ítem actualizado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el presidente puede cambiar el precio.',
+  })
   @ApiResponse({ status: 404, description: 'El ítem no existe.' })
   @Patch('item/:id')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, PriceFieldsGuard)
   @Roles(SystemRole.ADMIN)
+  @PriceFields({ blocked: ['price'] })
   async updateStoreItem(
     @Param('id') id: string,
     @Body() dto: UpdateStoreItemDto,
@@ -170,14 +196,18 @@ export class StoreController {
 
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Crear una campaña de descuento para la tienda (solo ADMIN)',
+    summary: 'Crear una campaña de descuento para la tienda (solo PRESIDENT)',
     description:
-      'El descuento aplica entre `startDate` y `endDate` a todos los ítems, a un tipo (`BY_TYPE`) o a un ítem puntual (`SPECIFIC_ITEM`), según `scope`.',
+      'El descuento aplica entre `startDate` y `endDate` a todos los ítems, a un tipo (`BY_TYPE`) o a un ítem puntual (`SPECIFIC_ITEM`), según `scope`. Como baja el precio efectivo hasta un 90%, es un cambio de precio y queda reservado al presidente.',
   })
   @ApiResponse({ status: 201, description: 'Campaña de descuento creada.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el presidente puede cambiar precios.',
+  })
   @Post('discount')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.PRESIDENT)
   async createDiscount(@Body() dto: CreateStoreDiscountDto) {
     const discount = await this.storeService.createDiscount(dto)
     return {

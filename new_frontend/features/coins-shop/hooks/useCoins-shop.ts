@@ -6,7 +6,9 @@ export const useGetCoinPacks = () => {
     return useQuery({
         queryKey: ['coin-packs'],
         queryFn: coinShopApi.getPacks,
-        staleTime: 1000 * 60 * 30,
+        // Corto a propósito: el presidente cambia los precios en caliente desde el
+        // panel y el checkout cobra el precio de la DB, no el que quedó cacheado.
+        staleTime: 1000 * 60,
     });
 };
 

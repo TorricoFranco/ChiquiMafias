@@ -34,7 +34,9 @@ import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 import { SubscriptionCheckoutService } from './subscription-checkout.service'
 import { SubscriptionPricingService } from './domain/subscription-pricing.service'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
+import { PriceFieldsGuard } from 'src/auth/guards/price-fields.guard'
 import { Roles } from 'src/auth/decorators/roles.decorator'
+import { PriceFields } from 'src/auth/decorators/price-fields.decorator'
 import { SystemRole } from '@prisma/client'
 import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto'
 /**
@@ -71,14 +73,26 @@ export class SubscriptionsController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Actualizar la configuración de un plan de suscripción (solo ADMIN)',
+      'Actualizar la configuración de un plan de suscripción (solo ADMIN, sin el precio)',
+    description:
+      'El precio base (`basePriceARS`) **no se cambia acá con ningún rol**: su única vía es `PATCH /pricing/subscription-plans/:id`, que registra el cambio en la auditoría. `storeDiscountPercentage` solo lo puede mandar el PRESIDENT, porque entra en el descuento de la tienda y baja el precio efectivo de cualquier ítem. Cualquier otro caso devuelve 403.',
   })
   @ApiParam({ name: 'id', description: 'ID del plan a actualizar' })
   @ApiResponse({ status: 200, description: 'Plan actualizado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el presidente puede cambiar el precio.',
+  })
   @ApiResponse({ status: 404, description: 'El plan no existe.' })
   @Patch(':id')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, PriceFieldsGuard)
   @Roles(SystemRole.ADMIN)
+  // `storeDiscountPercentage` lo lee `getApplicableDiscount` de la tienda: subirlo
+  // es la misma rebaja que una campaña de descuento, que ya es PRESIDENT-only.
+  @PriceFields({
+    blocked: ['basePriceARS'],
+    presidentOnly: ['storeDiscountPercentage'],
+  })
   async updatePlan(
     @Param('id') id: string,
     @Body() dto: UpdateSubscriptionPlanDto,

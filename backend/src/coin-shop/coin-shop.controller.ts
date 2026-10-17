@@ -19,7 +19,9 @@ import { CoinShopService } from './coin-shop.service'
 import { GetUser } from '../auth/decorators/get-user.decorator'
 import { OptionalAuth } from '../auth/decorators/auth.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { PriceFields } from '../auth/decorators/price-fields.decorator'
 import { RolesGuard } from '../auth/guards/roles.guard'
+import { PriceFieldsGuard } from '../auth/guards/price-fields.guard'
 import { SystemRole } from '../auth/enums/roles.enum'
 import { CreatePackDto } from './dto/create-pack.dto'
 import { UpdatePackDto } from './dto/update-pack.dto'
@@ -82,11 +84,19 @@ export class CoinShopController {
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Crear un pack de monedas (solo ADMIN)' })
+  @ApiOperation({
+    summary: 'Crear un pack de monedas (solo PRESIDENT)',
+    description:
+      'Fija el precio en pesos del pack, así que es exclusivo del presidente. El resto de los campos de un pack existente los sigue editando un ADMIN.',
+  })
   @ApiResponse({ status: 201, description: 'Pack creado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el presidente puede definir precios.',
+  })
   @Post('admin/packs')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.PRESIDENT)
   async createPack(@Body() dto: CreatePackDto) {
     const pack = await this.coinShopService.createPack(dto)
     return {
@@ -97,13 +107,27 @@ export class CoinShopController {
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Actualizar un pack de monedas (solo ADMIN)' })
+  @ApiOperation({
+    summary: 'Actualizar un pack de monedas (solo ADMIN, sin el precio)',
+    description:
+      'El precio (`priceARS`) **no se cambia acá con ningún rol**: su única vía es `PATCH /pricing/coin-packs/:id`, que registra el cambio en la auditoría. `coinsAmount` y `bonusCoins` solo los puede mandar el PRESIDENT, porque definen cuántas monedas se entregan por peso. Cualquier otro caso devuelve 403.',
+  })
   @ApiParam({ name: 'id', description: 'ID del pack a actualizar' })
   @ApiResponse({ status: 200, description: 'Pack actualizado.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el presidente puede cambiar el precio.',
+  })
   @ApiResponse({ status: 404, description: 'El pack no existe.' })
   @Patch('admin/packs/:id')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, PriceFieldsGuard)
   @Roles(SystemRole.ADMIN)
+  // `coinsAmount` y `bonusCoins` son el precio de la moneda en pesos: subirlos
+  // equivale a bajar el precio, y `updatePack` escribe el DTO completo.
+  @PriceFields({
+    blocked: ['priceARS'],
+    presidentOnly: ['coinsAmount', 'bonusCoins'],
+  })
   async updatePack(@Param('id') id: string, @Body() dto: UpdatePackDto) {
     const pack = await this.coinShopService.updatePack(id, dto)
     return {
