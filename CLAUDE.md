@@ -12,7 +12,6 @@ Plataforma de fútbol argentino: datos en vivo, chat, encuestas, apuestas virtua
 | `backend/` | API NestJS 11 + Prisma 6 + Redis + BullMQ + Socket.IO | activo | `backend/CLAUDE.md` |
 | `new_frontend/` | Next.js 16.2 + React 19.2 (App Router) | **frontend activo** | `new_frontend/CLAUDE.md` |
 | `discord-bot/` | Express 5 + discord.js 14 (backoffice de soporte y moderación) | activo | `discord-bot/CLAUDE.md` |
-| `frontend/` | Next.js anterior | **LEGACY: no editar**, solo consultar como referencia | — |
 
 
 ## Levantar el entorno
@@ -26,7 +25,6 @@ docker compose -f docker-compose.dev.yml up -d postgres redis # solo infra; las 
 |---|---|
 | backend (Swagger en `/api`) | 3007 |
 | new_frontend | 3005 |
-| frontend (legacy) | 3000 |
 | discord-bot | 3001 |
 | ngrok (inspector, expone el backend para webhooks de MP) | 4040 |
 | Postgres / Redis | 5432 / 6379 |
@@ -55,7 +53,6 @@ Producción: `docker-compose.yml`.
 
 - Nunca leer, mostrar ni commitear `.env`, `.env.dev`, `*/.env` ni `backup_dev.sql`. Las variables existentes están en `.env.example` y `backend/src/config/env.validation.ts`.
 - **Los e2e del backend borran tablas de la DB a la que apunte `DATABASE_URL`.** `npm test` también los incluye. Para tests unitarios usá `npm run test:unit` (= `jest src/`) desde `backend/`, y no corras e2e sin confirmación.
-- No modificar `frontend/`.
 - Antes de decir que algo está listo, corré build + lint (+ unit tests en el backend, + e2e mockeados en `new_frontend`) de la app tocada: `/verificar`.
 - Para cambios en monedas, apuestas, suscripciones o webhooks de pago, proponé un plan antes de editar y al terminar pasalo por el subagente `backend-reviewer`.
 

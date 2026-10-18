@@ -126,7 +126,6 @@ problemas comunes están en **[docs/SETUP.md](docs/SETUP.md)**.
 | [`new_frontend/`](new_frontend/) | Aplicación web (frontend activo) |
 | [`discord-bot/`](discord-bot/) | Microservicio de soporte y moderación |
 | [`docs/`](docs/) | Arquitectura, instalación y capturas |
-| `frontend/` | Versión anterior del frontend. **Legacy**: se conserva solo como referencia |
 | `.claude/` | Configuración del desarrollo asistido por IA (ver abajo) |
 
 ## Tests y CI

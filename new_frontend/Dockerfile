@@ -54,8 +54,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Cambiamos al usuario no root
 USER nextjs
 
-EXPOSE 3000
-ENV PORT=3000
+EXPOSE 3005
+ENV PORT=3005
 ENV HOSTNAME="0.0.0.0"
 
 # Ejecutamos el servidor standalone de Next.js

@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
+  // Necesario para el Dockerfile de producción (copia .next/standalone).
+  output: "standalone",
+  outputFileTracingRoot: path.join(__dirname),
   webpack(config, { dev }) {
     // El polling es para Docker; el servidor local de e2e usa el watcher nativo.
     if (dev && !process.env.E2E_DEV_SERVER) {
