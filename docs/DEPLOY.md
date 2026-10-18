@@ -94,14 +94,15 @@ El backend corre `prisma migrate deploy` al arrancar, así que las tablas se cre
 
 ### Cargar los datos de desarrollo (una sola vez, sobre la base vacía)
 
-En tu PC (con el contenedor de dev corriendo) generás el volcado sin usuarios de prueba:
+En tu PC (con el contenedor de dev corriendo) generás el volcado inicial. Le pasás el correo de tu cuenta
+de presidente, que es el único usuario que se conserva:
 
 ```bash
-bash backend/scripts/prod-data/export-dev-to-prod.sh      # deja backups/prod-seed.sql
+KEEP_EMAIL=tu-correo@gmail.com bash backend/scripts/prod-data/export-dev-to-prod.sh   # deja backups/prod-seed.sql
 scp backups/prod-seed.sql deploy@<IP>:/srv/chiquimafias/
 ```
 
-El archivo tiene emails de usuarios: no lo subas a git y borralo del servidor al terminar. En el VPS:
+El archivo tiene tu email: no lo subas a git y borralo del servidor al terminar. En el VPS:
 
 ```bash
 cd /srv/chiquimafias
@@ -111,10 +112,11 @@ docker compose up -d backend discord_bot
 shred -u prod-seed.sql
 ```
 
-> Revisá antes qué trae el volcado: además del catálogo (planes, packs, ítems, ligas, equipos, partidos)
-> incluye los usuarios reales de dev con sus saldos, las transacciones y las órdenes de monedas de prueba.
-> Si no querés llevar esos datos de prueba, limpialos en `backend/scripts/prod-data/clean-for-prod.sql`
-> antes de exportar.
+> Qué lleva el volcado (el detalle está en `backend/scripts/prod-data/clean-for-prod.sql`): el fútbol
+> (liga, equipos, partidos y jugadores), la tienda, los tiers de suscripción, los packs de monedas, los
+> equipos de hinchas y tu usuario con su billetera e inventario. No lleva los demás usuarios ni nada de lo
+> que generan (apuestas, encuestas, transacciones, órdenes, tickets, reportes). Tu saldo viaja tal cual
+> estaba en dev; si eran monedas de prueba, ajustalo después desde el panel de administración.
 
 Entrá con tu cuenta de Google: si tu usuario venía en el volcado, conserva el rol de presidente.
 
