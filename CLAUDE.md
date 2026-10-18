@@ -29,7 +29,7 @@ docker compose -f docker-compose.dev.yml up -d postgres redis # solo infra; las 
 | ngrok (inspector, expone el backend para webhooks de MP) | 4040 |
 | Postgres / Redis | 5432 / 6379 |
 
-Producción: `docker-compose.yml`.
+Producción: `docker-compose.yml` (Caddy + redes internas). Guía de despliegue, backups y rollback en `docs/DEPLOY.md`.
 
 ## Contrato entre apps
 
@@ -68,5 +68,6 @@ Producción: `docker-compose.yml`.
 - `README.md` — presentación pública del proyecto: funcionalidades, stack, quickstart y capturas (`docs/screenshots/`).
 - `docs/ARCHITECTURE.md` — arquitectura de las tres apps, patrones, módulos centrales, crons y flujos (auth, apuestas, webhooks).
 - `docs/SETUP.md` — instalación, variables de entorno, servicios externos y problemas comunes.
+- `docs/DEPLOY.md` — despliegue en el VPS: servidor, DNS, `.env` de producción, datos iniciales, backups, actualización y rollback. Scripts en `scripts/ops/`.
 - `backend/README.md`, `new_frontend/README.md`, `discord-bot/README.md` — resumen de cada app.
 - `new_frontend/DESIGN.md` — sistema de diseño "Estadio Digital".
