@@ -1,0 +1,32 @@
+# Los dominios salen de APP_DOMAIN y API_DOMAIN (ver docker-compose.yml). Caddy pide y renueva
+# solos los certificados de Let's Encrypt; para eso los registros DNS A tienen que apuntar a este
+# servidor y los puertos 80 y 443 estar abiertos. Los WebSockets (Socket.IO) pasan por
+# reverse_proxy sin configuración extra.
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+# Sitio web
+{$APP_DOMAIN:chiquimafias.com} {
+	encode zstd gzip
+	import security_headers
+	reverse_proxy new_frontend:3005
+}
+
+# www redirige al dominio principal (CORS y la cookie de sesión esperan solo ese origen).
+www.{$APP_DOMAIN:chiquimafias.com} {
+	redir https://{$APP_DOMAIN:chiquimafias.com}{uri} permanent
+}
+
+# API REST, WebSockets y webhook de Mercado Pago
+{$API_DOMAIN:api.chiquimafias.com} {
+	encode zstd gzip
+	import security_headers
+	reverse_proxy backend:3007
+}
