@@ -58,12 +58,12 @@ npm run start:dev
 ## API / runtime
 
 - Puerto `PORT` (default 3007), host `0.0.0.0`. **No hay prefijo global** (`/users`, no `/api/users`).
-- Swagger UI en **`/api`** (solo si compiló el plugin Nest CLI — ver `nest-cli.json`).
-- CORS hardcodeado en `src/main.ts` (`localhost:3000`, `localhost:3005`, `chiquimafias.com`) → para un origen nuevo, editar `main.ts` a mano.
+- Swagger UI en **`/api`** (solo si compiló el plugin Nest CLI — ver `nest-cli.json`). **No se publica en producción ni staging.**
+- CORS (REST y sockets) sale de `CLIENT_URL` vía `src/config/cors.ts`. En producción y staging es el **único** origen permitido y tiene que ser exacto (`https://chiquimafias.com`, sin barra final ni `www`); en dev y test se suman `localhost:3000` y `localhost:3005`. `trust proxy` (1 salto) se activa solo en producción/staging: el backend nunca debe quedar publicado directo, porque ahí `X-Forwarded-For` se puede falsear.
 - `ValidationPipe` global: `whitelist: true`, **`forbidNonWhitelisted: true`** → enviar props que no están en el DTO = **400**. Siempre declarar DTOs completos.
 - `ClassSerializerInterceptor` global → `@Exclude()`/`@Expose()` en entidades funcionan.
 - `globalThis.crypto` polyfill en `main.ts` (necesario para Google auth lib en algunos Node).
-- `main.ts` define también el `SocketIoAdapter` (`src/adapters/`) — cambiar CORS de sockets ahí.
+- `main.ts` define también el `SocketIoAdapter` (`src/adapters/`), que reusa los mismos orígenes de `src/config/cors.ts`.
 
 ## Guards globales (¡importante al crear rutas!)
 
