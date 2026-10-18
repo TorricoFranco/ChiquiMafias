@@ -18,6 +18,7 @@ out/
 *.env
 .env.*
 !.env.example
+!.env.production.example
 backup_dev.sql
 
 prisma/dev.db
