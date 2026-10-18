@@ -25,14 +25,16 @@ export class AuthController {
     private readonly configService: ConfigService<EnvironmentVariables>,
   ) {}
 
-  private get cookieOptions() {
-    // const isProduction = this.configService.get('NODE_ENV', { infer: true }) === 'production';
-    const isProduction = false
+  private getCookieOptions() {
+    const isProduction =
+      this.configService.get('NODE_ENV', { infer: true }) === 'production'
 
+    // Front y API comparten sitio (chiquimafias.com / api.chiquimafias.com), así que
+    // 'lax' alcanza y es más estricto que 'none'.
     const options = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      sameSite: 'lax' as const,
       domain: isProduction ? '.chiquimafias.com' : undefined,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     }
@@ -50,7 +52,7 @@ export class AuthController {
     const { accessToken, refreshToken, user } =
       await this.authService.googleLogin(googleLoginDto.credential)
 
-    res.cookie('refresh_token', refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', refreshToken, this.getCookieOptions())
 
     return { access_token: accessToken, user }
   }
@@ -71,7 +73,7 @@ export class AuthController {
     const { accessToken, refreshToken, user } =
       await this.authService.refreshTokens(incomingRefreshToken)
 
-    res.cookie('refresh_token', refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', refreshToken, this.getCookieOptions())
 
     return { access_token: accessToken, user }
   }
@@ -89,7 +91,7 @@ export class AuthController {
       await this.authService.logout(incomingRefreshToken)
     }
 
-    res.clearCookie('refresh_token', { ...this.cookieOptions, maxAge: 0 })
+    res.clearCookie('refresh_token', { ...this.getCookieOptions(), maxAge: 0 })
 
     return { status: 'ok', message: 'Sesión cerrada limpiamente, sese' }
   }
@@ -105,7 +107,7 @@ export class AuthController {
   ) {
     const { accessToken, refreshToken, user } =
       await this.authService.devLoginByEmail(email)
-    res.cookie('refresh_token', refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', refreshToken, this.getCookieOptions())
 
     return { access_token: accessToken, user }
   }

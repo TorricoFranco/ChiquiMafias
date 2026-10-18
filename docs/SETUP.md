@@ -99,7 +99,6 @@ npm run dev
 | ngrok (inspector) | 4040 |
 | PostgreSQL | 5432 |
 | Redis | 6379 |
-| frontend legacy (deshabilitado en el compose) | 3000 |
 
 ## Variables de entorno
 

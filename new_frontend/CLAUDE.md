@@ -4,7 +4,7 @@
 
 # new_frontend — ChiquiMafias (frontend activo)
 
-Next.js 16.2 (App Router) + React 19.2 + TypeScript. Reemplaza a `../frontend/`, que es legacy y no se toca.
+Next.js 16.2 (App Router) + React 19.2 + TypeScript.
 
 ## Stack
 
