@@ -10,6 +10,15 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import * as crypto from 'crypto'
+import { safeEqual } from 'src/common/safe-equal'
+
+// Se envuelve (no se reemplaza) para poder afirmar que la firma se decide con safeEqual.
+jest.mock('src/common/safe-equal', () => {
+  const actual = jest.requireActual<typeof import('src/common/safe-equal')>(
+    'src/common/safe-equal',
+  )
+  return { safeEqual: jest.fn(actual.safeEqual) }
+})
 
 describe('WebhookService', () => {
   let service: WebhookService
@@ -30,6 +39,8 @@ describe('WebhookService', () => {
   const TS = '1715623000'
 
   beforeEach(async () => {
+    ;(safeEqual as jest.Mock).mockClear()
+
     mockCheckoutService = {
       processWebhook: jest.fn().mockResolvedValue({ success: true }),
     }
@@ -82,6 +93,96 @@ describe('WebhookService', () => {
 
   it('debería lanzar UnauthorizedException si la firma es inválida', async () => {
     const signature = 'ts=123,v1=firma-falsa-que-no-coincide'
+    await expect(
+      service.processWebhook(MOCK_PAYLOAD, signature, X_REQUEST_ID),
+    ).rejects.toThrow(UnauthorizedException)
+  })
+
+  it('decide la firma con safeEqual (tiempo constante) y no con !==', async () => {
+    const signature = generateSignature(
+      TS,
+      MOCK_PAYLOAD.data.id,
+      X_REQUEST_ID,
+      TEST_SECRET,
+    )
+    const v1 = signature.split('v1=')[1]
+
+    await service.processWebhook(MOCK_PAYLOAD, signature, X_REQUEST_ID)
+
+    expect(safeEqual).toHaveBeenCalledWith(v1, v1)
+  })
+
+  it('debería rechazar si safeEqual dice que no coincide, aunque la firma sea válida', async () => {
+    const signature = generateSignature(
+      TS,
+      MOCK_PAYLOAD.data.id,
+      X_REQUEST_ID,
+      TEST_SECRET,
+    )
+    ;(safeEqual as jest.Mock).mockReturnValueOnce(false)
+
+    await expect(
+      service.processWebhook(MOCK_PAYLOAD, signature, X_REQUEST_ID),
+    ).rejects.toThrow(UnauthorizedException)
+    expect(mockCheckoutService.processWebhook).not.toHaveBeenCalled()
+  })
+
+  it('debería ignorar con 200 un evento sin data.id cuya firma no coincide, sin procesar nada', async () => {
+    const payload = {
+      type: 'topic_merchant_order_wh',
+    } as MercadoPagoWebhookPayload
+
+    const result = await service.processWebhook(
+      payload,
+      `ts=${TS},v1=firma-falsa`,
+      X_REQUEST_ID,
+    )
+
+    expect(result).toEqual({
+      status: 'ignored',
+      message: 'Evento sin data.id no procesable',
+    })
+    expect(mockCheckoutService.processWebhook).not.toHaveBeenCalled()
+    expect(mockCoinShopService.processPaymentWebhook).not.toHaveBeenCalled()
+    expect(
+      mockMercadoPagoService.getMerchantOrderDetails,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('debería rechazar una firma sin v1 aunque traiga ts', async () => {
+    await expect(
+      service.processWebhook(MOCK_PAYLOAD, `ts=${TS}`, X_REQUEST_ID),
+    ).rejects.toThrow(UnauthorizedException)
+    expect(mockCheckoutService.processWebhook).not.toHaveBeenCalled()
+  })
+
+  it('debería rechazar una v1 de otro largo, o que sea la correcta con un carácter cambiado', async () => {
+    const valid = generateSignature(
+      TS,
+      MOCK_PAYLOAD.data.id,
+      X_REQUEST_ID,
+      TEST_SECRET,
+    )
+    const v1 = valid.split('v1=')[1]
+    const lastChar = v1.endsWith('0') ? '1' : '0'
+    const tampered = `ts=${TS},v1=${v1.slice(0, -1)}${lastChar}`
+    const truncated = `ts=${TS},v1=${v1.slice(0, -2)}`
+
+    for (const signature of [tampered, truncated]) {
+      await expect(
+        service.processWebhook(MOCK_PAYLOAD, signature, X_REQUEST_ID),
+      ).rejects.toThrow(UnauthorizedException)
+    }
+    expect(mockCheckoutService.processWebhook).not.toHaveBeenCalled()
+  })
+
+  it('debería rechazar una firma válida para otro request-id', async () => {
+    const signature = generateSignature(
+      TS,
+      MOCK_PAYLOAD.data.id,
+      'otro-request-id',
+      TEST_SECRET,
+    )
     await expect(
       service.processWebhook(MOCK_PAYLOAD, signature, X_REQUEST_ID),
     ).rejects.toThrow(UnauthorizedException)

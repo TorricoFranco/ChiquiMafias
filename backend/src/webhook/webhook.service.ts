@@ -10,6 +10,7 @@ import { SubscriptionCheckoutService } from 'src/subscriptions/subscription-chec
 import { CoinShopService } from 'src/coin-shop/coin-shop.service'
 import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service'
 import { MercadoPagoWebhookPayload } from 'src/subscriptions'
+import { safeEqual } from 'src/common/safe-equal'
 
 // Estados de pago que se mandan a coin-shop: los que acreditan y las reversas (reembolso, contracargo)
 const COIN_ORDER_PAYMENT_STATUSES = [
@@ -79,7 +80,9 @@ export class WebhookService {
       .update(manifest)
       .digest('hex')
 
-    if (hmac !== v1) {
+    // Comparación en tiempo constante: no filtra por tiempos cuántos caracteres de la firma acertó
+    // quien la adivina, y tolera que v1 falte o venga con otro largo.
+    if (!safeEqual(v1, hmac)) {
       // Eventos sin data.id (ej: topic_merchant_order_wh) no usan esta plantilla
       if (!dataId) {
         this.logger.warn(
