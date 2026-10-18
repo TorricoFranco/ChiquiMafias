@@ -1,6 +1,12 @@
 node_modules
 dist
+coverage
 npm-debug.log
-Dockerfile
-docker-compose.yml
+Dockerfile*
+docker-compose*.yml
 .env
+.env.*
+!.env.example
+test
+*.md
+.git
