@@ -25,7 +25,7 @@ import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import { DiscordActionDto } from './dto/discord-action.dto'
 import { DiscordTicketMessageDto } from './dto/discord-ticket-message.dto'
 import { DiscordUpdateTicketStatusDto } from './dto/discord-update-ticket-status.dto'
-import { safeEqual } from './safe-equal'
+import { safeEqual } from 'src/common/safe-equal'
 
 @ApiTags('Discord Bot Webhooks (servicio a servicio)')
 @ApiHeader({
