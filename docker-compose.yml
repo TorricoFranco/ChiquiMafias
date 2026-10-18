@@ -1,111 +1,164 @@
-version: '3.8'
+# Producción. Un solo punto de entrada público: Caddy (80/443).
+# Todo lo demás vive en redes internas y no publica puertos en el host.
+#
+#   app  -> Caddy, frontend, backend y bot. Tiene salida a internet (Google, Mercado Pago, Discord...).
+#   data -> Postgres, Redis y backend. `internal: true`: sin salida a internet ni acceso desde el host.
+#
+# Las variables salen del .env de esta carpeta (ver docs/DEPLOY.md). Para levantar:
+#   docker compose up -d --build
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: redis
+  caddy:
+    image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-chiquimafias.com}
+      API_DOMAIN: ${API_DOMAIN:-api.chiquimafias.com}
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      new_frontend:
+        condition: service_healthy
+    networks: [app]
+    mem_limit: 128m
+    logging: *default-logging
 
   postgres:
     image: postgres:15
-    container_name: football_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [data]
+    mem_limit: 768m
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    # Redis guarda estado (saldos, apuestas en curso): sin maxmemory para que nunca desaloje claves.
+    command: sh -c 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [data]
+    mem_limit: 512m
+    logging: *default-logging
 
   backend:
-    container_name: football_backend
     build: ./backend
     restart: unless-stopped
-    ports:
-      - "3007:3007"
     env_file:
       - .env
-    depends_on:
-      - postgres
-      - redis
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:prod"
     environment:
-      PORT: ${PORT}
-      HOST: ${HOST}
-      DATABASE_URL: ${DATABASE_URL}
-      ID_LEAGUE_ARG: ${ID_LEAGUE_ARG}
-      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN}
-      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
-      MERCADO_PAGO_API_URL: ${MERCADO_PAGO_API_URL}
-      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN}
-      MERCADO_PAGO_WEBHOOK_URL: ${MERCADO_PAGO_WEBHOOK_URL}
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
-      RESEND_API_KEY: ${RESEND_API_KEY}
-      DISCORD_INTERNAL_SECRET: ${DISCORD_INTERNAL_SECRET}
-      DISCORD_BOT_URL: ${DISCORD_BOT_URL}
-      FRONTEND_SUCCESS_URL: ${FRONTEND_SUCCESS_URL}
-      FRONTEND_FAILURE_URL: ${FRONTEND_FAILURE_URL}
-      FRONTEND_PENDING_URL: ${FRONTEND_PENDING_URL}
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      NODE_ENV: ${NODE_ENV}
-      # Fijo: pisa cualquier valor del .env. dev-login y test-events nunca en prod.
+      # Fijos: pisan cualquier valor del .env.
+      NODE_ENV: production
+      PORT: "3007"
+      HOST: 0.0.0.0
+      # dev-login y test-events nunca en prod.
       ENABLE_DEV_TOOLS: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    # El cliente de Prisma ya se generó en el build; acá solo se aplican las migraciones pendientes.
+    command: sh -c "./node_modules/.bin/prisma migrate deploy && exec node dist/main"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3007/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks: [app, data]
+    mem_limit: 768m
+    logging: *default-logging
 
-
-  new_frontend: 
-    container_name: football_new_frontend
+  new_frontend:
     build:
       context: ./new_frontend
       args:
-        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-        - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
-        - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
+        # Next.js hornea estos valores en el build: si cambian, hay que reconstruir la imagen.
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+        NEXT_PUBLIC_API_URL: ${API_BACKEND_URL}
+        NEXT_PUBLIC_ARGENTINA_LEAGUE_ID: ${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
     restart: unless-stopped
-    ports:
-      - "3005:3005"
     environment:
-      - PORT=${NEW_FRONTEND_PORT}
-      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-      - NEXT_PUBLIC_API_URL=${API_BACKEND_URL}
-      - NEXT_PUBLIC_ARGENTINA_LEAGUE_ID=${NEXT_PUBLIC_ARGENTINA_LEAGUE_ID}
-      - API_INTERNAL_URL=${API_INTERNAL_URL}
-      - NODE_ENV=production
+      PORT: "3005"
+      NODE_ENV: production
     depends_on:
       - backend
-
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3005/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [app]
+    mem_limit: 512m
+    logging: *default-logging
 
   discord_bot:
-    container_name: football_discord_bot
     build: ./discord-bot
     restart: unless-stopped
-    ports:
-      - "3001:3001"
     environment:
-      PORT: 3001
+      PORT: "3001"
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DISCORD_MODERATION_CHANNEL_ID: ${DISCORD_MODERATION_CHANNEL_ID}
       DISCORD_TICKETS_CHANNEL_ID: ${DISCORD_TICKETS_CHANNEL_ID}
       DISCORD_INTERNAL_SECRET: ${DISCORD_INTERNAL_SECRET}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
-      BACKEND_URL: "http://backend:3007" 
+      BACKEND_URL: http://backend:3007
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 3001 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [app]
+    mem_limit: 256m
+    logging: *default-logging
+
+networks:
+  app:
+  data:
+    internal: true
 
 volumes:
   postgres_data:
   redis_data:
+  caddy_data:
+  caddy_config:
