@@ -25,7 +25,6 @@ prisma/dev.db-journal
 prisma/debug.log
 *.db
 *.db-journal
-backend/prisma/migrations/
 
 # --- Docker & Logs ---
 *.log
