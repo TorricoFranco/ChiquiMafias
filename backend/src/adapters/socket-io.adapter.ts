@@ -1,6 +1,7 @@
 import { IoAdapter } from '@nestjs/platform-socket.io'
 import { ConfigService } from '@nestjs/config'
 import { INestApplicationContext, Logger } from '@nestjs/common'
+import { buildCorsOrigins } from 'src/config/cors'
 
 export class SocketIoAdapter extends IoAdapter {
   private configService: ConfigService
@@ -18,9 +19,11 @@ export class SocketIoAdapter extends IoAdapter {
       `Configurando WebSocket CORS para el origen: "${clientUrl}"`,
     )
 
-    const origins = clientUrl
-      ? clientUrl.split(',').map((url) => url.trim())
-      : '*'
+    // Mismos orígenes que el CORS de REST; nunca '*' con credentials.
+    const origins = buildCorsOrigins(
+      clientUrl,
+      this.configService.get<string>('NODE_ENV'),
+    )
 
     const serverOptions = {
       ...options,

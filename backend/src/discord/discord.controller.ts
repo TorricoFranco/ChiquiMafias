@@ -25,6 +25,7 @@ import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
 import { DiscordActionDto } from './dto/discord-action.dto'
 import { DiscordTicketMessageDto } from './dto/discord-ticket-message.dto'
 import { DiscordUpdateTicketStatusDto } from './dto/discord-update-ticket-status.dto'
+import { safeEqual } from './safe-equal'
 
 @ApiTags('Discord Bot Webhooks (servicio a servicio)')
 @ApiHeader({
@@ -67,7 +68,7 @@ export class DiscordController {
       { infer: true },
     )
 
-    if (token !== internalSecret) {
+    if (!safeEqual(token, internalSecret)) {
       this.logger.error('❌ Token inválido o no enviado')
       throw new UnauthorizedException('Intento de acceso no autorizado')
     }
@@ -139,7 +140,7 @@ export class DiscordController {
       'DISCORD_INTERNAL_SECRET',
       { infer: true },
     )
-    if (token !== internalSecret) {
+    if (!safeEqual(token, internalSecret)) {
       throw new UnauthorizedException('Token inválido')
     }
   }
