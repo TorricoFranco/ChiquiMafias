@@ -3,5 +3,7 @@ export interface StreakTimelineItem {
   coins: number
   hasSpecialGift: boolean
   giftName: string | null
+  giftType?: string | null
+  giftAssetId?: string | null
   status: 'completed' | 'current' | 'upcoming'
 }

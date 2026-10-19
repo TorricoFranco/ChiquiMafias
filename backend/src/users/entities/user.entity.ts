@@ -14,6 +14,8 @@ export class UserEntity implements User {
   email: string
   username: string | null
   isFirstLogin: boolean
+  termsAcceptedAt: Date | null
+  termsVersion: string | null
   status: UserStatus
   mutedUntil: Date | null
   role: SystemRole
@@ -23,8 +25,12 @@ export class UserEntity implements User {
   streakRewardClaimed: boolean
   activeNameColorId: string | null
   activeBannerId: string | null
+  activeChatBubbleId: string | null
   createdAt: Date
   teamId: string | null
+  wallet?: {
+    balance: number
+  } | null
 
   @ApiProperty({ type: () => Object, nullable: true })
   team?: FootballTeam | null

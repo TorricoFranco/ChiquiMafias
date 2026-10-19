@@ -11,7 +11,6 @@ import { SystemRole } from '../enums/roles.enum'
 import { ROLE_HIERARCHY } from '../enums/roles.enum'
 import { ActiveUser } from '../interfaces/active-user.interface'
 
-
 function hasRole(userRole: SystemRole, requiredRoles: SystemRole[]): boolean {
   const userIdx = ROLE_HIERARCHY.indexOf(userRole)
   return requiredRoles.some((role) => userIdx >= ROLE_HIERARCHY.indexOf(role))
@@ -19,7 +18,7 @@ function hasRole(userRole: SystemRole, requiredRoles: SystemRole[]): boolean {
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) { }
+  constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<SystemRole[]>(

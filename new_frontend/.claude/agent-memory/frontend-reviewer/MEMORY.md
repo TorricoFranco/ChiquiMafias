@@ -1,0 +1,1 @@
+- [Memoria canónica del reviewer](../../../../.claude/agent-memory/frontend-reviewer/MEMORY.md) — la memoria real (versionada) está en la raíz del repo: chiquimafias/.claude/agent-memory/frontend-reviewer/

@@ -1,15 +1,11 @@
-import {
-  Injectable,
-  BadRequestException,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common'
+import { Injectable, NotFoundException, Logger } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { SubscriptionTier, SubscriptionStatus } from '@prisma/client'
 import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service'
 import { SubscriptionPricingService } from './domain/subscription-pricing.service'
 
 import { SubscriptionDetailResponseDto } from './dto/subscription-response.dto'
+import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto'
 
 @Injectable()
 export class SubscriptionsService {
@@ -18,66 +14,37 @@ export class SubscriptionsService {
   constructor(
     private readonly pricingService: SubscriptionPricingService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   /**
-   * ============================================================================
-   * ACTUALIZAR PRECIO BASE DE UN PLAN (ADMIN ONLY)
-   * ============================================================================
+   * ACTUALIZAR UN PLAN
    */
-  async updatePlanPrice(tier: SubscriptionTier, basePriceARS: number) {
-    try {
-      // Verificamos si el plan existe antes de actualizar
-      const plan = await this.prisma.subscriptionPlan.findUnique({
-        where: { tier },
-      })
+  async updatePlan(id: string, dto: UpdateSubscriptionPlanDto) {
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id },
+    })
 
-      if (!plan) {
-        throw new BadRequestException(
-          `No se encontró el plan para el tier ${tier}`,
-        )
-      }
-
-      // Actualizamos el precio
-      const updatedPlan = await this.prisma.subscriptionPlan.update({
-        where: { tier },
-        data: { basePriceARS },
-      })
-
-      this.logger.log(
-        `[Admin] Precio del plan ${tier} actualizado a $${basePriceARS} ARS`,
-      )
-
-      return {
-        message: `Precio del plan ${tier} actualizado con éxito.`,
-        plan: updatedPlan,
-      }
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error
-
-      this.logger.error(`[UpdatePlanPrice Error] ${error.message}`, error.stack)
-      throw new InternalServerErrorException(
-        'Error al actualizar el precio del plan',
-      )
+    if (!plan) {
+      throw new NotFoundException('El plan de suscripción no existe')
     }
+
+    return this.prisma.subscriptionPlan.update({
+      where: { id },
+      data: dto,
+    })
   }
 
-  // -----------------------------
   /**
-   * ============================================================================
    * OBTENER DETALLES DE SUSCRIPCIÓN ACTUAL
-   * ============================================================================
    */
   async getCurrentSubscription(
     userId: string,
   ): Promise<SubscriptionDetailResponseDto> {
-    // 1. Buscamos el usuario para saber su tier real e impactado actualmente
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { activeSubscriptionTier: true },
     })
 
-    // 2. Buscamos primero si tiene algo corriendo (ACTIVE o CANCELLATION_PENDING)
     let subscription = await this.prisma.userSubscription.findFirst({
       where: {
         userId,

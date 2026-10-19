@@ -17,7 +17,6 @@ export class BetsProcessor extends WorkerHost {
 
       try {
         await this.prisma.$transaction(async (tx) => {
-          // 1. Guardar la apuesta
           await tx.bet.create({
             data: {
               id: betId,
@@ -53,6 +52,19 @@ export class BetsProcessor extends WorkerHost {
               totalStaked: { increment: stake },
             },
           })
+
+          await tx.userStats.upsert({
+            where: { userId: userId },
+            create: {
+              userId: userId,
+              totalBetsPlaced: 1,
+              totalCoinsStaked: stake,
+            },
+            update: {
+              totalBetsPlaced: { increment: 1 },
+              totalCoinsStaked: { increment: stake },
+            },
+          })
         })
 
         this.logger.debug(
@@ -65,6 +77,9 @@ export class BetsProcessor extends WorkerHost {
         )
         throw error
       }
+      return
     }
+
+    this.logger.warn(`Job desconocido en bets-queue: ${job.name} (${job.id})`)
   }
 }

@@ -9,4 +9,4 @@ import { ChatModule } from 'src/chat/chat.module'
   providers: [StoreService],
   imports: [WalletModule, ChatModule],
 })
-export class StoreModule { }
+export class StoreModule {}

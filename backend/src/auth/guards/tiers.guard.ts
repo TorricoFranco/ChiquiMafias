@@ -12,7 +12,7 @@ import { ActiveUser } from '../interfaces/active-user.interface'
 
 @Injectable()
 export class TiersGuard implements CanActivate {
-  constructor(private reflector: Reflector) { }
+  constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredMinTier = this.reflector.getAllAndOverride<SubscriptionTier>(

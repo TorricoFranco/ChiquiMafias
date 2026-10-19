@@ -20,6 +20,12 @@ import { PLACE_BET_LUA_SCRIPT } from './bets.scripts'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 
+import { calculateMarketOdds } from './utils/odds.util'
+
+// La liquidación recorre todas las apuestas del mercado en una sola transacción:
+// con el timeout por defecto de Prisma (5 s) un partido grande nunca terminaría
+const SETTLEMENT_TX_OPTIONS = { maxWait: 10_000, timeout: 60_000 }
+
 @Injectable()
 export class BetsService {
   private readonly logger = new Logger(BetsService.name)
@@ -32,25 +38,27 @@ export class BetsService {
     private readonly chatGateway: ChatGateway,
     private readonly redisService: RedisService,
     @InjectQueue('bets-queue') private betsQueue: Queue,
-  ) { }
+  ) {}
 
   /**
-   * Resuelve el GET del Frontend trayendo mercados abiertos o pausados en vivo
+   * Resuelve el GET del Frontend trayendo mercados abiertos o pausados en vivo con cuotas calculadas
    */
   async getActiveMarkets() {
-    return this.prisma.market.findMany({
+    const markets = await this.prisma.market.findMany({
       where: {
-        status: { in: ['OPEN', 'LOCKED'] },
+        status: { in: ['OPEN'] },
       },
       include: {
         options: true,
       },
       orderBy: { closesAt: 'asc' },
     })
+
+    return markets.map((market) => calculateMarketOdds(market))
   }
 
   /**
-   * Procesa de forma atómica la creación de una apuesta y distribuye por WS
+   * Procesa de forma atómica la creación de una apuesta y distribuye por WS las cuotas recalculadas
    */
   async placeBet(userId: string, dto: CreateBetDto) {
     const { optionId, stake, marketId } = dto
@@ -80,9 +88,39 @@ export class BetsService {
 
     this.chatGateway.sendWalletUpdate(userId, result.new_balance)
 
+    // Recuperar mercado de la DB para recalcular cuotas con Pari-Mutuel
+    const market = await this.prisma.market.findUnique({
+      where: { id: marketId },
+      include: { options: true },
+    })
+
+    let newOdds = 1.0
+    let updatedOptions: any[] = []
+
+    if (market) {
+      const marketWithUpdatedStakes = {
+        ...market,
+        options: market.options.map((opt) =>
+          opt.id === optionId ? { ...opt, totalStaked: result.new_pool } : opt,
+        ),
+      }
+      const calculatedMarket = calculateMarketOdds(marketWithUpdatedStakes)
+      const targetOption = calculatedMarket.options.find(
+        (o) => o.id === optionId,
+      )
+      newOdds = targetOption?.currentOdds ?? 1.0
+      updatedOptions = calculatedMarket.options.map((o) => ({
+        id: o.id,
+        currentOdds: o.currentOdds,
+        totalStaked: o.totalStaked,
+      }))
+    }
+
     this.betsGateway.emitPoolUpdate(marketId, {
       optionId: optionId,
       newTotalStaked: result.new_pool,
+      newOdds: newOdds,
+      options: updatedOptions,
     })
 
     await this.betsQueue.add('persist-bet', {
@@ -102,9 +140,13 @@ export class BetsService {
   }
 
   async createManualMarket(dto: CreateMarketDto) {
-    const market = await this.prisma.market.create({
+    const market = (await this.prisma.market.create({
       data: {
         title: dto.title,
+        type: dto.type ?? 'CUSTOM',
+        category: dto.category,
+        description: dto.description,
+        metadata: dto.metadata ? (dto.metadata as any) : undefined,
         closesAt: new Date(dto.closesAt),
         isManual: true,
         status: 'OPEN',
@@ -113,11 +155,12 @@ export class BetsService {
             name: opt.name,
             initialProb: opt.initialProb,
             totalStaked: 0,
+            logoUrl: opt.logoUrl ?? null,
           })),
         },
       },
       include: { options: true },
-    })
+    })) as any
 
     const redis = this.redisService.redis
     const marketKey = `market:${market.id}`
@@ -134,13 +177,14 @@ export class BetsService {
       await redis.hset(marketKey, opt.id, '0')
     }
 
-    this.betsGateway.emitMarketCreated(market)
+    const calculatedMarket = calculateMarketOdds(market)
+    this.betsGateway.emitMarketCreated(calculatedMarket)
 
-    return market
+    return calculatedMarket
   }
 
   async getUserBets(userId: string) {
-    return this.prisma.bet.findMany({
+    const bets = await this.prisma.bet.findMany({
       where: { userId },
       include: {
         option: {
@@ -154,17 +198,57 @@ export class BetsService {
       },
       orderBy: { createdAt: 'desc' },
     })
+
+    return bets.map((bet) => ({
+      id: bet.id,
+      marketTitle: bet.option.market.title,
+      optionName: bet.option.name,
+      stake: bet.stake,
+      payout: bet.payout ?? 0,
+      multiplier: bet.multiplier ?? 0,
+      status: bet.status,
+      marketStatus: bet.option.market.status,
+      createdAt: bet.createdAt,
+    }))
   }
 
   async settleMarket(marketId: string, dto: SettleMarketDto) {
     const { status, winningOptionId } = dto
 
-    const redis = this.redisService.redis
-    await redis.hset(`market:${marketId}`, 'status', 'SETTLED')
-
     if (status === 'SETTLED' && !winningOptionId) {
       throw new BadRequestException('Debe especificar la opción ganadora')
     }
+
+    // Validación previa: no cerrar en Redis un mercado que no se va a poder liquidar
+    const current = await this.prisma.market.findUnique({
+      where: { id: marketId },
+      select: { status: true, options: { select: { id: true } } },
+    })
+
+    if (!current) throw new NotFoundException('El mercado no existe')
+    if (current.status === 'SETTLED' || current.status === 'REFUNDED') {
+      throw new BadRequestException(
+        'Este mercado ya fue liquidado anteriormente',
+      )
+    }
+    if (
+      status === 'SETTLED' &&
+      !current.options.some((o) => o.id === winningOptionId)
+    ) {
+      throw new NotFoundException(
+        'La opción ganadora no pertenece a este mercado',
+      )
+    }
+
+    // Corta las apuestas nuevas antes de leer las existentes
+    await this.redisService.redis.hset(
+      `market:${marketId}`,
+      'status',
+      'SETTLED',
+    )
+
+    // Usuarios cuyo saldo cambió, para sincronizar Redis después del commit
+    const usersToSync = new Set<string>()
 
     const pendingEvents: Array<{
       userId: string
@@ -234,7 +318,7 @@ export class BetsService {
               data: { balance: { increment: bet.stake } },
             })
 
-            await redis.set(`wallet:${bet.userId}:balance`, wallet.balance)
+            usersToSync.add(bet.userId)
 
             await tx.coinTransaction.create({
               data: {
@@ -247,7 +331,11 @@ export class BetsService {
             })
             await tx.bet.update({
               where: { id: bet.id },
-              data: { status: 'REFUNDED' },
+              data: {
+                status: 'REFUNDED',
+                payout: bet.stake,
+                multiplier: 1,
+              },
             })
 
             pendingEvents.push({
@@ -277,7 +365,7 @@ export class BetsService {
               data: { balance: { increment: payout } },
             })
 
-            await redis.set(`wallet:${bet.userId}:balance`, wallet.balance)
+            usersToSync.add(bet.userId)
 
             await tx.coinTransaction.create({
               data: {
@@ -290,7 +378,44 @@ export class BetsService {
             })
             await tx.bet.update({
               where: { id: bet.id },
-              data: { status: 'WON' },
+              data: {
+                status: 'WON',
+                payout: payout,
+                multiplier: multiplier,
+              },
+            })
+
+            const currentStats = await tx.userStats.findUnique({
+              where: { userId: bet.userId },
+            })
+
+            const newStreak = (currentStats?.currentWinStreak || 0) + 1
+            const newMaxStreak = Math.max(
+              currentStats?.longestWinStreak || 0,
+              newStreak,
+            )
+            const newHighestMult = Math.max(
+              currentStats?.highestMultiplier || 0,
+              multiplier,
+            )
+
+            await tx.userStats.upsert({
+              where: { userId: bet.userId },
+              create: {
+                userId: bet.userId,
+                totalBetsWon: 1,
+                totalCoinsWon: payout,
+                currentWinStreak: 1,
+                longestWinStreak: 1,
+                highestMultiplier: multiplier,
+              },
+              update: {
+                totalBetsWon: { increment: 1 },
+                totalCoinsWon: { increment: payout },
+                currentWinStreak: newStreak,
+                longestWinStreak: newMaxStreak,
+                highestMultiplier: newHighestMult,
+              },
             })
 
             pendingEvents.push({
@@ -302,7 +427,16 @@ export class BetsService {
           } else {
             await tx.bet.update({
               where: { id: bet.id },
-              data: { status: 'LOST' },
+              data: {
+                status: 'LOST',
+                payout: 0,
+                multiplier: multiplier,
+              },
+            })
+
+            await tx.userStats.updateMany({
+              where: { userId: bet.userId },
+              data: { currentWinStreak: 0 },
             })
 
             pendingEvents.push({
@@ -317,7 +451,20 @@ export class BetsService {
 
       // mercado actualizado
       return { ...market, status: finalStatusToSet, settledAt: new Date() }
-    })
+    }, SETTLEMENT_TX_OPTIONS)
+
+    // El mercado ya quedó liquidado en la DB: un fallo de Redis no corta el resto.
+    // Se relee el saldo de la DB: otra operación pudo cambiarlo después del commit.
+    for (const userId of usersToSync) {
+      try {
+        await this.walletService.syncBalanceCache(userId)
+      } catch (error) {
+        this.logger.error(
+          `No se pudo sincronizar el saldo de ${userId} en Redis tras liquidar ${marketId}`,
+          error instanceof Error ? error.message : String(error),
+        )
+      }
+    }
 
     // EMISIÓN DE EVENTOS
     this.betsGateway.emitMarketStatusChange(

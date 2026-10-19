@@ -7,4 +7,4 @@ import { SupportService } from './support.service'
   providers: [SupportService],
   exports: [SupportService],
 })
-export class SupportModule { }
+export class SupportModule {}

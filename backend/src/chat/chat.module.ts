@@ -8,4 +8,4 @@ import { AuthModule } from 'src/auth/auth.module'
   providers: [ChatGateway, ChatService],
   exports: [ChatGateway, ChatService],
 })
-export class ChatModule { }
+export class ChatModule {}

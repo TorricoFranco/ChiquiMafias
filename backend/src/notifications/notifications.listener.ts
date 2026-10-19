@@ -12,7 +12,7 @@ export class NotificationsListener {
     private readonly notificationsService: NotificationsService,
     private readonly chatGateway: ChatGateway,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @OnEvent('bet.settled')
   async handleBetSettled(payload: {
@@ -138,5 +138,23 @@ export class NotificationsListener {
       type,
       referenceId: payload.reportId,
     })
+  }
+
+  @OnEvent('wallet.admin_gift')
+  async handleAdminGift(payload: {
+    userId: string
+    amount: number
+    description: string
+    newBalance: number
+  }) {
+    await this.notificationsService.createPersonalNotification({
+      userId: payload.userId,
+      title: '🎁 ¡Regalo de la Presidencia!',
+      message: `¡Has recibido ${payload.amount} chiqui-coins!\nMotivo: ${payload.description}`,
+      type: NotifyType.ADMIN_GIFT,
+      metadata: { coins: payload.amount },
+    })
+
+    this.chatGateway.sendWalletUpdate(payload.userId, payload.newBalance)
   }
 }

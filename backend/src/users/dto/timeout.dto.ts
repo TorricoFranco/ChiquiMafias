@@ -1,4 +1,5 @@
 import { IsString, IsEnum } from 'class-validator'
+import { ApiProperty } from '@nestjs/swagger'
 
 export enum TimeoutDuration {
   FIVE_MIN = 5,
@@ -8,9 +9,14 @@ export enum TimeoutDuration {
 }
 
 export class TimeoutDto {
+  @ApiProperty({ description: 'ID del usuario a silenciar (timeout)' })
   @IsString()
   userId: string
 
-  @IsEnum(TimeoutDuration) 
+  @ApiProperty({
+    enum: TimeoutDuration,
+    description: 'Duración del timeout en minutos',
+  })
+  @IsEnum(TimeoutDuration)
   durationMinutes: TimeoutDuration
 }

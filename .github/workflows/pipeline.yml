@@ -32,10 +32,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4  
       - uses: actions/setup-node@v4 
-        with: { node-version: '24' } 
+        with: { node-version: '20' } 
       
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         
     #   - name: Lint and Format
     #     run: npm run lint
@@ -46,10 +46,6 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           REDIS_PASSWORD: "dummy_password"
-          
-          CLIENT_URL: "http://localhost:3000"
-          FRONTEND_URL: "http://localhost:3000"
-          MERCADO_PAGO_WEBHOOK_SECRET: "dummy_webhook_secret"
           
           PORT: 3007
           HOST: localhost
@@ -63,6 +59,7 @@ jobs:
           MERCADO_PAGO_API_URL: "https://api.mercadopago.com"
           MERCADO_PAGO_ACCESS_TOKEN: "dummy_mp_token"
           MERCADO_PAGO_WEBHOOK_URL: "http://localhost/webhook"
+          MERCADO_PAGO_WEBHOOK_SECRET: "dummy_webhook_secret"
           CLOUDINARY_CLOUD_NAME: "dummy_cloud"
           CLOUDINARY_API_KEY: "dummy_key"
           CLOUDINARY_API_SECRET: "dummy_secret"
@@ -72,6 +69,8 @@ jobs:
           FRONTEND_SUCCESS_URL: "http://localhost:3000/success"
           FRONTEND_FAILURE_URL: "http://localhost:3000/failure"
           FRONTEND_PENDING_URL: "http://localhost:3000/pending"
+          FRONTEND_URL: "http://localhost:3005"
+          CLIENT_URL: "http://localhost:3005"
           
           TESTCONTAINERS_RYUK_DISABLED: 'true'
 
@@ -82,18 +81,3 @@ jobs:
           npm run test:unit
           npm run test:e2e
 
-#   frontend:
-#     runs-on: ubuntu-latest
-#     defaults:
-#       run:
-#         working-directory: ./frontend
-#     steps:
-#       - uses: actions/checkout@v3
-#       - uses: actions/setup-node@v3
-#         with: { node-version: '20' }
-      
-#       - name: Install dependencies
-#         run: npm ci
-      
-#       - name: Build Frontend
-#         run: npm run build

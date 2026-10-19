@@ -1,23 +1,18 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { WalletService } from '../wallet/wallet.service'
-import {
-  STREAK_CONFIG,
-  TIER_MULTIPLIERS,
-  SPECIAL_GIFTS,
-} from './constants/streak.constants'
+import { calculateStreakCoins } from './utils/streak-reward'
+import { STREAK_CONFIG } from './constants/streak.constants'
 import { StreakTimelineItem } from './interfaces/StrakeTimelineItem.interfaces'
+import { SPECIAL_GIFTS } from 'src/subscriptions/constants/subscription-rewards.constant'
 
 @Injectable()
 export class StreaksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletService: WalletService,
-  ) { }
+  ) {}
 
-  /**
-   * Evalúa la racha, la incrementa si corresponde, pero NO da monedas
-   */
   async handleAutoCheckIn(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -44,7 +39,7 @@ export class StreaksService {
       })
       const diffDays = Math.floor(
         (Date.parse(todayStr) - Date.parse(lastCheckInStr)) /
-        (1000 * 60 * 60 * 24),
+          (1000 * 60 * 60 * 24),
       )
 
       if (diffDays === 0) {
@@ -84,10 +79,7 @@ export class StreaksService {
     }
   }
 
-  /**
-   * Calcula el premio según su racha y tier, y procesa la transacción atómica.
-   */
-  async claimDailyReward(userId: string, userTier: string) {
+  async claimDailyReward(userId: string, userTier: string = 'FREE') {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { currentStreak: true, streakRewardClaimed: true },
@@ -98,62 +90,96 @@ export class StreaksService {
       throw new BadRequestException('Ya reclamaste el premio de hoy, campeón.')
     }
 
-    const streakDayForCalculation = Math.min(
-      user.currentStreak,
-      STREAK_CONFIG.MAX_GROWTH_DAY,
-    )
-    const baseReward = Math.floor(
-      STREAK_CONFIG.BASE_REWARD *
-      Math.pow(STREAK_CONFIG.GROWTH_RATE, streakDayForCalculation - 1),
-    )
+    const baseCoinReward = calculateStreakCoins(user.currentStreak, userTier)
 
-    const multiplier = TIER_MULTIPLIERS[userTier] || 1.0
-    const finalCoinReward = Math.floor(baseReward * multiplier)
+    const giftsForDay = SPECIAL_GIFTS[user.currentStreak]
+    const specialGiftDef = giftsForDay
+      ? giftsForDay[userTier] || giftsForDay['FREE']
+      : null
 
-    const specialGift = SPECIAL_GIFTS[user.currentStreak]
+    let finalTotalCoins = baseCoinReward
+    let cosmeticAwardedMessage: string | null = null
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: userId },
+      // Update condicional: con dos claims simultáneos solo uno marca el premio y acredita
+      const claim = await tx.user.updateMany({
+        where: { id: userId, streakRewardClaimed: false },
         data: { streakRewardClaimed: true },
       })
-
-      await this.walletService.addCoins({
-        userId,
-        amount: finalCoinReward,
-        type: 'STREAK_REWARD',
-        description: `Premio diario por racha del Día ${user.currentStreak}`,
-      })
-
-      if (specialGift) {
-        await tx.userInventory.upsert({
-          where: {
-            userId_itemId: { userId, itemId: specialGift.itemId },
-          },
-          update: {
-            quantity: { increment: 1 },
-          },
-          create: {
-            userId,
-            itemId: specialGift.itemId,
-            quantity: 1,
-          },
-        })
+      if (claim.count === 0) {
+        throw new BadRequestException(
+          'Ya reclamaste el premio de hoy, campeón.',
+        )
       }
+
+      if (specialGiftDef) {
+        const storeItem = await tx.storeItem.findUnique({
+          where: { assetId: specialGiftDef.assetId },
+        })
+
+        if (storeItem) {
+          const isPermanent = [
+            'NAME_COLOR',
+            'BANNER',
+            'CHAT_BUBBLE',
+            'STICKER_PACK',
+          ].includes(storeItem.type)
+
+          const existingInventory = await tx.userInventory.findUnique({
+            where: { userId_itemId: { userId, itemId: storeItem.id } },
+          })
+
+          if (isPermanent && existingInventory) {
+            // Con tope: si no, cortar la racha a propósito para repetir el regalo convendría
+            const compensationCoins = Math.min(
+              Math.floor(
+                storeItem.price * STREAK_CONFIG.GIFT_COMPENSATION_RATE,
+              ),
+              STREAK_CONFIG.MAX_GIFT_COMPENSATION,
+            )
+            finalTotalCoins += compensationCoins
+            cosmeticAwardedMessage = `${storeItem.name} (Ya lo tenías. Compensación: +${compensationCoins} monedas)`
+          } else {
+            await tx.userInventory.upsert({
+              where: {
+                userId_itemId: { userId, itemId: storeItem.id },
+              },
+              update: {
+                quantity: { increment: 1 },
+              },
+              create: {
+                userId,
+                itemId: storeItem.id,
+                quantity: 1,
+              },
+            })
+            cosmeticAwardedMessage = storeItem.name
+          }
+        }
+      }
+
+      await this.walletService.addCoins(
+        {
+          userId,
+          amount: finalTotalCoins,
+          type: 'STREAK_REWARD',
+          description: `Premio diario por racha del Día ${user.currentStreak}`,
+        },
+        tx,
+      )
     })
+
+    await this.walletService.syncBalanceCache(userId)
 
     return {
       status: 'success',
-      coinsAwarded: finalCoinReward,
-      cosmeticAwarded: specialGift ? specialGift.itemName : null,
+      coinsAwarded: finalTotalCoins,
+      cosmeticAwarded: cosmeticAwardedMessage,
       currentStreak: user.currentStreak,
     }
   }
 
-  /**
-   *  camino de recompensas (timeline) de 7 días personalizado para el usuario.
-   */
-  async getStreakTimeline(userId: string, userTier: string) {
+  async getStreakTimeline(userId: string, userTier: string = 'FREE') {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { currentStreak: true, streakRewardClaimed: true },
@@ -164,29 +190,25 @@ export class StreaksService {
     const current = user.currentStreak || 1
     const claimedToday = user.streakRewardClaimed
 
-    let startDay = Math.max(1, current - 1)
-
-    if (current > 2) {
-      startDay = current - 1
-    }
+    const cycle = Math.floor((current - 1) / 30)
+    const startDay = cycle * 30 + 1
 
     const timeline: StreakTimelineItem[] = []
-    const multiplier = TIER_MULTIPLIERS[userTier] || 1.0
+    const assetIdsToFetch: string[] = []
 
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 30; i++) {
       const dayNum = startDay + i
 
-      const streakDayForCalculation = Math.min(
-        dayNum,
-        STREAK_CONFIG.MAX_GROWTH_DAY,
-      )
-      const baseReward = Math.floor(
-        STREAK_CONFIG.BASE_REWARD *
-        Math.pow(STREAK_CONFIG.GROWTH_RATE, streakDayForCalculation - 1),
-      )
-      const estimatedCoins = Math.floor(baseReward * multiplier)
+      const estimatedCoins = calculateStreakCoins(dayNum, userTier)
 
-      const specialGift = SPECIAL_GIFTS[dayNum]
+      const giftsForDay = SPECIAL_GIFTS[dayNum]
+      const specialGiftDef = giftsForDay
+        ? giftsForDay[userTier] || giftsForDay['FREE']
+        : null
+
+      if (specialGiftDef) {
+        assetIdsToFetch.push(specialGiftDef.assetId)
+      }
 
       let status: 'completed' | 'current' | 'upcoming' = 'upcoming'
       if (dayNum < current) {
@@ -198,9 +220,32 @@ export class StreaksService {
       timeline.push({
         dayNumber: dayNum,
         coins: estimatedCoins,
-        hasSpecialGift: !!specialGift,
-        giftName: specialGift ? specialGift.itemName : null,
+        hasSpecialGift: !!specialGiftDef,
+        giftAssetId: specialGiftDef ? specialGiftDef.assetId : null,
+        giftType: specialGiftDef ? specialGiftDef.type : null,
         status,
+        giftName: null,
+      })
+    }
+
+    if (assetIdsToFetch.length > 0) {
+      const storeItems = await this.prisma.storeItem.findMany({
+        where: { assetId: { in: assetIdsToFetch } },
+        select: { assetId: true, name: true },
+      })
+
+      const itemsMap = storeItems.reduce(
+        (acc, item) => {
+          acc[item.assetId] = item
+          return acc
+        },
+        {} as Record<string, { assetId: string; name: string }>,
+      )
+
+      timeline.forEach((day) => {
+        if (day.giftAssetId && itemsMap[day.giftAssetId]) {
+          day.giftName = itemsMap[day.giftAssetId].name
+        }
       })
     }
 

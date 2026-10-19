@@ -16,13 +16,16 @@ out/
 .env.test.local
 .env.production.local
 *.env
+.env.*
+!.env.example
+!.env.production.example
+backup_dev.sql
 
 prisma/dev.db
 prisma/dev.db-journal
 prisma/debug.log
 *.db
 *.db-journal
-backend/prisma/migrations/
 
 # --- Docker & Logs ---
 *.log
@@ -42,4 +45,7 @@ coverage/
 
 backend/public/logos/
 
-backend/.agents/
+# --- Claude Code (personal, no se comparte) ---
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/agent-memory-local/

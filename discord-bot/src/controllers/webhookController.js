@@ -6,10 +6,14 @@ const {
   StringSelectMenuBuilder, 
   StringSelectMenuOptionBuilder 
 } = require('discord.js');
+const { safeEqual } = require('../utils/safeEqual');
+
+// El asunto y los mensajes los escribe el usuario en la web: sin esto, un "@everyone" pinguearía al staff.
+const NO_MENTIONS = { parse: [] };
 
 const handleReportAlert = async (req, res) => {
   const secret = req.headers['x-discord-bot-token'];
-  if (secret !== process.env.DISCORD_INTERNAL_SECRET) {
+  if (!safeEqual(secret, process.env.DISCORD_INTERNAL_SECRET)) {
     return res.status(401).json({ error: 'No autorizado.' });
   }
 
@@ -44,7 +48,7 @@ const handleReportAlert = async (req, res) => {
 
 const handleNewTicketAlert = async (req, res) => {
   const secret = req.headers['x-discord-bot-token'];
-  if (secret !== process.env.DISCORD_INTERNAL_SECRET) {
+  if (!safeEqual(secret, process.env.DISCORD_INTERNAL_SECRET)) {
     return res.status(401).json({ error: 'No autorizado.' });
   }
 
@@ -54,7 +58,10 @@ const handleNewTicketAlert = async (req, res) => {
   try {
     const channel = await client.channels.fetch(process.env.DISCORD_TICKETS_CHANNEL_ID);
     
-    const discordMsg = await channel.send(`🎟️ **Nuevo Ticket de Soporte**\nUsuario: <@${userId}>\nAsunto: ${subject}`);
+    const discordMsg = await channel.send({
+      content: `🎟️ **Nuevo Ticket de Soporte**\nUsuario: <@${userId}>\nAsunto: ${subject}`,
+      allowedMentions: NO_MENTIONS,
+    });
     
     const thread = await discordMsg.startThread({
       name: `TKT-${ticketId.substring(0, 8)}`,
@@ -76,7 +83,8 @@ const handleNewTicketAlert = async (req, res) => {
 
     const threadOptions = {
       content: `📝 **Mensaje inicial:**\n${initialMessage || 'Sin mensaje.'}`,
-      components: [row] 
+      components: [row],
+      allowedMentions: NO_MENTIONS,
     };
 
     if (screenshotUrl) {
@@ -94,7 +102,7 @@ const handleNewTicketAlert = async (req, res) => {
 
 const handleForwardMessage = async (req, res) => {
   const secret = req.headers['x-discord-bot-token'];
-  if (secret !== process.env.DISCORD_INTERNAL_SECRET) {
+  if (!safeEqual(secret, process.env.DISCORD_INTERNAL_SECRET)) {
     return res.status(401).json({ error: 'No autorizado.' });
   }
 
@@ -106,7 +114,8 @@ const handleForwardMessage = async (req, res) => {
     
     if (thread && thread.isThread()) {
       const options = {
-        content: `👤 **El usuario respondió desde la Web:**\n${message}`
+        content: `👤 **El usuario respondió desde la Web:**\n${message}`,
+        allowedMentions: NO_MENTIONS,
       };
 
       if (screenshotUrl) {

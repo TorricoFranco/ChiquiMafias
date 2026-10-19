@@ -12,4 +12,4 @@ import { HttpModule } from '@nestjs/axios'
   providers: [MercadoPagoService],
   exports: [MercadoPagoService],
 })
-export class MercadoPagoModule { }
+export class MercadoPagoModule {}

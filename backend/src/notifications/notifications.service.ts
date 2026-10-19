@@ -11,8 +11,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatGateway: ChatGateway,
-  ) { }
-
+  ) {}
 
   async createPersonalNotification(payload: {
     userId: string

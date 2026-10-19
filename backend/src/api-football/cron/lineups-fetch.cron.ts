@@ -20,7 +20,7 @@ export class LineupsFetchCron {
     private readonly prisma: PrismaService,
     private readonly http: ApiFootballHttp,
     private readonly redisService: RedisService,
-  ) { }
+  ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async fetchLineups() {
@@ -103,10 +103,10 @@ export class LineupsFetchCron {
             data: { lineup_fetched: true, lineup_fetched_at: new Date() },
           })
         })
-          ; (await this.redisService.redis.del(`match:details:v1:${match.id}`),
-            this.logger.debug(
-              `✅ Formaciones sincronizadas para Match: ${match.id}`,
-            ))
+        ;(await this.redisService.redis.del(`match:details:v1:${match.id}`),
+          this.logger.debug(
+            `✅ Formaciones sincronizadas para Match: ${match.id}`,
+          ))
 
         // NOTIFICACIÓN PUB/SUB
         await this.redisService.publish('match_updates', {

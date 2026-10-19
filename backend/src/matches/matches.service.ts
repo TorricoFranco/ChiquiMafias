@@ -8,11 +8,13 @@ import { MatchesMappers } from './matches.mappers'
 import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
+import { StandingsService } from 'src/standings/standings.service'
 
 @Injectable()
 export class MatchesService {
   private readonly logger = new Logger(MatchesService.name)
   private readonly CACHE_TTL = 3600
+  private readonly PRE_MATCH_STALE_TTL = 7 * 24 * 60 * 60 // 7 días
   private pendingRequests = new Map<string, Promise<any>>()
   private loadingMatches = new Map<string, Promise<any>>()
 
@@ -20,7 +22,8 @@ export class MatchesService {
     private prisma: PrismaService,
     private redisService: RedisService,
     private api: PrematchServiceApi,
-  ) { }
+    private standingsService: StandingsService,
+  ) {}
 
   async getMatchDetails(
     leagueId: string,
@@ -122,10 +125,10 @@ export class MatchesService {
             tournament: match.tournament,
             venue: finalVenue
               ? {
-                name: finalVenue.name,
-                city: finalVenue.city ?? null, // Clave: permitir null segun DTO
-                image: finalVenue.image_url ?? null,
-              }
+                  name: finalVenue.name,
+                  city: finalVenue.city ?? null, // Clave: permitir null segun DTO
+                  image: finalVenue.image_url ?? null,
+                }
               : null,
           },
           score: {
@@ -246,9 +249,9 @@ export class MatchesService {
       substitutionLog:
         event.type?.toLowerCase() === 'subst'
           ? {
-            playerIn: event.player?.name ?? 'Jugador Entrante',
-            playerOut: event.assist?.name ?? 'Jugador Saliente',
-          }
+              playerIn: event.player?.name ?? 'Jugador Entrante',
+              playerOut: event.assist?.name ?? 'Jugador Saliente',
+            }
           : null,
     }))
   }
@@ -272,8 +275,12 @@ export class MatchesService {
   // PRE-MATCH AGGREGATED DATA (H2H, FORMA, STANDINGS)
 
   async getAggregatedData(matchId: string): Promise<PreMatchResponseDto> {
-    const cacheKey = `pre_match:${matchId}`
+    // v2: la forma de PreMatchResponseDto cambió con el mapper nuevo.
+    // Si vuelve a cambiar, subí la versión para no servir objetos viejos.
+    const cacheKey = `pre_match:v2:${matchId}`
+    const staleKey = `pre_match:v2:stale:${matchId}`
 
+    // Endpoint público: sin esta lectura, cada visita hace 3 llamadas a API-Football
     const cached = await this.redisService.redis.get(cacheKey)
     if (cached) return JSON.parse(cached) as PreMatchResponseDto
 
@@ -292,34 +299,53 @@ export class MatchesService {
 
         if (!match) throw new Error('Match no encontrado')
 
-        const hId = match.home_team.api_team_id
-        const aId = match.away_team.api_team_id
+        const hId = String(match.home_team.id)
+        const aId = String(match.away_team.id)
+
+        const hIdApi = String(match.home_team.api_team_id)
+        const aIdApi = String(match.away_team.api_team_id)
         const leagueId = match.league_id
         const season = match.season
 
         const [h2h, hForm, aForm, standings] = await Promise.all([
-          this.api.getH2H(`${hId}-${aId}`),
-          this.api.getLatestResults(hId),
-          this.api.getLatestResults(aId),
-          this.api.getStandings(leagueId, season),
+          this.api.getH2H(`${hIdApi}-${aIdApi}`),
+          this.api.getLatestResults(hIdApi),
+          this.api.getLatestResults(aIdApi),
+          this.standingsService.getCachedFullStandings(leagueId, season),
         ])
 
         const processed = MatchesMappers.toPreMatchResponse(
           { h2h, hForm, aForm, standings },
           hId,
           aId,
+          hIdApi,
+          aIdApi,
         )
 
+        const serialized = JSON.stringify(processed)
         await this.redisService.redis.set(
           cacheKey,
-          JSON.stringify(processed),
+          serialized,
           'EX',
-          3600,
+          this.CACHE_TTL,
+        )
+        // Copia de respaldo con TTL largo: solo se lee si API-Football falla
+        // después de que venció la key principal.
+        await this.redisService.redis.set(
+          staleKey,
+          serialized,
+          'EX',
+          this.PRE_MATCH_STALE_TTL,
         )
         return processed
       } catch (error) {
-        const stale = await this.redisService.redis.get(cacheKey)
-        if (stale) return JSON.parse(stale)
+        const stale = await this.redisService.redis.get(staleKey)
+        if (stale) {
+          this.logger.warn(
+            `Pre-match ${matchId}: falló la API, se sirve la copia de respaldo`,
+          )
+          return JSON.parse(stale) as PreMatchResponseDto
+        }
         throw error
       } finally {
         this.pendingRequests.delete(matchId)

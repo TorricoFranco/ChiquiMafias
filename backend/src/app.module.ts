@@ -35,6 +35,9 @@ import { DiscordModule } from './discord/discord.module'
 import { CloudinaryModule } from './cloudinary/cloudinary.module'
 import { EmailModule } from './email/email.module'
 import { WebhookModule } from './webhook/webhook.module'
+import { CoinShopModule } from './coin-shop/coin-shop.module'
+import { StatsModule } from './stats/stats.module'
+import { PricingModule } from './pricing/pricing.module'
 
 @Module({
   imports: [
@@ -87,6 +90,9 @@ import { WebhookModule } from './webhook/webhook.module'
     EmailModule,
     MercadoPagoModule,
     WebhookModule,
+    CoinShopModule,
+    StatsModule,
+    PricingModule,
   ],
   controllers: [AppController],
   providers: [
@@ -105,4 +111,4 @@ import { WebhookModule } from './webhook/webhook.module'
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

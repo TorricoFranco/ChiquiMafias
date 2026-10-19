@@ -19,7 +19,7 @@ export class EventsFetchCron {
     private readonly prisma: PrismaService,
     private readonly http: ApiFootballHttp,
     private readonly redisService: RedisService,
-  ) { }
+  ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
   async fetchEvents() {

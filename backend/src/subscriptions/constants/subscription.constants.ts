@@ -1,31 +1,41 @@
 import { SubscriptionTier } from '@prisma/client'
 
 /**
- * DESCUENTO APLICADO EN FINES DE SEMANA O PROMOCIONES
- * Se aplica como porcentaje de rebaja sobre el precio base
+ * NOMBRES DE PLANES
+ * El enum de Prisma (TIER_1..3) es interno; esto es lo que ve el usuario.
  */
-export const WEEKEND_DISCOUNT_PERCENTAGE = 15 // 15% de descuento
+export const SUBSCRIPTION_TIER_NAMES: Record<SubscriptionTier, string> = {
+  [SubscriptionTier.TIER_1]: 'Popular',
+  [SubscriptionTier.TIER_2]: 'Plateísta',
+  [SubscriptionTier.TIER_3]: 'Palco VIP',
+}
+
+export const getTierDisplayName = (tier: SubscriptionTier): string =>
+  SUBSCRIPTION_TIER_NAMES[tier] ?? tier
 
 /**
- * CICLO DE SUSCRIPCIÓN
- * Período en días para el cual se genera la suscripción
+ * DESCUENTOS Y PROMOCIONES
+ */
+export const WEEKEND_DISCOUNT_PERCENTAGE = 10
+export const SUNDAY_VIP_DISCOUNT_PERCENTAGE = 15
+export const SUNDAY_VIP_UPGRADE_DISCOUNT_PERCENTAGE = 25
+
+export const PROMO_MESSAGES = {
+  SUNDAY_VIP_UPGRADE: '⚡ UPGRADE VIP 25% OFF',
+  SUNDAY_VIP: '⚡ OFERTA DOMINGO VIP 15% OFF',
+  WEEKEND: '🔥 OFERTA DE FIN DE SEMANA',
+} as const
+
+/**
+ * CICLO DE SUSCRIPCIÓN Y PERÍODOS
  */
 export const SUBSCRIPTION_CYCLE_DAYS = 30
-
-/**
- * PERÍODO DE GRACIA
- * Tiempo en horas para recuperación ante fallo de pago
- */
 export const GRACE_PERIOD_HOURS = 48
+// Vínculo upgrade → suscripción vieja en Redis: cubre los reintentos de cobro de MP
+export const UPGRADE_LINK_TTL_SECONDS = 15 * 24 * 60 * 60
 
 /**
- * CONVERSIÓN DE DÍAS A MONEDAS VIRTUALES (PARA UPGRADE)
- * Cantidad de coins por cada día no consumido del plan anterior
- */
-export const COINS_PER_DAY_UPGRADE = 100
-
-/**
- * VALORES FIJOS DE INTEGRACIÓN
+ * INTEGRACIONES
  */
 export const MERCADO_PAGO_CONSTANTS = {
   PREAPPROVAL_ENDPOINT: '/preapproval',

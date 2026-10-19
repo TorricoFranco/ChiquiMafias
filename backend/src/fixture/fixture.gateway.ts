@@ -17,7 +17,7 @@ export class FixtureLeagueGateway implements OnApplicationBootstrap {
   @WebSocketServer() server: Server
   private readonly logger = new Logger(FixtureLeagueGateway.name)
 
-  constructor(private readonly redisService: RedisService) { }
+  constructor(private readonly redisService: RedisService) {}
 
   async onApplicationBootstrap() {
     let retries = 0
@@ -33,7 +33,6 @@ export class FixtureLeagueGateway implements OnApplicationBootstrap {
       return
     }
 
-    // Ahora ya debería funcionar
     await this.redisService.subscribe('league_live_updates', (data) => {
       try {
         if (!data) return

@@ -5,6 +5,7 @@ import {
   Res,
   Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common'
 import { AuthService } from './auth.service'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
@@ -13,7 +14,8 @@ import * as express from 'express'
 import { Public } from './decorators/auth.decorator'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
-import { Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler'
+import { DevToolsGuard } from './guards/dev-tools.guard'
 
 @ApiTags('Auth (Autenticación)')
 @Controller('auth')
@@ -21,16 +23,22 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService<EnvironmentVariables>,
-  ) { }
+  ) {}
 
-  private get cookieOptions() {
-    return {
+  private getCookieOptions() {
+    const isProduction =
+      this.configService.get('NODE_ENV', { infer: true }) === 'production'
+
+    // Front y API comparten sitio (chiquimafias.com / api.chiquimafias.com), así que
+    // 'lax' alcanza y es más estricto que 'none'.
+    const options = {
       httpOnly: true,
-      secure:
-        this.configService.get('NODE_ENV', { infer: true }) === 'production',
+      secure: isProduction,
       sameSite: 'lax' as const,
+      domain: isProduction ? '.chiquimafias.com' : undefined,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     }
+    return options
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -44,7 +52,7 @@ export class AuthController {
     const { accessToken, refreshToken, user } =
       await this.authService.googleLogin(googleLoginDto.credential)
 
-    res.cookie('refresh_token', refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', refreshToken, this.getCookieOptions())
 
     return { access_token: accessToken, user }
   }
@@ -65,12 +73,13 @@ export class AuthController {
     const { accessToken, refreshToken, user } =
       await this.authService.refreshTokens(incomingRefreshToken)
 
-    res.cookie('refresh_token', refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', refreshToken, this.getCookieOptions())
 
     return { access_token: accessToken, user }
   }
 
   @Post('logout')
+  @Public()
   @ApiOperation({ summary: 'Cerrar sesión limpiando cookies y base de datos' })
   async logout(
     @Req() req: express.Request,
@@ -82,14 +91,15 @@ export class AuthController {
       await this.authService.logout(incomingRefreshToken)
     }
 
-    res.clearCookie('refresh_token', { ...this.cookieOptions, maxAge: 0 })
+    res.clearCookie('refresh_token', { ...this.getCookieOptions(), maxAge: 0 })
 
     return { status: 'ok', message: 'Sesión cerrada limpiamente, sese' }
   }
 
-  // AAAAAAAAAAAAAAAAA
+  // Solo para desarrollo: sin ENABLE_DEV_TOOLS=true (o en producción) responde 404.
   @Post('dev-login')
   @Public()
+  @UseGuards(DevToolsGuard)
   @ApiOperation({ summary: '[DEV] Login solo con email' })
   async devLogin(
     @Body('email') email: string,
@@ -97,7 +107,7 @@ export class AuthController {
   ) {
     const { accessToken, refreshToken, user } =
       await this.authService.devLoginByEmail(email)
-    res.cookie('refresh_token', refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', refreshToken, this.getCookieOptions())
 
     return { access_token: accessToken, user }
   }

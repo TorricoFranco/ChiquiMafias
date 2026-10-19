@@ -18,7 +18,7 @@ class UserAuthResponseDto {
     example: 'ADMIN',
     description: 'Rol asignado al usuario en el sistema',
   })
-  role: string 
+  role: string
 }
 
 export class AuthResponseDto {

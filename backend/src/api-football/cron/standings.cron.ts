@@ -13,6 +13,7 @@ import { ApiFootballStandingsResponse } from '../interfaces/apiStandings'
 import { mapApiGroupToStage } from '../mappers/mapApiGroupStage'
 import { upsertTeam } from '../upserts/upsert-team'
 import { upsertTeamSeasonStats } from '../upserts/upsert-teamSeasonStats'
+import { OnEvent } from '@nestjs/event-emitter'
 
 @Injectable()
 export class StandingCron {
@@ -25,10 +26,25 @@ export class StandingCron {
     private readonly http: ApiFootballHttp,
     private readonly redis: RedisService,
     private readonly standings: StandingsService,
-  ) { }
+  ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async fetchStandings() {
+    await this.syncStandings()
+  }
+
+  @OnEvent('match.finished')
+  async handleMatchFinished(payload: { leagueId: number; season: number }) {
+    this.logger.log(
+      `Evento recibido: Partido terminado. Actualizando Standings de liga ${payload.leagueId}`,
+    )
+
+    setTimeout(async () => {
+      await this.syncStandings()
+    }, 60000)
+  }
+
+  private async syncStandings() {
     try {
       const res = await this.http.get<
         ApiFootballResponse<ApiFootballStandingsResponse>

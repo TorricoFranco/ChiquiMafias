@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "Poll" ADD COLUMN     "userId" TEXT,
+ALTER COLUMN "startsAt" DROP NOT NULL,
+ALTER COLUMN "endsAt" DROP NOT NULL;
+
+-- AddForeignKey
+ALTER TABLE "Poll" ADD CONSTRAINT "Poll_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;

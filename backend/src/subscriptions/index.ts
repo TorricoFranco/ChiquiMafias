@@ -30,5 +30,4 @@ export {
   WEEKEND_DISCOUNT_PERCENTAGE,
   SUBSCRIPTION_CYCLE_DAYS,
   GRACE_PERIOD_HOURS,
-  COINS_PER_DAY_UPGRADE,
 } from './constants/subscription.constants'
