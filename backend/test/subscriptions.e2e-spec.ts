@@ -145,12 +145,13 @@ describe('SubscriptionsController (e2e)', () => {
     })
   })
 
-  describe('PATCH /subscriptions/plans/price (Admin)', () => {
-    it('debería denegar el acceso si el usuario no es ADMIN (403 Forbidden)', async () => {
+  describe('PATCH /subscriptions/plans/price (retirada)', () => {
+    // Los precios solo se cambian por /pricing (solo el presidente, con auditoría): esta ruta ya no existe.
+    it('debería responder 404 porque los precios ya no se editan desde /subscriptions', async () => {
       await request(app.getHttpServer())
         .patch('/subscriptions/plans/price')
-        .send({ tier: SubscriptionTier.PRO, basePriceARS: 15000 })
-        .expect(403)
+        .send({ tier: SubscriptionTier.TIER_1, basePriceARS: 15000 })
+        .expect(404)
     })
   })
 })
