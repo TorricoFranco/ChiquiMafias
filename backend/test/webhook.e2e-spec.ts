@@ -36,10 +36,12 @@ describe('WebhookController (e2e)', () => {
       .send(mockPayload)
       .expect(201)
 
+    // El 4.º argumento es el query string (vacío en esta llamada): el servicio lo usa para el data.id.
     expect(mockWebhookService.processWebhook).toHaveBeenCalledWith(
       mockPayload,
       'ts=123,v1=abc',
       'req-999',
+      {},
     )
   })
 })
