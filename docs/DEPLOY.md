@@ -40,8 +40,20 @@ sudo bash /root/harden-server.sh --user deploy --pubkey-file /root/chiquimafias_
 ```
 
 El script actualiza el sistema, crea el usuario `deploy`, deja SSH solo con llave y sin root, activa UFW
-(22, 80 y 443), fail2ban, actualizaciones automáticas e instala Docker. **Antes de cerrar la sesión de
-root**, abrí otra terminal y comprobá que entrás: `ssh -i ~/.ssh/chiquimafias_vps deploy@<IP>`.
+(el puerto de SSH, 80 y 443), fail2ban, actualizaciones automáticas e instala Docker. **Antes de cerrar la
+sesión de root**, abrí otra terminal y comprobá que entrás: `ssh -i ~/.ssh/chiquimafias_vps deploy@<IP>`.
+
+**Puerto de SSH.** Algunos proveedores (DonWeb, por ejemplo) no usan el 22 sino otro puerto, como el 5622, y su
+firewall externo solo deja pasar ese. Pasale el que ya funciona con `--ssh-port` (en el ejemplo de arriba,
+`--ssh-port 5622`) y no lo muevas al 22 o te quedás afuera. En Ubuntu 24.04 SSH arranca por socket
+(`ssh.socket`); el script ya lo contempla y deja un solo puerto escuchando.
+
+**Cuidado con fail2ban mientras probás.** Después del hardening, `root` ya no puede entrar por SSH, y cada
+intento fallido cuenta: 4 en 10 minutos bloquean tu IP durante 1 hora. No dejes bucles ni scripts que sigan
+intentando entrar como `root`. Si te bloqueás, entrá por la consola web del panel del proveedor y corré
+`fail2ban-client unban --all`. Como red de seguridad, antes de endurecer SSH podés programar un
+`systemd-run --on-active=900 <script-que-restaura-sshd>` y cancelarlo (`systemctl stop <unidad>.timer`) cuando
+confirmes que entrás como `deploy`.
 
 > Docker se salta UFW cuando un servicio publica puertos con `ports:`. Por eso el compose de producción
 > solo publica Caddy. No agregues `ports:` a Postgres, Redis, el backend ni el bot.
@@ -130,6 +142,13 @@ Con el dominio funcionando:
    copiá el secreto de firma a `MERCADO_PAGO_WEBHOOK_SECRET`. Después `docker compose up -d backend`.
 3. **Resend:** verificá el dominio (registros SPF y DKIM en tu DNS) para que los mails no caigan en spam.
 4. **Discord:** registrá los comandos del bot una vez: `docker compose exec discord_bot node deploy-commands.js`.
+   Si usás el mismo token de bot en tu PC y en el servidor, los dos responden a la vez: apagá el de tu PC o
+   creá otro bot para producción.
+5. **API-Football:** el plan gratuito no da acceso a la temporada en curso (solo 2022 a 2024) ni alcanza para
+   los crons (100 pedidos por día). Con ese plan el sitio sirve los datos del seed, pero los partidos, las
+   posiciones y los eventos en vivo no se actualizan y el cron de posiciones falla. Para datos en vivo hace
+   falta un plan de pago en `dashboard.api-football.com`. Comprobalo con
+   `curl -s -H "x-apisports-key: $KEY" https://v3.football.api-sports.io/status`.
 
 ## 6. Verificación desde afuera
 
@@ -137,9 +156,10 @@ Desde **tu PC** (no desde el VPS):
 
 ```bash
 bash scripts/ops/scan-ports.sh <IP> chiquimafias.com api.chiquimafias.com
+SSH_PORT=5622 bash scripts/ops/scan-ports.sh <IP> chiquimafias.com api.chiquimafias.com   # si el SSH no está en el 22
 ```
 
-Comprueba que solo estén abiertos 22, 80 y 443, que HTTP redirija a HTTPS, que la API mande HSTS,
+Comprueba que solo estén abiertos el puerto de SSH, el 80 y el 443, que HTTP redirija a HTTPS, que la API mande HSTS,
 que Swagger y `dev-login` no existan, que CORS acepte solo el sitio y que `www` redirija. Tiene que terminar
 con "Todo en orden". Después probá a mano: login con Google, un pago de prueba con tu cuenta, el chat
 (WebSockets) y que llegue un reporte al canal de Discord.

@@ -4,6 +4,7 @@
 #
 #   scripts/ops/scan-ports.sh <ip-o-dominio> [dominio-del-sitio] [dominio-de-la-api]
 #   scripts/ops/scan-ports.sh 203.0.113.10 chiquimafias.com api.chiquimafias.com
+#   SSH_PORT=5622 scripts/ops/scan-ports.sh 203.0.113.10   # si el SSH no está en el 22
 #
 # Sale con código 1 si hay algo que no debería estar abierto o si falla una comprobación.
 set -uo pipefail
@@ -13,7 +14,8 @@ APP="${2:-chiquimafias.com}"
 API="${3:-api.chiquimafias.com}"
 [ -n "$HOST" ] || { echo "Uso: $0 <ip-o-dominio> [dominio-del-sitio] [dominio-de-la-api]"; exit 2; }
 
-EXPECTED_OPEN=" 22 80 443 "                         # si cambiaste el puerto SSH, ajustá esta lista
+SSH_PORT="${SSH_PORT:-22}"                       # si tu SSH no está en el 22: SSH_PORT=5622 scripts/ops/scan-ports.sh ...
+EXPECTED_OPEN=" $SSH_PORT 80 443 "
 INTERNAL_PORTS="3001 3005 3007 5432 5433 6379 8080 9000 2375 2376 27017"
 FAIL=0
 CURL_OPTS="${CURL_OPTS:-}"   # por ejemplo "-k" para probar contra un certificado local
@@ -23,7 +25,7 @@ ok()   { echo "  [OK]    $*"; }
 bad()  { echo "  [FALLA] $*"; FAIL=1; }
 
 echo "== Puertos TCP en $HOST"
-for p in 21 22 23 25 53 80 110 143 443 465 587 993 995 $INTERNAL_PORTS; do
+for p in $SSH_PORT 21 22 23 25 53 80 110 143 443 465 587 993 995 $INTERNAL_PORTS; do
   if is_open "$p"; then
     case "$EXPECTED_OPEN" in
       *" $p "*) ok "puerto $p abierto (esperado)" ;;
@@ -31,7 +33,7 @@ for p in 21 22 23 25 53 80 110 143 443 465 587 993 995 $INTERNAL_PORTS; do
     esac
   fi
 done
-for p in 22 80 443; do
+for p in $SSH_PORT 80 443; do
   is_open "$p" || bad "puerto $p cerrado y debería estar abierto"
 done
 
