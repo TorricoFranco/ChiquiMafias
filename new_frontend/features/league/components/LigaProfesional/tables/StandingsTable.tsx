@@ -37,20 +37,20 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                 </div>
             </div>
 
-            {/* Table Content with horizontal scroll on small devices */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[550px] sm:min-w-full">
+            {/* Table Content: en mobile entra completa, sin scroll lateral */}
+            <div>
+                <table className="w-full table-fixed text-left border-collapse">
                     <thead>
                         <tr className="border-b border-[#353534] bg-[#181818] text-[11px] font-bold uppercase tracking-wider text-[#8e9285]">
-                            <th className="py-2.5 px-3 text-center w-10">Pos</th>
-                            <th className="py-2.5 px-3">Equipo</th>
-                            <th className="py-2.5 px-3 text-center font-black text-sky-400 w-12">PTS</th>
-                            <th className="py-2.5 px-2 text-center w-10">J</th>
-                            <th className="py-2.5 px-2 text-center w-10">G</th>
-                            <th className="py-2.5 px-2 text-center w-10">E</th>
-                            <th className="py-2.5 px-2 text-center w-10">P</th>
+                            <th className="py-2.5 px-1 sm:px-3 text-center w-9 sm:w-10">Pos</th>
+                            <th className="py-2.5 px-1 sm:px-3">Equipo</th>
+                            <th className="py-2.5 px-0.5 sm:px-3 text-center font-black text-sky-400 w-9 sm:w-12">PTS</th>
+                            <th className="py-2.5 px-0.5 sm:px-2 text-center w-7 sm:w-10">J</th>
+                            <th className="py-2.5 px-0.5 sm:px-2 text-center w-7 sm:w-10">G</th>
+                            <th className="py-2.5 px-0.5 sm:px-2 text-center w-7 sm:w-10">E</th>
+                            <th className="py-2.5 px-0.5 sm:px-2 text-center w-7 sm:w-10">P</th>
                             <th className="py-2.5 px-3 text-center hidden sm:table-cell w-16">Goles</th>
-                            <th className="py-2.5 px-2 text-center w-12">DG</th>
+                            <th className="py-2.5 px-0.5 sm:px-2 text-center w-9 sm:w-12">DG</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[#2a2a2a] text-xs font-medium text-[#c6c9ab]">
@@ -67,7 +67,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                                     }`}
                                 >
                                     {/* Position number */}
-                                    <td className="py-2 px-3 text-center">
+                                    <td className="py-2 px-1 sm:px-3 text-center">
                                         <span
                                             className={`inline-flex items-center justify-center w-5 h-5 rounded-md font-bold text-xs font-mono ${
                                                 isPlayoffZone
@@ -80,7 +80,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                                     </td>
 
                                     {/* Team cell */}
-                                    <td className="py-2 px-3">
+                                    <td className="py-2 px-1 sm:px-3 overflow-hidden">
                                         <TeamRowCell
                                             teamId={row.teamId}
                                             teamName={row.teamName}
@@ -90,15 +90,15 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                                     </td>
 
                                     {/* Points (Highlighted in sky-400) */}
-                                    <td className="py-2 px-3 text-center font-black text-sm text-sky-400 font-mono">
+                                    <td className="py-2 px-0.5 sm:px-3 text-center font-black text-sm text-sky-400 font-mono">
                                         {row.points}
                                     </td>
 
                                     {/* Stats */}
-                                    <td className="py-2 px-2 text-center font-mono text-[#e5e2e1]">{row.played}</td>
-                                    <td className="py-2 px-2 text-center font-mono text-emerald-400/90">{row.won}</td>
-                                    <td className="py-2 px-2 text-center font-mono text-[#a0a09e]">{row.draw}</td>
-                                    <td className="py-2 px-2 text-center font-mono text-red-400/90">{row.lost}</td>
+                                    <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-[#e5e2e1]">{row.played}</td>
+                                    <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-emerald-400/90">{row.won}</td>
+                                    <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-[#a0a09e]">{row.draw}</td>
+                                    <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-red-400/90">{row.lost}</td>
 
                                     {/* Goles (hidden on mobile) */}
                                     <td className="py-2 px-3 text-center font-mono text-[#8e9285] hidden sm:table-cell text-[11px]">
@@ -107,7 +107,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
 
                                     {/* Goal Difference */}
                                     <td
-                                        className={`py-2 px-2 text-center font-mono font-bold ${
+                                        className={`py-2 px-0.5 sm:px-2 text-center font-mono font-bold ${
                                             row.goalDiff > 0
                                                 ? 'text-emerald-400'
                                                 : row.goalDiff < 0

@@ -25,10 +25,10 @@ export default function FullMatchPage() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#050505] text-[#e5e2e1]">
+    <div className="h-dvh w-screen flex flex-col overflow-hidden bg-[#050505] text-[#e5e2e1]">
       <Header activeTab="ligas" setActiveTab={() => router.push('/')} />
 
-      <div className="flex-1 flex flex-col pt-16 overflow-hidden">
+      <div className="flex-1 flex flex-col md:pt-16 overflow-hidden">
         <div className="flex h-full w-full relative">
 
           <LeagueSidebar

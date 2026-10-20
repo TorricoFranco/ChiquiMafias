@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Flame, Bell, Gift, PlusCircle, ChevronDown, Menu, User, Settings } from 'lucide-react';
 import { useUserStore } from "@/store/useUserStore";
 import { useWallet } from "@/features/wallet/socket/useWalletSocket";
@@ -11,6 +12,7 @@ import { useUIStore } from '@/store/useUIStore';
 import { AnimatedBalance } from '@/features/wallet/components/AnimatedBalance';
 import { MobileMenu } from './MobileMenu';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 
 interface HeaderProps {
     activeTab: string;
@@ -27,6 +29,9 @@ export const Header: React.FC<HeaderProps> = ({
     const toggleMobileSidebar = useUIStore((state) => state.toggleMobileSidebar)
     const isMobileSidebarOpen = useUIStore((state) => state.isMobileSidebarOpen)
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const pathname = usePathname();
+    const hiddenOnScroll = useHideOnScroll(`${pathname}|${activeTab}`);
+    const isFolded = hiddenOnScroll && !showUserMenu && !isMobileSidebarOpen;
 
     const id = useUserStore((state) => state.id);
     const isAuthenticated = !!id;
@@ -54,7 +59,15 @@ export const Header: React.FC<HeaderProps> = ({
 
     return (
         <>
-            <header className="fixed top-0 left-0 w-full z-50 border-b border-[#353534] shadow-md bg-[#131313]/95 backdrop-blur-md">
+            {/* Celular: va en el flujo (ocupa su lugar) y se pliega al bajar el scroll; desde md: fixed */}
+            <div
+                inert={isFolded}
+                className={`max-md:grid max-md:transition-[grid-template-rows] max-md:duration-200 md:contents ${isFolded
+                    ? 'max-md:grid-rows-[0fr] max-md:overflow-hidden'
+                    : 'max-md:grid-rows-[1fr]'
+                    }`}
+            >
+            <header className="max-md:min-h-0 md:fixed md:top-0 md:left-0 w-full z-50 border-b border-[#353534] shadow-md bg-[#131313]/95 backdrop-blur-md">
                 <div className="flex justify-between items-center h-16 px-4 md:px-8 max-w-[1920px] mx-auto">
                     <div className="flex items-center gap-4 md:gap-6">
                         <button
@@ -210,6 +223,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
             </header>
+            </div>
 
             {isStreakModalOpen && (
                 <StreakModal onClose={() => setIsStreakModalOpen(false)} />

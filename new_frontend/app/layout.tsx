@@ -71,7 +71,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         />
       </head>
-      <body className="h-screen flex flex-col bg-[#050505] text-[#e5e2e1] overflow-hidden font-sans">
+      <body className="h-dvh flex flex-col bg-[#050505] text-[#e5e2e1] overflow-hidden font-sans">
         <Script
           src="https://accounts.google.com/gsi/client"
           strategy="afterInteractive"
