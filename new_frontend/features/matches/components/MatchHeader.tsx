@@ -65,7 +65,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
     const awayGoals = score.summary?.goals?.filter((g) => g.team === teams.away.id) || [];
 
     return (
-        <div className="relative overflow-hidden rounded-2xl bg-[#1c1b1b] border border-[#2b2a2a] p-6 md:p-8 shadow-xl">
+        <div className="relative overflow-hidden rounded-2xl bg-[#1c1b1b] border border-[#2b2a2a] p-4 md:p-8 shadow-xl">
             {metadata.venue?.image && (
                 <div
                     className="absolute inset-0 bg-cover bg-center opacity-10 blur-sm pointer-events-none"
@@ -98,15 +98,15 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
             </div>
 
             {/* Scoreboard Arena */}
-            <div className="relative z-10 grid grid-cols-1 md:grid-cols-7 items-center gap-6 md:gap-4 my-2">
+            <div className="relative z-10 grid grid-cols-[1fr_auto_1fr] md:grid-cols-7 items-center gap-2 md:gap-4 my-2">
                 {/* Local Team */}
-                <div className="md:col-span-3 flex items-center justify-start md:justify-end gap-4 order-1">
-                    <div className="text-left md:text-right">
-                        <h2 className="text-xl md:text-2xl font-black text-[#e5e2e1] tracking-tight">
+                <div className="md:col-span-3 flex flex-col md:flex-row items-center justify-start md:justify-end gap-2 md:gap-4 order-1 min-w-0">
+                    <div className="text-center md:text-right order-2 md:order-1 min-w-0">
+                        <h2 className="text-sm md:text-2xl font-black text-[#e5e2e1] tracking-tight break-words">
                             {teams.home.name}
                         </h2>
                     </div>
-                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-[#2b2a2a] p-2 flex items-center justify-center border border-[#3e3d3c] shrink-0">
+                    <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl bg-[#2b2a2a] p-2 flex items-center justify-center border border-[#3e3d3c] shrink-0 order-1 md:order-2">
                         {teams.home.logo ? (
                             <img
                                 src={teams.home.logo}
@@ -144,7 +144,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                                 <div
                                     role="group"
                                     aria-label={`Marcador: ${teams.home.name} ${score.home}, ${teams.away.name} ${score.away}`}
-                                    className="flex items-center gap-3 bg-[#131313] px-5 py-2.5 rounded-2xl border border-[#2b2a2a] shadow-inner"
+                                    className="flex items-center gap-2 md:gap-3 bg-[#131313] px-3 md:px-5 py-2 rounded-2xl border border-[#2b2a2a] shadow-inner"
                                 >
                                     <span className="text-3xl md:text-4xl font-black text-[#e5e2e1] font-mono">
                                         {score.home}
@@ -182,8 +182,8 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                 </div>
 
                 {/* Away Team */}
-                <div className="md:col-span-3 flex items-center justify-start gap-4 order-3">
-                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-[#2b2a2a] p-2 flex items-center justify-center border border-[#3e3d3c] shrink-0">
+                <div className="md:col-span-3 flex flex-col md:flex-row items-center justify-start gap-2 md:gap-4 order-3 min-w-0">
+                    <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl bg-[#2b2a2a] p-2 flex items-center justify-center border border-[#3e3d3c] shrink-0">
                         {teams.away.logo ? (
                             <img
                                 src={teams.away.logo}
@@ -195,8 +195,8 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                             <Shield className="w-10 h-10 text-[#8e9285]" />
                         )}
                     </div>
-                    <div className="text-left">
-                        <h2 className="text-xl md:text-2xl font-black text-[#e5e2e1] tracking-tight">
+                    <div className="text-center md:text-left min-w-0">
+                        <h2 className="text-sm md:text-2xl font-black text-[#e5e2e1] tracking-tight break-words">
                             {teams.away.name}
                         </h2>
                     </div>
