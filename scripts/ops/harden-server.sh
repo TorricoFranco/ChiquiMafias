@@ -76,7 +76,11 @@ visudo -cf "/etc/sudoers.d/90-$USER_NAME" >/dev/null || die "sudoers inválido"
 # --- SSH --------------------------------------------------------------------------------
 log "Endureciendo SSH (puerto $SSH_PORT)"
 mkdir -p /etc/ssh/sshd_config.d
-cat > /etc/ssh/sshd_config.d/99-hardening.conf <<EOF
+rm -f /etc/ssh/sshd_config.d/99-hardening.conf   # nombre de versiones anteriores del script
+cp -n /etc/ssh/sshd_config /etc/ssh/sshd_config.pre-hardening
+# sshd usa el PRIMER valor que encuentra de cada opción y lee los .d en orden alfabético. Este
+# archivo se llama 00-... para ganarles a los de la imagen (p. ej. custom.conf con PermitRootLogin yes).
+cat > /etc/ssh/sshd_config.d/00-hardening.conf <<EOF
 Port $SSH_PORT
 PermitRootLogin no
 PasswordAuthentication no
@@ -88,9 +92,30 @@ LoginGraceTime 30
 X11Forwarding no
 AllowAgentForwarding no
 EOF
-# Si la validación falla no se reinicia nada y la sesión actual sigue viva.
-sshd -t || { rm -f /etc/ssh/sshd_config.d/99-hardening.conf; die "Configuración de sshd inválida; se revirtió"; }
-systemctl reload ssh 2>/dev/null || systemctl reload sshd
+# Port es acumulativo: si el archivo principal declara otros puertos, siguen escuchando. Se comentan.
+sed -i -E 's/^[[:space:]]*Port[[:space:]]+[0-9]+/#&   # desactivado por harden-server.sh/' /etc/ssh/sshd_config
+
+revert_ssh() {
+  rm -f /etc/ssh/sshd_config.d/00-hardening.conf
+  cp /etc/ssh/sshd_config.pre-hardening /etc/ssh/sshd_config
+}
+# Si algo falla no se recarga nada y la sesión actual sigue viva.
+mkdir -p /run/sshd   # sshd -t lo necesita; con arranque por socket todavía no existe
+sshd -t || { revert_ssh; die "Configuración de sshd inválida; se revirtió"; }
+effective="$(sshd -T)"
+echo "$effective" | grep -qx 'permitrootlogin no' || { revert_ssh; die "sshd sigue permitiendo root; se revirtió"; }
+echo "$effective" | grep -qx 'passwordauthentication no' || { revert_ssh; die "sshd sigue permitiendo contraseñas; se revirtió"; }
+[ "$(echo "$effective" | grep -c '^port ')" -eq 1 ] && echo "$effective" | grep -qx "port $SSH_PORT" \
+  || { revert_ssh; die "sshd no quedó escuchando solo en el puerto $SSH_PORT; se revirtió"; }
+# Ubuntu 24.04 arranca sshd por socket (ssh.socket) y un generador de systemd arma los puertos a partir
+# del sshd_config: hay que regenerar y reiniciar el socket para que se cierren los puertos viejos.
+# Las sesiones abiertas sobreviven (ssh.service usa KillMode=process).
+if systemctl cat ssh.socket >/dev/null 2>&1 && systemctl is-active --quiet ssh.socket; then
+  systemctl daemon-reload
+  systemctl restart ssh.socket
+else
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd
+fi
 
 # --- Firewall ---------------------------------------------------------------------------
 # Ojo: Docker publica puertos saltándose UFW. Por eso el compose de producción solo publica Caddy
@@ -117,6 +142,13 @@ bantime = 1h
 EOF
 systemctl enable --now fail2ban
 systemctl restart fail2ban
+
+# --- Servicios que no se usan ------------------------------------------------------------
+# Algunas imágenes traen Postfix escuchando en el puerto 25. El correo de la app sale por la API de Resend.
+if systemctl is-active --quiet postfix 2>/dev/null; then
+  log "Desactivando Postfix (no se usa)"
+  systemctl disable --now postfix
+fi
 
 # --- Swap (opcional) -----------------------------------------------------------------------
 if [ "$SWAP_GB" -gt 0 ] && ! swapon --show | grep -q .; then

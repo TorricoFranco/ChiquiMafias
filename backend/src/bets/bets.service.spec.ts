@@ -8,7 +8,6 @@ import { RedisService } from '../redis/redis.service'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { getQueueToken } from '@nestjs/bullmq'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
-import { CreateMarketDto } from './dto/create-market.dto'
 
 describe('BetsService', () => {
   let service: BetsService
@@ -111,9 +110,27 @@ describe('BetsService', () => {
         status: 'OPEN',
         closesAt: new Date('2026-11-01T20:00:00.000Z'),
         options: [
-          { id: 'opt-1', name: 'Ronaldo Martinez', initialProb: 25, totalStaked: 0, logoUrl: '435' },
-          { id: 'opt-2', name: 'Huracán', initialProb: 25, totalStaked: 0, logoUrl: '445' },
-          { id: 'opt-3', name: 'Empate', initialProb: 50, totalStaked: 0, logoUrl: null },
+          {
+            id: 'opt-1',
+            name: 'Ronaldo Martinez',
+            initialProb: 25,
+            totalStaked: 0,
+            logoUrl: '435',
+          },
+          {
+            id: 'opt-2',
+            name: 'Huracán',
+            initialProb: 25,
+            totalStaked: 0,
+            logoUrl: '445',
+          },
+          {
+            id: 'opt-3',
+            name: 'Empate',
+            initialProb: 50,
+            totalStaked: 0,
+            logoUrl: null,
+          },
         ],
       })
 
@@ -126,11 +143,17 @@ describe('BetsService', () => {
           { name: 'Huracán', initialProb: 25, logoUrl: '445' },
           { name: 'Empate', initialProb: 50 },
         ],
-      } as CreateMarketDto)
+      })
 
-      const created = mockPrisma.market.create.mock.calls[0][0].data.options.create
+      const created =
+        mockPrisma.market.create.mock.calls[0][0].data.options.create
       expect(created).toEqual([
-        { name: 'Ronaldo Martinez', initialProb: 25, totalStaked: 0, logoUrl: '435' },
+        {
+          name: 'Ronaldo Martinez',
+          initialProb: 25,
+          totalStaked: 0,
+          logoUrl: '435',
+        },
         { name: 'Huracán', initialProb: 25, totalStaked: 0, logoUrl: '445' },
         { name: 'Empate', initialProb: 50, totalStaked: 0, logoUrl: null },
       ])

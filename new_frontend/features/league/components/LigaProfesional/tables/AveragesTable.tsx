@@ -29,15 +29,15 @@ export const AveragesTable: React.FC<AveragesTableProps> = ({ averages }) => {
                 )}
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[580px]">
+            <div>
+                <table className="w-full table-fixed text-left border-collapse">
                     <thead className="sticky top-0 z-10">
                         <tr className="border-b border-[#353534] bg-[#181818] text-[11px] font-bold uppercase tracking-wider text-[#8e9285]">
-                            <th className="py-2.5 px-3 text-center w-10">#</th>
-                            <th className="py-2.5 px-3">Equipo</th>
-                            <th className="py-2.5 px-3 text-center font-black text-amber-400 w-24">Promedio</th>
-                            <th className="py-2.5 px-2 text-center w-12">Pts</th>
-                            <th className="py-2.5 px-2 text-center w-12">PJ</th>
+                            <th className="py-2.5 px-1 sm:px-3 text-center w-9 sm:w-10">#</th>
+                            <th className="py-2.5 px-1 sm:px-3">Equipo</th>
+                            <th className="py-2.5 px-0.5 sm:px-3 text-center font-black text-amber-400 w-[4.5rem] sm:w-24">Promedio</th>
+                            <th className="py-2.5 px-0.5 sm:px-2 text-center w-10 sm:w-12">Pts</th>
+                            <th className="py-2.5 px-0.5 sm:px-2 text-center w-9 sm:w-12">PJ</th>
                             <th className="py-2.5 px-3 text-center hidden md:table-cell text-[10px] text-[#8e9285] w-28">
                                 Pts (24/25/26)
                             </th>
@@ -60,12 +60,12 @@ export const AveragesTable: React.FC<AveragesTableProps> = ({ averages }) => {
                                     className={`transition-colors hover:bg-[#2e2e2d] ${rowClass}`}
                                 >
                                     {/* Pos */}
-                                    <td className="py-2 px-3 text-center font-mono font-bold text-[#8e9285]">
+                                    <td className="py-2 px-1 sm:px-3 text-center font-mono font-bold text-[#8e9285]">
                                         {pos}
                                     </td>
 
                                     {/* Team */}
-                                    <td className="py-2 px-3">
+                                    <td className="py-2 px-1 sm:px-3 overflow-hidden">
                                         <TeamRowCell
                                             teamId={row.teamId}
                                             teamName={row.teamName}
@@ -75,7 +75,7 @@ export const AveragesTable: React.FC<AveragesTableProps> = ({ averages }) => {
                                         />
                                     </td>
 
-                                    <td className="py-2 px-3 text-center font-black text-sm font-mono">
+                                    <td className="py-2 px-0.5 sm:px-3 text-center font-black text-sm font-mono">
                                         <span
                                             className={`inline-block px-2 py-0.5 rounded ${isLast
                                                 ? 'bg-red-500 text-white font-extrabold shadow-[0_0_8px_rgba(239,68,68,0.4)]'
@@ -86,11 +86,11 @@ export const AveragesTable: React.FC<AveragesTableProps> = ({ averages }) => {
                                         </span>
                                     </td>
 
-                                    <td className="py-2 px-2 text-center font-mono font-bold text-[#e5e2e1]">
+                                    <td className="py-2 px-0.5 sm:px-2 text-center font-mono font-bold text-[#e5e2e1]">
                                         {row.totalPoints}
                                     </td>
 
-                                    <td className="py-2 px-2 text-center font-mono text-[#8e9285]">
+                                    <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-[#8e9285]">
                                         {row.totalPlayed}
                                     </td>
 

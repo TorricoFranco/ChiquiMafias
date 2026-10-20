@@ -36,11 +36,11 @@ function HomeContent() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#050505] text-[#e5e2e1]">
+    <div className="h-dvh w-screen flex flex-col overflow-hidden bg-[#050505] text-[#e5e2e1]">
       <Header activeTab={mainTab} setActiveTab={handleTabChange} />
 
       {/* pb-16: lugar para la MobileNav fija en pantallas chicas */}
-      <div className="flex-1 flex flex-col pt-16 pb-16 lg:pb-0 overflow-hidden">
+      <div className="flex-1 flex flex-col md:pt-16 pb-16 lg:pb-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           {mainTab === "social" && <SocialView />}
 
@@ -64,7 +64,7 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="h-screen w-screen bg-[#050505]" />}>
+    <Suspense fallback={<div className="h-dvh w-screen bg-[#050505]" />}>
       <HomeContent />
     </Suspense>
   );

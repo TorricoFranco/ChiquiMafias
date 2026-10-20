@@ -32,10 +32,10 @@ export default function InterceptedMatchModal() {
   if (!matchId || matchId === 'null') return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col h-screen w-screen overflow-hidden text-[#e5e2e1]">
+    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col h-dvh w-screen overflow-hidden text-[#e5e2e1]">
       <Header activeTab="ligas" setActiveTab={() => router.push('/')} />
 
-      <div className="flex-1 flex flex-col pt-16 overflow-hidden">
+      <div className="flex-1 flex flex-col md:pt-16 overflow-hidden">
         <div className="flex h-full w-full relative">
           <LeagueSidebar
             activeTournament={activeTournament}
