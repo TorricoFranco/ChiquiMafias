@@ -37,12 +37,12 @@ export const TeamRowCell: React.FC<TeamRowCellProps> = ({
     <div className="flex items-center justify-between gap-1 sm:gap-2.5 py-1 w-full">
       <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
         {/* Team Crest / Logo */}
-        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#252525] border border-[#353534] flex items-center justify-center overflow-hidden flex-shrink-0">
+        <div className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} sm:w-7 sm:h-7 rounded-full bg-[#252525] border border-[#353534] flex items-center justify-center overflow-hidden flex-shrink-0`}>
           {logoSrc ? (
             <img
               src={logoSrc}
               alt={teamName}
-              className="w-5 h-5 sm:w-5.5 sm:h-5.5 object-contain"
+              className={`${compact ? 'w-3.5 h-3.5' : 'w-5 h-5'} sm:w-5.5 sm:h-5.5 object-contain`}
               referrerPolicy="no-referrer"
               onError={() => setImageError(true)}
               loading="lazy"
@@ -53,8 +53,7 @@ export const TeamRowCell: React.FC<TeamRowCellProps> = ({
         </div>
 
         <span
-          className={`font-extrabold uppercase tracking-tight text-[#e5e2e1] truncate ${compact ? 'text-[11px] sm:text-xs' : 'text-[11px] sm:text-sm'
-            }`}
+          className={`font-extrabold uppercase tracking-tight text-[#e5e2e1] ${compact ? 'line-clamp-2 break-words leading-tight sm:truncate text-[10px] sm:text-xs' : 'truncate text-[11px] sm:text-sm'}`}
           title={teamName}
         >
           {teamName}

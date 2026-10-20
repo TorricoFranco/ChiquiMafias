@@ -30,20 +30,20 @@ export const AnnualTable: React.FC<AnnualTableProps> = ({
         )}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[580px]">
+      <div>
+        <table className="w-full table-fixed text-left border-collapse">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[#353534] bg-[#181818] text-[11px] font-bold uppercase tracking-wider text-[#8e9285]">
-              <th className="py-2.5 px-3 text-center w-10" title="Posición en la tabla">#</th>
-              <th className="py-2.5 px-3" title="Nombre y escudo oficial del equipo">Equipo</th>
-              <th className="py-2.5 px-3 text-center font-black text-sky-400 w-12" title="Puntos totales obtenidos">PTS</th>
-              <th className="py-2.5 px-2 text-center w-10" title="Partidos jugados">PJ</th>
-              <th className="py-2.5 px-2 text-center w-10" title="Partidos ganados">G</th>
-              <th className="py-2.5 px-2 text-center w-10" title="Partidos empatados">E</th>
-              <th className="py-2.5 px-2 text-center w-10" title="Partidos perdidos">P</th>
+              <th className="py-2.5 px-0 sm:px-3 text-center w-5 sm:w-10" title="Posición en la tabla">#</th>
+              <th className="py-2.5 px-1 sm:px-3" title="Nombre y escudo oficial del equipo">Equipo</th>
+              <th className="py-2.5 px-0.5 sm:px-3 text-center font-black text-sky-400 w-7 sm:w-12" title="Puntos totales obtenidos">PTS</th>
+              <th className="py-2.5 px-0 sm:px-2 text-center w-5 sm:w-10" title="Partidos jugados">PJ</th>
+              <th className="py-2.5 px-0 sm:px-2 text-center w-5 sm:w-10" title="Partidos ganados">G</th>
+              <th className="py-2.5 px-0 sm:px-2 text-center w-5 sm:w-10" title="Partidos empatados">E</th>
+              <th className="py-2.5 px-0 sm:px-2 text-center w-5 sm:w-10" title="Partidos perdidos">P</th>
               <th className="py-2.5 px-3 text-center hidden md:table-cell w-16" title="Goles a favor y goles en contra">Gol</th>
-              <th className="py-2.5 px-2 text-center w-12" title="Diferencia de gol (GF menos GC)">DG</th>
-              <th className="py-2.5 px-3 text-center w-20" title="Clasificación a copas internacionales o situación actual">Estado</th>
+              <th className="py-2.5 px-0.5 sm:px-2 text-center w-7 sm:w-12" title="Diferencia de gol (GF menos GC)">DG</th>
+              <th className="py-2.5 px-3 text-center hidden sm:table-cell w-20" title="Clasificación a copas internacionales o situación actual">Estado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#2a2a2a] text-xs font-medium text-[#c6c9ab]">
@@ -67,15 +67,55 @@ export const AnnualTable: React.FC<AnnualTableProps> = ({
                 rowClass = 'bg-red-950/25 border-l-4 border-l-red-500';
               }
 
+              const estadoBadge = (
+                <>
+                {isLibGroup && (
+                  <span
+                    className="inline-block px-1 sm:px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-[10px] font-black tracking-wider border border-emerald-500/30"
+                    title="Campeón de Liga. Clasificado a Copa Libertadores 2027 y Supercopa Internacional 2026"
+                  >
+                    LIB
+                  </span>
+                )}
+                {isLibPrevia && (
+                  <span
+                    className="inline-block px-0.5 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] sm:text-[10px] whitespace-nowrap font-black tracking-wider border border-amber-500/30"
+                    title="CONMEBOL Libertadores"
+                  >
+                    LIB (P)
+                  </span>
+                )}
+                {isSuda && (
+                  <span
+                    className="inline-block px-1 sm:px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 text-[9px] sm:text-[10px] font-black tracking-wider border border-sky-500/30"
+                    title="CONMEBOL Sudamericana"
+                  >
+                    SUD
+                  </span>
+                )}
+                {isRelegation && (
+                  <span
+                    className="inline-block px-0.5 sm:px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[9px] sm:text-[10px] font-black tracking-wider border border-red-500/30"
+                    title="Zona de Descenso por Tabla Anual"
+                  >
+                    DESC
+                  </span>
+                )}
+                {!isLibGroup && !isLibPrevia && !isSuda && !isRelegation && (
+                  <span className="text-[#555] text-xs">—</span>
+                )}
+                </>
+              );
+
               return (
                 <tr key={row.teamId} className={`transition-colors hover:bg-[#2e2e2d] ${rowClass}`}>
                   {/* Position */}
-                  <td className="py-2 px-3 text-center font-mono font-bold text-[#8e9285]">
+                  <td className="py-2 px-1 sm:px-3 text-center font-mono font-bold text-[#8e9285]">
                     {pos}
                   </td>
 
                   {/* Team */}
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-1 sm:px-3 overflow-hidden">
                     <TeamRowCell
                       teamId={row.teamId}
                       teamName={row.teamName}
@@ -83,18 +123,21 @@ export const AnnualTable: React.FC<AnnualTableProps> = ({
                       live={row.live}
                       compact
                     />
+                    {(isLibGroup || isLibPrevia || isSuda || isRelegation) && (
+                      <div className="sm:hidden mt-0.5 pl-[26px]">{estadoBadge}</div>
+                    )}
                   </td>
 
                   {/* Points */}
-                  <td className="py-2 px-3 text-center font-black text-sm text-sky-400 font-mono">
+                  <td className="py-2 px-0.5 sm:px-3 text-center font-black text-sm text-sky-400 font-mono">
                     {row.points}
                   </td>
 
                   {/* PJ */}
-                  <td className="py-2 px-2 text-center font-mono text-[#e5e2e1]">{row.played}</td>
-                  <td className="py-2 px-2 text-center font-mono text-emerald-400/90">{row.won}</td>
-                  <td className="py-2 px-2 text-center font-mono text-[#a0a09e]">{row.draw}</td>
-                  <td className="py-2 px-2 text-center font-mono text-red-400/90">{row.lost}</td>
+                  <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-[#e5e2e1]">{row.played}</td>
+                  <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-emerald-400/90">{row.won}</td>
+                  <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-[#a0a09e]">{row.draw}</td>
+                  <td className="py-2 px-0.5 sm:px-2 text-center font-mono text-red-400/90">{row.lost}</td>
 
                   {/* Goles */}
                   <td className="py-2 px-3 text-center font-mono text-[#8e9285] hidden md:table-cell text-[11px]">
@@ -103,7 +146,7 @@ export const AnnualTable: React.FC<AnnualTableProps> = ({
 
                   {/* DG */}
                   <td
-                    className={`py-2 px-2 text-center font-mono font-bold ${row.goalDiff > 0
+                    className={`py-2 px-0.5 sm:px-2 text-center font-mono font-bold ${row.goalDiff > 0
                       ? 'text-emerald-400'
                       : row.goalDiff < 0
                         ? 'text-red-400'
@@ -114,42 +157,8 @@ export const AnnualTable: React.FC<AnnualTableProps> = ({
                   </td>
 
                   {/* Estado Badge */}
-                  <td className="py-2 px-3 text-center">
-                    {isLibGroup && (
-                      <span
-                        className="inline-block px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-black tracking-wider border border-emerald-500/30"
-                        title="Campeón de Liga. Clasificado a Copa Libertadores 2027 y Supercopa Internacional 2026"
-                      >
-                        LIB
-                      </span>
-                    )}
-                    {isLibPrevia && (
-                      <span
-                        className="inline-block px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-black tracking-wider border border-amber-500/30"
-                        title="CONMEBOL Libertadores"
-                      >
-                        LIB (P)
-                      </span>
-                    )}
-                    {isSuda && (
-                      <span
-                        className="inline-block px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 text-[10px] font-black tracking-wider border border-sky-500/30"
-                        title="CONMEBOL Sudamericana"
-                      >
-                        SUD
-                      </span>
-                    )}
-                    {isRelegation && (
-                      <span
-                        className="inline-block px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-black tracking-wider border border-red-500/30"
-                        title="Zona de Descenso por Tabla Anual"
-                      >
-                        DESC
-                      </span>
-                    )}
-                    {!isLibGroup && !isLibPrevia && !isSuda && !isRelegation && (
-                      <span className="text-[#555] text-xs">—</span>
-                    )}
+                  <td className="py-2 px-0.5 sm:px-3 text-center hidden sm:table-cell">
+                    {estadoBadge}
                   </td>
                 </tr>
               );
