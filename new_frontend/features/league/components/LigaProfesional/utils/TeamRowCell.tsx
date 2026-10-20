@@ -34,8 +34,8 @@ export const TeamRowCell: React.FC<TeamRowCellProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between gap-2.5 py-1 w-full">
-      <div className="flex items-center gap-2.5 min-w-0">
+    <div className="flex items-center justify-between gap-1 sm:gap-2.5 py-1 w-full">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
         {/* Team Crest / Logo */}
         <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#252525] border border-[#353534] flex items-center justify-center overflow-hidden flex-shrink-0">
           {logoSrc ? (
@@ -53,7 +53,7 @@ export const TeamRowCell: React.FC<TeamRowCellProps> = ({
         </div>
 
         <span
-          className={`font-extrabold uppercase tracking-tight text-[#e5e2e1] truncate ${compact ? 'text-xs' : 'text-xs sm:text-sm'
+          className={`font-extrabold uppercase tracking-tight text-[#e5e2e1] truncate ${compact ? 'text-[11px] sm:text-xs' : 'text-[11px] sm:text-sm'
             }`}
           title={teamName}
         >

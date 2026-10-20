@@ -17,11 +17,11 @@ export const SidebarMatchCard: React.FC<SidebarMatchCardProps> = ({ match }) => 
         <Link
             href={`/match/${match.id}`}
             aria-label={`${match.home_team.name} vs ${match.away_team.name}`}
-            className="flex items-center justify-between p-3 md:p-3.5 rounded-xl bg-[#201f1f] border border-[#353534] hover:border-[#d2f000]/50 hover:bg-[#262525] transition-all cursor-pointer group shadow-sm w-full"
+            className="flex items-center justify-between p-2.5 md:p-3.5 rounded-xl bg-[#201f1f] border border-[#353534] hover:border-[#d2f000]/50 hover:bg-[#262525] transition-all cursor-pointer group shadow-sm w-full"
         >
             {/* LOCAL (Alineado a la derecha) */}
-            <div className="flex-1 flex items-center justify-end gap-2 md:gap-3 min-w-0">
-                <span className="text-xs md:text-sm font-bold text-[#e5e2e1] group-hover:text-white transition-colors truncate text-right">
+            <div className="flex-1 flex items-center justify-end gap-1.5 md:gap-3 min-w-0">
+                <span className="text-xs md:text-sm font-bold text-[#e5e2e1] group-hover:text-white transition-colors line-clamp-2 break-words leading-tight text-right">
                     {match.home_team.name}
                 </span>
                 <img
@@ -33,7 +33,7 @@ export const SidebarMatchCard: React.FC<SidebarMatchCardProps> = ({ match }) => 
             </div>
 
             {/* CENTRO: MARCADOR / HORA / ESTADO */}
-            <div className="w-24 md:w-28 flex flex-col items-center justify-center mx-2 md:mx-4 px-2 py-1 bg-[#181818] rounded-lg border border-[#30302f] flex-shrink-0">
+            <div className="w-[4.5rem] md:w-28 flex flex-col items-center justify-center mx-1.5 md:mx-4 px-1 md:px-2 py-1 bg-[#181818] rounded-lg border border-[#30302f] flex-shrink-0">
                 {isLive ? (
                     <div className="flex flex-col items-center">
                         <div className="flex items-center gap-1 mb-0.5">
@@ -55,23 +55,22 @@ export const SidebarMatchCard: React.FC<SidebarMatchCardProps> = ({ match }) => 
                     </div>
                 ) : (
                     <div className="flex flex-col items-center">
-                        <span className="text-[10px] md:text-xs font-bold text-[#c6c9ab]">
+                        <span className="text-[10px] md:text-xs font-bold text-[#c6c9ab] whitespace-nowrap">
                             {formatMatchTime(match.date)}
                         </span>
-                        <span className="text-[9px] font-semibold text-[#8c8e76]">HS</span>
                     </div>
                 )}
             </div>
 
             {/* VISITANTE (Alineado a la izquierda) */}
-            <div className="flex-1 flex items-center justify-start gap-2 md:gap-3 min-w-0">
+            <div className="flex-1 flex items-center justify-start gap-1.5 md:gap-3 min-w-0">
                 <img
                     src={match.away_team.logo_url}
                     alt={match.away_team.name}
                     className="w-5 h-5 md:w-7 md:h-7 object-contain flex-shrink-0"
                     onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
                 />
-                <span className="text-xs md:text-sm font-bold text-[#e5e2e1] group-hover:text-white transition-colors truncate text-left">
+                <span className="text-xs md:text-sm font-bold text-[#e5e2e1] group-hover:text-white transition-colors line-clamp-2 break-words leading-tight text-left">
                     {match.away_team.name}
                 </span>
             </div>
