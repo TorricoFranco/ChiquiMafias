@@ -160,6 +160,31 @@ model Leagues {
   teamSeasonStats    TeamSeasonStats[]
 }
 
+// Mapeo de entidades internas a los IDs que les asigna cada proveedor de datos
+// deportivos (api-football, highlightly...). `entity_id` es el uuid de Teams,
+// Matches, Leagues, Players o Venues según `entity`; no hay FK a propósito
+// (una sola tabla para las cinco entidades).
+model ProviderRef {
+  id          String         @id @default(uuid())
+  entity      FootballEntity
+  entity_id   String
+  provider    String
+  external_id Int
+  created_at  DateTime       @default(now())
+
+  @@unique([entity, provider, external_id])
+  @@unique([entity, entity_id, provider])
+  @@index([entity, entity_id])
+}
+
+enum FootballEntity {
+  TEAM
+  MATCH
+  LEAGUE
+  PLAYER
+  VENUE
+}
+
 model Players {
   id          String    @id @default(uuid())
   api_id      Int       @unique
