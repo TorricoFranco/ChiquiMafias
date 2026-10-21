@@ -13,7 +13,7 @@ import { AppService } from './app.service'
 import { ChatModule } from './chat/chat.module'
 import { MatchesModule } from './matches/matches.module'
 import { PrismaModule } from './prisma/prisma.module'
-import { ApiFootballModule } from './api-football/api-football.module'
+import { FootballModule } from './football/football.module'
 import { AuthModule } from './auth/auth.module'
 import { PollsModule } from './polls/polls.module'
 import { RedisModule } from './redis/redis.module'
@@ -68,7 +68,7 @@ import { PricingModule } from './pricing/pricing.module'
     ChatModule,
     UsersModule,
     MatchesModule,
-    ApiFootballModule,
+    FootballModule,
     AuthModule,
     PrismaModule,
     PollsModule,

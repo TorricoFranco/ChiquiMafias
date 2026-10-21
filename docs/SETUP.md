@@ -117,7 +117,9 @@ si falta una obligatoria, la API no levanta y el error dice cuál.
 | `ENABLE_DEV_TOOLS` | Habilita `/auth/dev-login` y `/test-events`. Prohibido en producción | `false` |
 | `ID_LEAGUE_ARG` | ID de la liga argentina en API-Football | — (`128`) |
 | `DATABASE_URL` | Conexión a PostgreSQL | — |
-| `API_FOOTBALL_KEY` | API key de API-Football | — |
+| `FOOTBALL_PROVIDER` | Proveedor de datos deportivos: `api-football` o `highlightly` (este todavía no está implementado) | `api-football` |
+| `API_FOOTBALL_KEY` | API key de API-Football (obligatoria con `FOOTBALL_PROVIDER=api-football`) | — |
+| `HIGHLIGHTLY_API_KEY` | API key de Highlightly (obligatoria con `FOOTBALL_PROVIDER=highlightly`) | — |
 | `GOOGLE_CLIENT_ID` | Client ID de Google OAuth | — |
 | `JWT_ACCESS_SECRET` | Secreto del access token | — |
 | `JWT_ACCESS_EXPIRES_IN` | Duración del access token | `15m` |

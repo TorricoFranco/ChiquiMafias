@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 
-import { PrematchServiceApi } from 'src/api-football/services/prematch.api'
+import { PrematchServiceApi } from 'src/football/services/prematch.api'
 import { MatchesMappers } from './matches.mappers'
 
 import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
@@ -280,7 +280,7 @@ export class MatchesService {
     const cacheKey = `pre_match:v2:${matchId}`
     const staleKey = `pre_match:v2:stale:${matchId}`
 
-    // Endpoint público: sin esta lectura, cada visita hace 3 llamadas a API-Football
+    // Endpoint público: sin esta lectura, cada visita hace 3 llamadas al proveedor
     const cached = await this.redisService.redis.get(cacheKey)
     if (cached) return JSON.parse(cached) as PreMatchResponseDto
 
@@ -308,7 +308,7 @@ export class MatchesService {
         const season = match.season
 
         const [h2h, hForm, aForm, standings] = await Promise.all([
-          this.api.getH2H(`${hIdApi}-${aIdApi}`),
+          this.api.getH2H(hIdApi, aIdApi),
           this.api.getLatestResults(hIdApi),
           this.api.getLatestResults(aIdApi),
           this.standingsService.getCachedFullStandings(leagueId, season),
@@ -329,7 +329,7 @@ export class MatchesService {
           'EX',
           this.CACHE_TTL,
         )
-        // Copia de respaldo con TTL largo: solo se lee si API-Football falla
+        // Copia de respaldo con TTL largo: solo se lee si el proveedor falla
         // después de que venció la key principal.
         await this.redisService.redis.set(
           staleKey,

@@ -286,7 +286,7 @@ backend/
 │   ├── notifications/   # notificaciones y anuncios
 │   ├── support/         # tickets y reportes
 │   ├── polls/           # encuestas
-│   ├── api-football/    # ingesta deportiva (crons + pub/sub)
+│   ├── football/        # ingesta deportiva (crons + pub/sub) detrás de FootballDataProvider
 │   ├── standings/, fixture/, matches/, teams/
 │   ├── discord/, cloudinary/, email/, mercado-pago/   # integraciones
 │   ├── redis/, prisma/  # infraestructura (pub/sub, ORM)
