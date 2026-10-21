@@ -17,7 +17,7 @@ export class PrematchServiceApi {
     )
   }
 
-  /** Forma reciente como string de resultados: `W`, `D`, `L` (más reciente primero). */
+  /** Forma reciente como string de resultados: `W`, `D`, `L` (en el orden en que lo entrega el proveedor). */
   async getLatestResults(teamExternalId: string): Promise<string> {
     const fixtures = await this.provider.getRecentFinishedFixtures(
       Number(teamExternalId),
