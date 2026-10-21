@@ -105,6 +105,14 @@ export class FixturesSyncCron {
         home_penalty_goals: f.penalty.home ?? null,
         away_penalty_goals: f.penalty.away ?? null,
       }
+      // Un proveedor que todavía no informa estadio o árbitro no debe borrar el
+      // que ya teníamos: solo se actualiza cuando viene un valor.
+      const { venue_id, referee, ...rest } = changing
+      const updating = {
+        ...rest,
+        ...(venue_id ? { venue_id } : {}),
+        ...(referee ? { referee } : {}),
+      }
       const creating = {
         ...changing,
         league_id: league.id,
@@ -120,7 +128,7 @@ export class FixturesSyncCron {
         updatedMatch = await this.prisma.matches.upsert({
           where: { api_fixture_id: f.externalId },
           select,
-          update: changing,
+          update: updating,
           create: { ...creating, api_fixture_id: f.externalId },
         })
       } else {
@@ -158,7 +166,7 @@ export class FixturesSyncCron {
           updatedMatch = await this.prisma.matches.update({
             where: { id: existingId },
             select,
-            data: changing,
+            data: updating,
           })
         } else {
           updatedMatch = await this.prisma.$transaction(async (tx) => {

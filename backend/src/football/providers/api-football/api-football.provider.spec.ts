@@ -51,7 +51,14 @@ describe('ApiFootballProvider', () => {
       timestamp: 1772395200,
       timezone: 'UTC',
       referee: null,
-      venue: { externalId: 7, name: 'La Bombonera', city: 'Buenos Aires' },
+      venue: {
+        externalId: 7,
+        name: 'La Bombonera',
+        city: 'Buenos Aires',
+        capacity: null,
+        surface: null,
+        image: null,
+      },
       status: { short: '2H', long: 'Second Half', elapsed: 67 },
       league: { externalId: 128, season: 2026, round: 'Apertura - 9' },
       home: {

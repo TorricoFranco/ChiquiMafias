@@ -51,6 +51,9 @@ export function mapStatusShort(description: string | null | undefined) {
   )
 }
 
+const isKnownStatus = (description: string | null | undefined) =>
+  (description ?? '').trim().toLowerCase() in STATUS_BY_DESCRIPTION
+
 /** Estados que equivalen a "el partido todavía no empezó". */
 export const NOT_STARTED_SHORTS = ['TBD', 'NS', 'PST', 'CANC']
 
@@ -81,11 +84,25 @@ function winnerOf(
 }
 
 export function mapTeam(team: HlTeamBasic): FootballTeamRef {
-  return { externalId: team.id, name: team.name, logo: team.logo ?? null }
+  return {
+    externalId: team.id,
+    name: team.name,
+    logo: team.logo ?? null,
+    // Highlightly no informa estos datos; null como en el otro proveedor.
+    code: null,
+    country: null,
+    founded: null,
+  }
 }
 
 export function mapMatch(raw: HlMatch | HlMatchDetail): FootballFixture {
-  const short = mapStatusShort(raw.state.description)
+  // Una descripción que no conocemos pero con el reloj en marcha es un partido
+  // en juego: no puede quedar como "no empezó" y dejar de actualizarse.
+  const clock = raw.state.clock ?? 0
+  const short =
+    !isKnownStatus(raw.state.description) && clock > 0
+      ? 'LIVE'
+      : mapStatusShort(raw.state.description)
   const goals = parseScore(raw.state.score.current)
   const penalty = parseScore(raw.state.score.penalties)
   const winner = winnerOf(short, goals, penalty)
@@ -104,6 +121,8 @@ export function mapMatch(raw: HlMatch | HlMatchDetail): FootballFixture {
           name: detail.venue.name,
           city: detail.venue.city ?? null,
           capacity: Number.isFinite(capacity) && capacity > 0 ? capacity : null,
+          surface: null,
+          image: null,
         }
       : null,
     status: {

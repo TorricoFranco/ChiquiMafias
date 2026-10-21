@@ -50,6 +50,33 @@ describe('Highlightly mappers', () => {
       expect(mapStatusShort(description)).toBe(short)
     })
 
+    it('Debe tratar como en juego un estado desconocido con el reloj en marcha', () => {
+      const f = mapMatch({
+        ...match(),
+        state: {
+          clock: 37,
+          score: { current: '1 - 0', penalties: null },
+          description: 'Descripción nueva',
+        },
+      })
+
+      expect(f.status.short).toBe('LIVE')
+      expect(f.status.elapsed).toBe(37)
+    })
+
+    it('Debe dejar como TBD un estado desconocido sin reloj', () => {
+      const f = mapMatch({
+        ...match(),
+        state: {
+          clock: null,
+          score: { current: null, penalties: null },
+          description: 'Descripción nueva',
+        },
+      })
+
+      expect(f.status.short).toBe('TBD')
+    })
+
     it('Debe tratar un estado desconocido como TBD (programado)', () => {
       expect(mapStatusShort('Algo nuevo')).toBe('TBD')
       expect(mapStatusShort(undefined)).toBe('TBD')
@@ -122,6 +149,8 @@ describe('Highlightly mappers', () => {
         name: 'Estadio X',
         city: 'Flores',
         capacity: 3000,
+        surface: null,
+        image: null,
       })
       expect(f.referee).toBe('Pérez, Juan')
     })

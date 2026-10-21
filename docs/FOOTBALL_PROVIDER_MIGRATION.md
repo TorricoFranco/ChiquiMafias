@@ -69,6 +69,12 @@ partidos no se actualizan.
    ciclo (`Equipo sin vincular`, `Partido activo … sin ID`).
 5. Comparar contra API-Football en un partido en vivo: orden de `form` (últimos 5), sustituciones
    (`player` sale, `assist` entra), estados durante el juego.
+   - **Orden de `/last-five-games` y `/head-2-head`: verificado, vienen del más reciente al más
+     viejo.** `form` se muestra en el orden recibido (`RecentForm.tsx`), así que con Highlightly el
+     último partido queda a la izquierda. Falta confirmar qué orden entregaba API-Football; si era
+     del más viejo al más reciente hay que ordenar por fecha en `PrematchServiceApi`.
+   - Verificado con una respuesta real: los eventos vienen en orden cronológico, `statistics[0]` es
+     el local, y las sustituciones traen `assistingPlayerId` y el nombre del que entra.
 
 ## Volver a API-Football después de usar Highlightly
 

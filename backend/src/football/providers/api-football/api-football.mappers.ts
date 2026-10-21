@@ -45,7 +45,14 @@ export function mapFixture(raw: ApiFixtureRaw): FootballFixture {
     timezone: raw.fixture.timezone,
     referee: raw.fixture.referee ?? null,
     venue: venue
-      ? { externalId: venue.id, name: venue.name, city: venue.city }
+      ? {
+          externalId: venue.id,
+          name: venue.name,
+          city: venue.city,
+          capacity: null,
+          surface: null,
+          image: null,
+        }
       : null,
     status: {
       short: raw.fixture.status.short,
