@@ -14,6 +14,7 @@ import { FootballStandingsService } from './services/standings.service'
 import { FootballLeagueService } from './services/league.service'
 import { FootballTeamsService } from './services/teams.service'
 import { PrematchServiceApi } from './services/prematch.api'
+import { FootballRefsService } from './services/refs.service'
 
 import { LineupsFetchCron } from './cron/lineups-fetch.cron'
 import { PrematchTrackerService } from './cron/prematch-tracker.cron'
@@ -61,6 +62,7 @@ export function createFootballProvider(
     FootballLeagueService,
     FootballTeamsService,
     PrematchServiceApi,
+    FootballRefsService,
     // CRONS
     LineupsFetchCron,
     PrematchTrackerService,
@@ -76,6 +78,7 @@ export function createFootballProvider(
     FootballLeagueService,
     FootballTeamsService,
     PrematchServiceApi,
+    FootballRefsService,
   ],
   imports: [StandingsModule],
 })

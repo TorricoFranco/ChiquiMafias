@@ -9,11 +9,12 @@ export async function upsertMatchStats(
   tx: PrismaClientLike,
   matchId: string,
   stats: FootballTeamStatistics[],
+  findTeam: (
+    ref: FootballTeamStatistics['team'],
+  ) => Promise<{ id: string } | null>,
 ) {
   for (const item of stats) {
-    const team = await tx.teams.findUnique({
-      where: { api_team_id: item.team.externalId },
-    })
+    const team = await findTeam(item.team)
 
     if (!team) continue
 

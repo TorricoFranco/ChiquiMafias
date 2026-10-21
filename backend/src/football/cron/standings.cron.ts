@@ -8,7 +8,7 @@ import { RedisService } from 'src/redis/redis.service'
 import { StandingsService } from 'src/standings/standings.service'
 
 import { mapApiGroupToStage } from '../mappers/mapApiGroupStage'
-import { upsertTeam } from '../upserts/upsert-team'
+import { FootballRefsService } from '../services/refs.service'
 import { upsertTeamSeasonStats } from '../upserts/upsert-teamSeasonStats'
 import { OnEvent } from '@nestjs/event-emitter'
 
@@ -23,6 +23,7 @@ export class StandingCron {
     private readonly provider: FootballDataProvider,
     private readonly redis: RedisService,
     private readonly standings: StandingsService,
+    private readonly refs: FootballRefsService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -43,8 +44,24 @@ export class StandingCron {
 
   private async syncStandings() {
     try {
+      // La liga se identifica internamente por su ID de API-Football (ancla);
+      // el ID que se le pide al proveedor activo sale de ProviderRef.
+      const leagueDb = await this.prisma.leagues.findFirst({
+        where: { api_league_id: this.LEAGUE_API_ID },
+      })
+
+      if (!leagueDb) return
+
+      const leagueExternalId = await this.refs.leagueExternalId(leagueDb)
+      if (leagueExternalId === null) {
+        this.logger.warn(
+          `La liga ${leagueDb.name} no tiene ID en ${this.refs.providerName}; se saltea la tabla.`,
+        )
+        return
+      }
+
       const rows = await this.provider.getStandings(
-        this.LEAGUE_API_ID,
+        leagueExternalId,
         this.SEASON,
       )
 
@@ -53,14 +70,8 @@ export class StandingCron {
         return
       }
 
-      const leagueDb = await this.prisma.leagues.findFirst({
-        where: { api_league_id: this.LEAGUE_API_ID },
-      })
-
-      if (!leagueDb) return
-
       for (const s of rows) {
-        const team = await upsertTeam(this.prisma, s.team)
+        const team = await this.refs.resolveTeam(this.prisma, s.team)
 
         if (!team) {
           this.logger.warn(

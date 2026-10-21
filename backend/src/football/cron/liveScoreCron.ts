@@ -8,6 +8,7 @@ import { FootballFixture } from '../football.types'
 import { FINAL_STATUSES, ACTIVE_STATUSES } from '../mappers/API_STATUSES'
 import { fixturesCacheKey, resolveRound } from '../mappers/round'
 import { LiveMatchData } from 'src/fixture/types/fixtures'
+import { FootballRefsService } from '../services/refs.service'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 
 // El cron corre cada 30 s; si el proveedor refresca más lento se saltean ticks.
@@ -19,12 +20,14 @@ const TICK_JITTER_MS = TICK_MS / 2
 export class LiveScoreCron {
   private readonly logger = new Logger(LiveScoreCron.name)
   private lastRunAt = 0
+  private readonly warnedWithoutId = new Set<string>()
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly provider: FootballDataProvider,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly refs: FootballRefsService,
   ) {}
 
   @Cron('*/30 * * * * *')
@@ -46,6 +49,7 @@ export class LiveScoreCron {
           season: true,
           league: {
             select: {
+              id: true,
               api_league_id: true,
             },
           },
@@ -56,9 +60,35 @@ export class LiveScoreCron {
         this.logger.log('No hay partidos activos para trackear.')
         return
       }
-      const leagueId = activeMatchesDb[0]?.league.api_league_id
+      const league = activeMatchesDb[0].league
+      // Clave estable de la liga para Redis y eventos (la de siempre).
+      const leagueId: number | string = league.api_league_id ?? league.id
+      // ID que entiende el proveedor activo.
+      const leagueExternalId = await this.refs.leagueExternalId(league)
+      if (leagueExternalId === null) {
+        this.logger.warn(
+          `La liga ${league.id} no tiene ID en ${this.refs.providerName}; se saltea el tick.`,
+        )
+        return
+      }
+      const externalIds = await this.refs.matchExternalIds(activeMatchesDb)
+      for (const m of activeMatchesDb) {
+        if (!externalIds.has(m.id) && !this.warnedWithoutId.has(m.id)) {
+          this.warnedWithoutId.add(m.id)
+          this.logger.warn(
+            `Partido activo ${m.id} sin ID en ${this.refs.providerName}: no se actualiza ni se cierra hasta vincularlo (puede tener un mercado de apuestas abierto).`,
+          )
+        }
+      }
+      const dbByExternalId = new Map(
+        activeMatchesDb.flatMap((m) => {
+          const externalId = externalIds.get(m.id)
+          return externalId === undefined ? [] : [[externalId, m] as const]
+        }),
+      )
 
-      const liveMatchesApi = await this.provider.getLiveFixtures(leagueId)
+      const liveMatchesApi =
+        await this.provider.getLiveFixtures(leagueExternalId)
 
       if (liveMatchesApi.length === 0) {
         await this.redisService.redis.del(`live_scores:league:${leagueId}`)
@@ -69,18 +99,21 @@ export class LiveScoreCron {
       const missingMatches = this.reconcileMatches(
         activeMatchesDb,
         liveMatchesApi,
+        externalIds,
       )
 
       for (const match of missingMatches) {
-        await this.syncSpecificMatch(match.id, match.api_fixture_id, leagueId)
+        await this.syncSpecificMatch(
+          match.id,
+          externalIds.get(match.id)!,
+          leagueId,
+        )
       }
 
       const liveScoresHash: Record<string, string> = {}
 
       for (const apiMatch of liveMatchesApi) {
-        const matchDb = activeMatchesDb.find(
-          (m) => m.api_fixture_id === apiMatch.externalId,
-        )
+        const matchDb = dbByExternalId.get(apiMatch.externalId)
 
         const apiStatus = apiMatch.status.short
         const isFinished = FINAL_STATUSES.includes(apiStatus)
@@ -235,7 +268,7 @@ export class LiveScoreCron {
     })
   }
 
-  private async handleMatchCleanup(matchId: string, leagueId: number) {
+  private async handleMatchCleanup(matchId: string, leagueId: number | string) {
     await this.redisService.redis.hdel(
       `live_scores:league:${leagueId}`,
       matchId,
@@ -247,13 +280,19 @@ export class LiveScoreCron {
     this.logger.log(`Partido ${matchId} finalizado y limpiado de Redis.`)
   }
 
-  private reconcileMatches<
-    T extends { api_fixture_id: number; status_short: string },
-  >(activeMatchesDb: T[], liveMatchesApi: FootballFixture[]): T[] {
+  private reconcileMatches<T extends { id: string; status_short: string }>(
+    activeMatchesDb: T[],
+    liveMatchesApi: FootballFixture[],
+    externalIds: Map<string, number>,
+  ): T[] {
     const apiIds = new Set(liveMatchesApi.map((m) => m.externalId))
 
     return activeMatchesDb.filter((dbMatch) => {
-      const isMissing = !apiIds.has(dbMatch.api_fixture_id)
+      const externalId = externalIds.get(dbMatch.id)
+      // Sin ID en el proveedor no se puede consultar: se deja para el próximo tick.
+      if (externalId === undefined) return false
+
+      const isMissing = !apiIds.has(externalId)
       const wasInPlay = ACTIVE_STATUSES.includes(dbMatch.status_short)
 
       return isMissing && wasInPlay
@@ -263,7 +302,7 @@ export class LiveScoreCron {
   private async syncSpecificMatch(
     matchDbId: string,
     apiFixtureId: number,
-    leagueId: number,
+    leagueId: number | string,
   ) {
     try {
       const apiMatch = await this.provider.getFixture(apiFixtureId)

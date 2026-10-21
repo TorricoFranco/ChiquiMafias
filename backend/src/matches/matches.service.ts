@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 
 import { PrematchServiceApi } from 'src/football/services/prematch.api'
+import { FootballRefsService } from 'src/football/services/refs.service'
 import { MatchesMappers } from './matches.mappers'
 
 import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
@@ -23,6 +24,7 @@ export class MatchesService {
     private redisService: RedisService,
     private api: PrematchServiceApi,
     private standingsService: StandingsService,
+    private refs: FootballRefsService,
   ) {}
 
   async getMatchDetails(
@@ -54,6 +56,7 @@ export class MatchesService {
             venue: true,
             league: {
               select: {
+                id: true,
                 api_league_id: true,
               },
             },
@@ -66,7 +69,7 @@ export class MatchesService {
 
         // Recuperar data de live scores si existe
         const liveDataRaw = await this.redisService.redis.hget(
-          `live_scores:league:${match.league.api_league_id}`,
+          `live_scores:league:${match.league.api_league_id ?? match.league.id}`,
           matchId,
         )
         if (liveDataRaw) {
@@ -302,15 +305,22 @@ export class MatchesService {
         const hId = String(match.home_team.id)
         const aId = String(match.away_team.id)
 
-        const hIdApi = String(match.home_team.api_team_id)
-        const aIdApi = String(match.away_team.api_team_id)
+        // IDs de los equipos en el proveedor activo.
+        const [hExternal, aExternal] = await Promise.all([
+          this.refs.teamExternalId(match.home_team),
+          this.refs.teamExternalId(match.away_team),
+        ])
+        const hIdApi = String(hExternal)
+        const aIdApi = String(aExternal)
+        const hasExternalIds = hExternal !== null && aExternal !== null
         const leagueId = match.league_id
         const season = match.season
 
+        // Sin vínculo con el proveedor no hay historial ni forma; la tabla sí.
         const [h2h, hForm, aForm, standings] = await Promise.all([
-          this.api.getH2H(hIdApi, aIdApi),
-          this.api.getLatestResults(hIdApi),
-          this.api.getLatestResults(aIdApi),
+          hasExternalIds ? this.api.getH2H(hIdApi, aIdApi) : [],
+          hasExternalIds ? this.api.getLatestResults(hIdApi) : '',
+          hasExternalIds ? this.api.getLatestResults(aIdApi) : '',
           this.standingsService.getCachedFullStandings(leagueId, season),
         ])
 
@@ -321,6 +331,9 @@ export class MatchesService {
           hIdApi,
           aIdApi,
         )
+
+        // Sin vínculo con el proveedor el resultado es parcial: no se cachea.
+        if (!hasExternalIds) return processed
 
         const serialized = JSON.stringify(processed)
         await this.redisService.redis.set(

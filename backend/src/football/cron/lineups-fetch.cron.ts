@@ -3,8 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { FootballDataProvider } from '../football-data.provider'
 import { FootballLineupPlayer } from '../football.types'
 
-import { upsertPlayer } from '../upserts/upsert-players'
-import { upsertTeam } from '../upserts/upsert-team'
+import { FootballRefsService } from '../services/refs.service'
 import { upsertMatchLineup, upsertMatchPlayer } from '../upserts/upsert-lineups'
 
 import { PrismaService } from 'src/prisma/prisma.service'
@@ -18,6 +17,7 @@ export class LineupsFetchCron {
     private readonly prisma: PrismaService,
     private readonly provider: FootballDataProvider,
     private readonly redisService: RedisService,
+    private readonly refs: FootballRefsService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES)
@@ -28,9 +28,18 @@ export class LineupsFetchCron {
     })
     if (matches.length === 0) return
 
+    const externalIds = await this.refs.matchExternalIds(matches)
+
     for (const match of matches) {
       try {
-        const lineups = await this.provider.getLineups(match.api_fixture_id)
+        const externalId = externalIds.get(match.id)
+        if (externalId === undefined) {
+          this.logger.warn(
+            `Partido ${match.id} sin ID en el proveedor, se saltea`,
+          )
+          continue
+        }
+        const lineups = await this.provider.getLineups(externalId)
         this.logger.debug(`Alineaciones recibidas: ${lineups.length}`)
         const hasConfirmedLineups = lineups.some((l) => l.startXI.length > 0)
 
@@ -38,7 +47,7 @@ export class LineupsFetchCron {
 
         await this.prisma.$transaction(async (tx) => {
           for (const lineup of lineups) {
-            const team = await upsertTeam(tx, {
+            const team = await this.refs.resolveTeam(tx, {
               externalId: lineup.team.externalId,
               name: lineup.team.name,
             })
@@ -56,7 +65,7 @@ export class LineupsFetchCron {
               isStarting: boolean,
             ) => {
               for (const p of players) {
-                const player = await upsertPlayer(tx, {
+                const player = await this.refs.resolvePlayer(tx, {
                   externalId: p.externalId,
                   name: p.name,
                   position: p.position,

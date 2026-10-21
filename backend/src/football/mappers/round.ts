@@ -34,10 +34,10 @@ export function resolveRound(
 
 /** Clave de Redis con los partidos de una fecha. */
 export function fixturesCacheKey(
-  leagueExternalId: number,
+  leagueKey: number | string,
   season: number,
   tournament: string,
   matchdayKey: string,
 ): string {
-  return `fixtures:${leagueExternalId}:${season}:${tournament}:${matchdayKey}`
+  return `fixtures:${leagueKey}:${season}:${tournament}:${matchdayKey}`
 }

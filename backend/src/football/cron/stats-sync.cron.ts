@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule'
 
 import { FootballDataProvider } from '../football-data.provider'
 import { upsertMatchStats } from '../upserts/upsert-stats'
+import { FootballRefsService } from '../services/refs.service'
 
 import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
@@ -15,6 +16,7 @@ export class StatsSyncCron {
     private readonly prisma: PrismaService,
     private readonly provider: FootballDataProvider,
     private readonly redisService: RedisService,
+    private readonly refs: FootballRefsService,
   ) {}
 
   @Cron('*/3 * * * *') // 3 min
@@ -42,11 +44,18 @@ export class StatsSyncCron {
 
     if (matchesToSync.length === 0) return
 
+    const externalIds = await this.refs.matchExternalIds(matchesToSync)
+
     for (const match of matchesToSync) {
       try {
-        const stats = await this.provider.getMatchStatistics(
-          match.api_fixture_id,
-        )
+        const externalId = externalIds.get(match.id)
+        if (externalId === undefined) {
+          this.logger.warn(
+            `Partido ${match.id} sin ID en el proveedor, se saltea`,
+          )
+          continue
+        }
+        const stats = await this.provider.getMatchStatistics(externalId)
         if (stats.length === 0) continue
 
         const dbStats = await this.prisma.stats_team_match.findMany({
@@ -67,7 +76,9 @@ export class StatsSyncCron {
           JSON.stringify(newStatsProcessed.map((s) => s.statistics))
 
         if (hasChanged || dbStats.length === 0) {
-          await upsertMatchStats(this.prisma, match.id, stats)
+          await upsertMatchStats(this.prisma, match.id, stats, (team) =>
+            this.refs.findTeam(this.prisma, team),
+          )
 
           await this.redisService.redis.del(`match:details:v1:${match.id}`)
 
@@ -88,9 +99,7 @@ export class StatsSyncCron {
               stats_finalized: true,
             },
           })
-          this.logger.log(
-            `📊 Stats de Match ${match.api_fixture_id} FINALIZADAS.`,
-          )
+          this.logger.log(`📊 Stats de Match ${match.id} FINALIZADAS.`)
         }
       } catch (error) {
         this.logger.error(
