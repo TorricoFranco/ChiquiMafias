@@ -32,7 +32,8 @@ export function toWireEvent(event: FootballEvent) {
       ? { id: event.assist.externalId, name: event.assist.name }
       : null,
     type: event.type,
-    detail: event.detail,
+    // El front hace detail.toLowerCase(): nunca null (la base guarda 'NONE').
+    detail: event.detail ?? 'NONE',
   }
 }
 

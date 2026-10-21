@@ -39,4 +39,8 @@ describe('EventsFetchCron helpers', () => {
       detail: 'Normal Goal',
     })
   })
+
+  it('Debe mandar detail NONE por socket si el evento no tiene detalle', () => {
+    expect(toWireEvent({ ...goal, detail: null }).detail).toBe('NONE')
+  })
 })

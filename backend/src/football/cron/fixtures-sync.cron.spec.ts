@@ -100,6 +100,47 @@ describe('FixturesSyncCron', () => {
     expect(refs.link).not.toHaveBeenCalled()
   })
 
+  it('No debe pisar el estadio ni el árbitro con null al actualizar', async () => {
+    prisma.matches.upsert.mockResolvedValue({
+      id: 'm1',
+      tournament: 'CLAUSURA',
+      api_fixture_id: 5001,
+    })
+    // fixture sin árbitro y sin estadio (venue: null -> venueId null)
+
+    await cron.handle()
+
+    const call = (
+      prisma.matches.upsert.mock.calls[0] as [
+        { update: Record<string, unknown>; create: Record<string, unknown> },
+      ]
+    )[0]
+    expect(call.update).not.toHaveProperty('venue_id')
+    expect(call.update).not.toHaveProperty('referee')
+    // al crear sí se guardan (null) para que la fila exista completa
+    expect(call.create).toHaveProperty('referee', null)
+  })
+
+  it('Debe actualizar el árbitro cuando el proveedor lo informa', async () => {
+    provider.getFixtures.mockResolvedValue([
+      { ...fixture, referee: 'Pérez, Juan' },
+    ])
+    prisma.matches.upsert.mockResolvedValue({
+      id: 'm1',
+      tournament: 'CLAUSURA',
+      api_fixture_id: 5001,
+    })
+
+    await cron.handle()
+
+    const call = (
+      prisma.matches.upsert.mock.calls[0] as [
+        { update: Record<string, unknown> },
+      ]
+    )[0]
+    expect(call.update).toHaveProperty('referee', 'Pérez, Juan')
+  })
+
   it('Con otro proveedor debe actualizar el partido ya vinculado', async () => {
     refs.usesLegacyColumns = false
     refs.findInternalId.mockResolvedValue('m-existing')
