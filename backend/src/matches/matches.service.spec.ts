@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { MatchesService } from './matches.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
-import { PrematchServiceApi } from '../api-football/services/prematch.api'
+import { PrematchServiceApi } from '../football/services/prematch.api'
 import { StandingsService } from '../standings/standings.service'
 
 describe('MatchesService (getAggregatedData)', () => {

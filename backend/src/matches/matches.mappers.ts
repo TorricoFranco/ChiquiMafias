@@ -1,4 +1,5 @@
-import { FORM_TRANSLATIONS } from 'src/api-football/mappers/formTranslations'
+import { FORM_TRANSLATIONS } from 'src/football/mappers/formTranslations'
+import { FootballFixture } from 'src/football/football.types'
 import { PreMatchResponse, MatchHistoryItem } from './matches.interfaces'
 
 export class MatchesMappers {
@@ -62,28 +63,27 @@ export class MatchesMappers {
       .join('')
   }
 
-  static formatH2H(h2hMatches: any[], currentHomeId: string) {
+  static formatH2H(h2hMatches: FootballFixture[], currentHomeId: string) {
     if (!Array.isArray(h2hMatches))
       return { homeWins: 0, awayWins: 0, draws: 0, total: 0, lastMatches: [] }
 
     const finishedMatches = h2hMatches.filter(
-      (m) =>
-        m.fixture.status.short === 'FT' || m.fixture.status.short === 'PEN',
+      (m) => m.status.short === 'FT' || m.status.short === 'PEN',
     )
 
     const stats = finishedMatches.reduce(
       (acc, match) => {
-        const homeTeam = match.teams.home
-        const awayTeam = match.teams.away
+        const homeTeam = match.home
+        const awayTeam = match.away
 
         if (homeTeam.winner === true) {
-          if (String(homeTeam.id) === String(currentHomeId)) {
+          if (String(homeTeam.externalId) === String(currentHomeId)) {
             acc.homeWins++
           } else {
             acc.awayWins++
           }
         } else if (awayTeam.winner === true) {
-          if (String(awayTeam.id) === String(currentHomeId)) {
+          if (String(awayTeam.externalId) === String(currentHomeId)) {
             acc.homeWins++
           } else {
             acc.awayWins++
@@ -99,24 +99,24 @@ export class MatchesMappers {
 
     const lastMatches = finishedMatches.slice(0, 5).map((m) => ({
       fixture: {
-        id: m.fixture.id,
-        date: m.fixture.date,
+        id: m.externalId,
+        date: m.date,
         venue: {
-          name: m.fixture.venue.name,
-          city: m.fixture.venue.city,
+          name: m.venue?.name ?? '',
+          city: m.venue?.city ?? '',
         },
-        status: { short: m.fixture.status.short },
+        status: { short: m.status.short },
       },
       teams: {
         home: {
-          id: m.teams.home.id,
-          name: m.teams.home.name,
-          logo: m.teams.home.logo,
+          id: m.home.externalId,
+          name: m.home.name,
+          logo: m.home.logo ?? '',
         },
         away: {
-          id: m.teams.away.id,
-          name: m.teams.away.name,
-          logo: m.teams.away.logo,
+          id: m.away.externalId,
+          name: m.away.name,
+          logo: m.away.logo ?? '',
         },
       },
       goals: {
