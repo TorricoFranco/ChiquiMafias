@@ -40,6 +40,12 @@ export class BetsCronService {
     const upcomingMatches = await this.prisma.matches.findMany({
       where: {
         market_created: false,
+        // El mercado se liquida buscando el partido por `fixtureId`
+        // (api_fixture_id). Un partido creado desde otro proveedor no lo tiene y
+        // su mercado quedaría sin poder liquidarse, así que no se abre.
+        api_fixture_id: { not: null },
+        home_team: { api_team_id: { not: null } },
+        away_team: { api_team_id: { not: null } },
         date: {
           gte: now,
           lte: endWindow,

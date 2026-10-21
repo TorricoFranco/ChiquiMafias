@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 import { PrematchServiceApi } from '../football/services/prematch.api'
 import { StandingsService } from '../standings/standings.service'
+import { FootballRefsService } from '../football/services/refs.service'
 
 describe('MatchesService (getAggregatedData)', () => {
   let service: MatchesService
@@ -12,6 +13,11 @@ describe('MatchesService (getAggregatedData)', () => {
   const mockRedisService = { redis: { get: jest.fn(), set: jest.fn() } }
   const mockApi = { getH2H: jest.fn(), getLatestResults: jest.fn() }
   const mockStandingsService = { getCachedFullStandings: jest.fn() }
+  const mockRefs = {
+    teamExternalId: jest.fn((team: { api_team_id: number | null }) =>
+      Promise.resolve(team.api_team_id),
+    ),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -21,6 +27,7 @@ describe('MatchesService (getAggregatedData)', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: PrematchServiceApi, useValue: mockApi },
         { provide: StandingsService, useValue: mockStandingsService },
+        { provide: FootballRefsService, useValue: mockRefs },
       ],
     }).compile()
 

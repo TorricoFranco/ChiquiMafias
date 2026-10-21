@@ -35,9 +35,13 @@ export async function upsertVenue(
     }
 
     if (existingVenue) {
+      // Un proveedor que no informa un dato no debe borrar el que ya teníamos.
+      const present = Object.fromEntries(
+        Object.entries(data).filter(([, v]) => v !== null && v !== undefined),
+      )
       const updated = await prisma.venues.update({
         where: { id: existingVenue.id },
-        data,
+        data: present,
       })
       return updated.id
     }

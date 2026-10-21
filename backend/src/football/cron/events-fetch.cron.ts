@@ -4,8 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { FootballDataProvider } from '../football-data.provider'
 import { FootballEvent } from '../football.types'
 
-import { upsertPlayer } from '../upserts/upsert-players'
-import { upsertTeam } from '../upserts/upsert-team'
+import { FootballRefsService } from '../services/refs.service'
 import { upsertMatchEvent } from '../upserts/upsert-events'
 
 import { PrismaService } from 'src/prisma/prisma.service'
@@ -57,6 +56,7 @@ export class EventsFetchCron {
     private readonly prisma: PrismaService,
     private readonly provider: FootballDataProvider,
     private readonly redisService: RedisService,
+    private readonly refs: FootballRefsService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -95,9 +95,18 @@ export class EventsFetchCron {
         .join(', ')}]`,
     )
 
+    const externalIds = await this.refs.matchExternalIds(matches)
+
     for (const match of matches) {
       try {
-        const apiEvents = await this.provider.getEvents(match.api_fixture_id)
+        const externalId = externalIds.get(match.id)
+        if (externalId === undefined) {
+          this.logger.warn(
+            `Partido ${match.id} sin ID en el proveedor, se saltea`,
+          )
+          continue
+        }
+        const apiEvents = await this.provider.getEvents(externalId)
 
         const redisCountKey = `match:events_count:${match.id}`
         const lastCount = await this.redisService.redis.get(redisCountKey)
@@ -121,13 +130,13 @@ export class EventsFetchCron {
 
             currentApiEventIds.push(uniqueEventId)
             const teamInternal = event.team
-              ? await upsertTeam(tx, event.team)
+              ? await this.refs.resolveTeam(tx, event.team)
               : null
             const playerInternal = event.player
-              ? await upsertPlayer(tx, event.player)
+              ? await this.refs.resolvePlayer(tx, event.player)
               : null
             const assistInternal = event.assist
-              ? await upsertPlayer(tx, event.assist)
+              ? await this.refs.resolvePlayer(tx, event.assist)
               : null
 
             if (!teamInternal) {

@@ -27,7 +27,7 @@ const activeMatch = {
   home_team_id: 'h',
   away_team_id: 'a',
   season: 2026,
-  league: { api_league_id: 128 },
+  league: { id: 'league-1', api_league_id: 128 },
 }
 
 describe('LiveScoreCron', () => {
@@ -42,6 +42,22 @@ describe('LiveScoreCron', () => {
   }
   const redisService = { redis, publish: jest.fn() }
   const eventEmitter = { emit: jest.fn() }
+  const refs = {
+    providerName: 'api-football',
+    leagueExternalId: jest.fn((league: { api_league_id: number | null }) =>
+      Promise.resolve(league.api_league_id),
+    ),
+    matchExternalIds: jest.fn(
+      (matches: { id: string; api_fixture_id: number | null }[]) =>
+        Promise.resolve(
+          new Map(
+            matches
+              .filter((m) => m.api_fixture_id !== null)
+              .map((m) => [m.id, m.api_fixture_id as number]),
+          ),
+        ),
+    ),
+  }
   const provider = {
     liveRefreshMs: 30_000,
     getLiveFixtures: jest.fn(),
@@ -57,6 +73,7 @@ describe('LiveScoreCron', () => {
       provider as never,
       redisService as never,
       eventEmitter as never,
+      refs as never,
     )
     prisma.matches.findMany.mockResolvedValue([activeMatch])
   })

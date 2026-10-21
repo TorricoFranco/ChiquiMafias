@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { FootballDataProvider } from '../football-data.provider'
-import { upsertTeam } from '../upserts/upsert-team'
+import { FootballRefsService } from './refs.service'
 
 @Injectable()
 export class FootballStandingsService {
@@ -10,6 +10,7 @@ export class FootballStandingsService {
   constructor(
     private readonly provider: FootballDataProvider,
     private readonly prisma: PrismaService,
+    private readonly refs: FootballRefsService,
   ) {}
 
   /**
@@ -19,14 +20,19 @@ export class FootballStandingsService {
   async getStandings(season: number, leagueExternalId: number) {
     const rows = await this.provider.getStandings(leagueExternalId, season)
 
-    const league = await this.prisma.leagues.findFirst({
-      where: { api_league_id: leagueExternalId },
-    })
+    const leagueId = this.refs.usesLegacyColumns
+      ? (
+          await this.prisma.leagues.findFirst({
+            where: { api_league_id: leagueExternalId },
+            select: { id: true },
+          })
+        )?.id
+      : await this.refs.findInternalId('LEAGUE', leagueExternalId)
 
-    if (!league) throw new NotFoundException('Liga no encontrada')
+    if (!leagueId) throw new NotFoundException('Liga no encontrada')
 
     for (const row of rows) {
-      const team = await upsertTeam(this.prisma, row.team)
+      const team = await this.refs.resolveTeam(this.prisma, row.team)
 
       if (!team) {
         this.logger.warn(

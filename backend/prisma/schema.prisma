@@ -15,7 +15,7 @@ model Teams {
   country         String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
-  api_team_id     Int      @unique
+  api_team_id     Int?     @unique
   short_code      String?
   venue_id        String?
 
@@ -99,7 +99,7 @@ model Matches {
   home_team_id       String
   away_team_id       String
   league_id          String
-  api_fixture_id     Int         @unique
+  api_fixture_id     Int?        @unique
   away_goals         Int?
   home_goals         Int?
   home_penalty_goals Int?
@@ -147,7 +147,7 @@ model Matches {
 
 model Leagues {
   id                 String               @id @default(uuid())
-  api_league_id      Int                  @unique
+  api_league_id      Int?                 @unique
   name               String
   type               String?
   country            String?
@@ -187,7 +187,7 @@ enum FootballEntity {
 
 model Players {
   id          String    @id @default(uuid())
-  api_id      Int       @unique
+  api_id      Int?      @unique
   name        String
   firstname   String?
   lastname    String?
