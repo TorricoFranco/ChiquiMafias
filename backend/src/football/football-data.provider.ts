@@ -30,6 +30,8 @@ export abstract class FootballDataProvider {
     season: number
     from: string
     to: string
+    /** false evita pedidos extra (estadio y árbitro); por defecto true. */
+    includeDetails?: boolean
   }): Promise<FootballFixture[]>
 
   /** Partidos de la liga que están en juego ahora. */

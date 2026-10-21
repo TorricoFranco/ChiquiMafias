@@ -33,8 +33,23 @@ partidos no se actualizan.
 1. **Aplicar las migraciones** (`npx prisma migrate dev` en dev; `migrate deploy` en prod, después de
    verificar el estado real de las migraciones del VPS). Hacerlo fuera de partidos en vivo: el
    `ALTER TABLE` toma un lock exclusivo por un instante.
-2. **Vincular los IDs** de Highlightly con los de la base: equipos por nombre, partidos por
-   local + visitante + ronda. Ver `PR de vinculación` (pendiente).
+2. **Vincular los IDs** de Highlightly con los de la base (equipos por nombre y calendario, partidos por
+   local + visitante + ronda, con la fecha como desempate). Dry-run primero, después `--apply`;
+   se puede repetir sin duplicar y nunca modifica Teams, Matches ni Leagues:
+
+   ```bash
+   # desde el contenedor del backend (tiene la DATABASE_URL y tsconfig-paths)
+   docker exec football_backend npx ts-node -r tsconfig-paths/register      scripts/link-provider-ids.ts --league-ext 109712            # informe, no escribe
+   docker exec football_backend npx ts-node -r tsconfig-paths/register      scripts/link-provider-ids.ts --league-ext 109712 --apply    # escribe ProviderRef
+   ```
+
+   Sin `--source-file` pide la temporada a Highlightly (5 pedidos, necesita `HIGHLIGHTLY_API_KEY`
+   en el entorno). Con `--source-file <json>` usa partidos ya bajados y no hace pedidos.
+   Para otra liga: `--league-ext <id en Highlightly>` y `--anchor <api_league_id en la base>`.
+
+   Nota: Highlightly nombra distinto las fechas del Apertura (`Regular Season - N`) que la base
+   (`Apertura - N`); el script lo resuelve por equipos y horario. Los partidos con ronda distinta
+   *y* más de 72 h de diferencia no se aplican solos: quedan en "a revisar".
 3. **Mercados abiertos (dinero).** Todo partido con un mercado `OPEN` o `LOCKED` tiene que tener su
    `ProviderRef` de `highlightly`; si no, no se actualiza ni se cierra y el mercado no se liquida.
 

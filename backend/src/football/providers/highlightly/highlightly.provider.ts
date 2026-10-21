@@ -106,6 +106,7 @@ export class HighlightlyProvider extends FootballDataProvider {
     season: number
     from: string
     to: string
+    includeDetails?: boolean
   }): Promise<FootballFixture[]> {
     // No hay filtro por rango: se trae la temporada paginada y se recorta acá.
     const all = await this.fetchAllMatches({
@@ -116,7 +117,9 @@ export class HighlightlyProvider extends FootballDataProvider {
       const day = m.date.slice(0, 10)
       return day >= params.from && day <= params.to
     })
-    return this.withDetails(inRange)
+    return params.includeDetails === false
+      ? inRange.map((m) => mapMatch(m))
+      : this.withDetails(inRange)
   }
 
   async getLiveFixtures(leagueExternalId: number): Promise<FootballFixture[]> {
