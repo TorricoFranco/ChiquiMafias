@@ -1,22 +1,64 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 import { FootballDataProvider } from '../football-data.provider'
 import { FootballFixture } from '../football.types'
 
 import { FINAL_STATUSES, ACTIVE_STATUSES } from '../mappers/API_STATUSES'
-import { fixturesCacheKey, resolveRound } from '../mappers/round'
+import {
+  fixturesCacheKey,
+  leagueCacheKey,
+  matchdayKeyOf,
+} from '../mappers/round'
 import { LiveMatchData } from 'src/fixture/types/fixtures'
 import { FootballRefsService } from '../services/refs.service'
 import { matchStatusCacheKey } from 'src/matches/utils/match-chat.util'
 import { EventEmitter2 } from '@nestjs/event-emitter'
+import { MATCH_FINISHED_EVENT, MatchFinishedEvent } from '../football.events'
 
 // El cron corre cada 30 s; si el proveedor refresca más lento se saltean ticks.
 const TICK_MS = 30_000
 // Tolerancia al atraso del scheduler: media vuelta de cron.
 const TICK_JITTER_MS = TICK_MS / 2
+// Un partido con `tracked` que empezó hace más que esto no se consulta: hay
+// partidos viejos que nunca se cerraron (terminados antes de trackearse) y,
+// con una consulta por competición, cada uno costaría una request por tick.
+// El resultado final de esos lo sigue escribiendo `fixtures-sync`.
+const LIVE_LOOKBACK_MS = 12 * 60 * 60 * 1000
 
+const ACTIVE_MATCH_SELECT = {
+  id: true,
+  api_fixture_id: true,
+  home_goals: true,
+  away_goals: true,
+  status_short: true,
+  elapsed: true,
+  home_team_id: true,
+  away_team_id: true,
+  season: true,
+  // La ronda guardada por el sync del fixture: en formatos de eliminación no
+  // se puede deducir de un partido suelto del feed en vivo.
+  round: true,
+  tournament: true,
+  league: {
+    select: {
+      id: true,
+      api_league_id: true,
+    },
+  },
+} satisfies Prisma.MatchesSelect
+
+type ActiveMatch = Prisma.MatchesGetPayload<{
+  select: typeof ACTIVE_MATCH_SELECT
+}>
+type ActiveLeague = ActiveMatch['league']
+
+/**
+ * Marcador en vivo. Los partidos activos se agrupan por competición y se
+ * consulta al proveedor una vez por cada una (ERS RF-A07).
+ */
 @Injectable()
 export class LiveScoreCron {
   private readonly logger = new Logger(LiveScoreCron.name)
@@ -37,41 +79,19 @@ export class LiveScoreCron {
 
     try {
       const activeMatchesDb = await this.prisma.matches.findMany({
-        where: { tracked: true, is_live_finished: false },
-        select: {
-          id: true,
-          api_fixture_id: true,
-          home_goals: true,
-          away_goals: true,
-          status_short: true,
-          elapsed: true,
-          home_team_id: true,
-          away_team_id: true,
-          season: true,
-          league: {
-            select: {
-              id: true,
-              api_league_id: true,
-            },
-          },
+        where: {
+          tracked: true,
+          is_live_finished: false,
+          date: { gte: new Date(Date.now() - LIVE_LOOKBACK_MS) },
         },
+        select: ACTIVE_MATCH_SELECT,
       })
 
       if (activeMatchesDb.length === 0) {
-        this.logger.log('No hay partidos activos para trackear.')
+        this.logger.debug('No hay partidos activos para trackear.')
         return
       }
-      const league = activeMatchesDb[0].league
-      // Clave estable de la liga para Redis y eventos (la de siempre).
-      const leagueId: number | string = league.api_league_id ?? league.id
-      // ID que entiende el proveedor activo.
-      const leagueExternalId = await this.refs.leagueExternalId(league)
-      if (leagueExternalId === null) {
-        this.logger.warn(
-          `La liga ${league.id} no tiene ID en ${this.refs.providerName}; se saltea el tick.`,
-        )
-        return
-      }
+
       const externalIds = await this.refs.matchExternalIds(activeMatchesDb)
       for (const m of activeMatchesDb) {
         if (!externalIds.has(m.id) && !this.warnedWithoutId.has(m.id)) {
@@ -81,167 +101,176 @@ export class LiveScoreCron {
           )
         }
       }
-      const dbByExternalId = new Map(
-        activeMatchesDb.flatMap((m) => {
-          const externalId = externalIds.get(m.id)
-          return externalId === undefined ? [] : [[externalId, m] as const]
-        }),
-      )
 
-      const liveMatchesApi =
-        await this.provider.getLiveFixtures(leagueExternalId)
-
-      if (liveMatchesApi.length === 0) {
-        await this.redisService.redis.del(`live_scores:league:${leagueId}`)
-        return
+      const byLeague = new Map<string, ActiveMatch[]>()
+      for (const m of activeMatchesDb) {
+        const group = byLeague.get(m.league.id) ?? []
+        group.push(m)
+        byLeague.set(m.league.id, group)
       }
 
-      // Reconciliación para partidos que terminaron o desaparecieron del feed live
-      const missingMatches = this.reconcileMatches(
-        activeMatchesDb,
-        liveMatchesApi,
-        externalIds,
-      )
-
-      for (const match of missingMatches) {
-        await this.syncSpecificMatch(
-          match.id,
-          externalIds.get(match.id)!,
-          leagueId,
-        )
-      }
-
-      const liveScoresHash: Record<string, string> = {}
-
-      for (const apiMatch of liveMatchesApi) {
-        const matchDb = dbByExternalId.get(apiMatch.externalId)
-
-        const apiStatus = apiMatch.status.short
-        const isFinished = FINAL_STATUSES.includes(apiStatus)
-
-        if (!matchDb) continue
-
-        if (isFinished) {
-          await this.prisma.matches.update({
-            where: { id: matchDb.id },
-            data: {
-              home_goals: apiMatch.goals.home ?? 0,
-              away_goals: apiMatch.goals.away ?? 0,
-              status_short: apiStatus,
-              home_penalty_goals: apiMatch.penalty.home,
-              away_penalty_goals: apiMatch.penalty.away,
-              elapsed: apiMatch.status.elapsed,
-              is_live_finished: true,
-              tracked: false,
-            },
-          })
-
-          await this.handleMatchCleanup(matchDb.id, leagueId)
-
-          // Avisa al front que terminó: cierra el chat y recarga el partido.
-          await this.publishUpdate(matchDb.id, apiMatch, 'MATCH_ENDED')
-
-          const { tournament, matchdayKey } = resolveRound(
-            apiMatch.league.round,
-            '',
-          )
-
-          await this.redisService.redis.del(
-            fixturesCacheKey(leagueId, matchDb.season, tournament, matchdayKey),
-          )
-
-          // Actualizar los standings
-          this.logger.log(
-            `Partido ${matchDb.id} terminado. Solicitando actualización de Standings...`,
-          )
-
-          this.eventEmitter.emit('match.finished', {
-            leagueId: leagueId,
-            season: matchDb.season,
-          })
-          continue
-        }
-
-        const { round: roundForDb } = resolveRound(
-          apiMatch.league.round,
-          'Unknown Round',
-        )
-
-        const liveData: LiveMatchData = {
-          home_goals: apiMatch.goals.home ?? 0,
-          away_goals: apiMatch.goals.away ?? 0,
-          home_penalty_goals: apiMatch.penalty.home,
-          away_penalty_goals: apiMatch.penalty.away,
-          status_short: apiMatch.status.short,
-          elapsed: apiMatch.status.elapsed,
-          home_team_id: matchDb.home_team_id,
-          away_team_id: matchDb.away_team_id,
-          round: roundForDb,
-        }
-        liveScoresHash[matchDb.id] = JSON.stringify(liveData)
-
-        const hasPenaltiesChanged = apiMatch.penalty.home !== null
-
-        const hasScoreChanged =
-          matchDb.home_goals !== (apiMatch.goals.home ?? 0) ||
-          matchDb.away_goals !== (apiMatch.goals.away ?? 0)
-        const hasStatusChanged = matchDb.status_short !== apiMatch.status.short
-        const hasMinuteChanged = matchDb.elapsed !== apiMatch.status.elapsed
-
-        if (
-          hasScoreChanged ||
-          hasStatusChanged ||
-          hasMinuteChanged ||
-          hasPenaltiesChanged
-        ) {
-          await this.prisma.matches.update({
-            where: { id: matchDb.id },
-            data: {
-              home_goals: apiMatch.goals.home ?? 0,
-              away_goals: apiMatch.goals.away ?? 0,
-              status_short: apiMatch.status.short,
-              home_penalty_goals: apiMatch.penalty.home,
-              away_penalty_goals: apiMatch.penalty.away,
-              elapsed: apiMatch.status.elapsed,
-              is_live_finished: isFinished,
-              tracked: !isFinished,
-            },
-          })
-
-          await this.redisService.redis.del(
-            `match:details:v2:${matchDb.id}`,
-            // El chat consulta el estado con esta caché: se abre o se pausa ya.
-            matchStatusCacheKey(matchDb.id),
-          )
-
-          // Notificamos por Socket
-          await this.publishUpdate(
-            matchDb.id,
-            apiMatch,
-            hasScoreChanged || hasPenaltiesChanged
-              ? 'SCORE_UPDATED'
-              : 'MINUTE_TICK',
+      // Un error en una competición no deja sin marcador a las demás.
+      for (const matches of byLeague.values()) {
+        const league = matches[0].league
+        try {
+          await this.syncLeague(league, matches, externalIds)
+        } catch (error) {
+          this.logger.error(
+            `Error en LiveScoreCron (liga ${league.id}): ${error instanceof Error ? error.message : String(error)}`,
           )
         }
-      }
-
-      if (Object.keys(liveScoresHash).length > 0) {
-        await this.redisService.redis.hset(
-          `live_scores:league:${leagueId}`,
-          liveScoresHash,
-        )
-        await this.redisService.redis.expire(
-          `live_scores:league:${leagueId}`,
-          300,
-        )
-
-        await this.redisService.publish('league_live_updates', {
-          leagueId: leagueId,
-          matches: liveScoresHash,
-        })
       }
     } catch (error) {
       this.logger.error(`Error en LiveScoreCron: ${error.message}`)
+    }
+  }
+
+  private async syncLeague(
+    league: ActiveLeague,
+    activeMatchesDb: ActiveMatch[],
+    externalIds: Map<string, number>,
+  ) {
+    // Clave estable de la liga para Redis y eventos (la de siempre).
+    const leagueId = leagueCacheKey(league)
+    // ID que entiende el proveedor activo.
+    const leagueExternalId = await this.refs.leagueExternalId(league)
+    if (leagueExternalId === null) {
+      this.logger.warn(
+        `La liga ${league.id} no tiene ID en ${this.refs.providerName}; se saltea el tick.`,
+      )
+      return
+    }
+
+    const dbByExternalId = new Map(
+      activeMatchesDb.flatMap((m) => {
+        const externalId = externalIds.get(m.id)
+        return externalId === undefined ? [] : [[externalId, m] as const]
+      }),
+    )
+
+    const liveMatchesApi = await this.provider.getLiveFixtures(leagueExternalId)
+
+    if (liveMatchesApi.length === 0) {
+      await this.redisService.redis.del(`live_scores:league:${leagueId}`)
+      return
+    }
+
+    // Reconciliación para partidos que terminaron o desaparecieron del feed live
+    const missingMatches = this.reconcileMatches(
+      activeMatchesDb,
+      liveMatchesApi,
+      externalIds,
+    )
+
+    for (const match of missingMatches) {
+      await this.syncSpecificMatch(match, externalIds.get(match.id)!, leagueId)
+    }
+
+    const liveScoresHash: Record<string, string> = {}
+
+    for (const apiMatch of liveMatchesApi) {
+      const matchDb = dbByExternalId.get(apiMatch.externalId)
+
+      const apiStatus = apiMatch.status.short
+      const isFinished = FINAL_STATUSES.includes(apiStatus)
+
+      if (!matchDb) continue
+
+      if (isFinished) {
+        await this.prisma.matches.update({
+          where: { id: matchDb.id },
+          data: {
+            home_goals: apiMatch.goals.home ?? 0,
+            away_goals: apiMatch.goals.away ?? 0,
+            status_short: apiStatus,
+            home_penalty_goals: apiMatch.penalty.home,
+            away_penalty_goals: apiMatch.penalty.away,
+            elapsed: apiMatch.status.elapsed,
+            is_live_finished: true,
+            tracked: false,
+          },
+        })
+
+        await this.handleMatchCleanup(matchDb.id, leagueId)
+
+        // Avisa al front que terminó: cierra el chat y recarga el partido.
+        await this.publishUpdate(matchDb.id, apiMatch, 'MATCH_ENDED')
+        await this.notifyFinished(matchDb, leagueId)
+        continue
+      }
+
+      const liveData: LiveMatchData = {
+        home_goals: apiMatch.goals.home ?? 0,
+        away_goals: apiMatch.goals.away ?? 0,
+        home_penalty_goals: apiMatch.penalty.home,
+        away_penalty_goals: apiMatch.penalty.away,
+        status_short: apiMatch.status.short,
+        elapsed: apiMatch.status.elapsed,
+        home_team_id: matchDb.home_team_id,
+        away_team_id: matchDb.away_team_id,
+        round: matchDb.round,
+      }
+      liveScoresHash[matchDb.id] = JSON.stringify(liveData)
+
+      const hasPenaltiesChanged = apiMatch.penalty.home !== null
+
+      const hasScoreChanged =
+        matchDb.home_goals !== (apiMatch.goals.home ?? 0) ||
+        matchDb.away_goals !== (apiMatch.goals.away ?? 0)
+      const hasStatusChanged = matchDb.status_short !== apiMatch.status.short
+      const hasMinuteChanged = matchDb.elapsed !== apiMatch.status.elapsed
+
+      if (
+        hasScoreChanged ||
+        hasStatusChanged ||
+        hasMinuteChanged ||
+        hasPenaltiesChanged
+      ) {
+        await this.prisma.matches.update({
+          where: { id: matchDb.id },
+          data: {
+            home_goals: apiMatch.goals.home ?? 0,
+            away_goals: apiMatch.goals.away ?? 0,
+            status_short: apiMatch.status.short,
+            home_penalty_goals: apiMatch.penalty.home,
+            away_penalty_goals: apiMatch.penalty.away,
+            elapsed: apiMatch.status.elapsed,
+            is_live_finished: isFinished,
+            tracked: !isFinished,
+          },
+        })
+
+        await this.redisService.redis.del(
+          `match:details:v2:${matchDb.id}`,
+          // El chat consulta el estado con esta caché: se abre o se pausa ya.
+          matchStatusCacheKey(matchDb.id),
+        )
+
+        // Notificamos por Socket
+        await this.publishUpdate(
+          matchDb.id,
+          apiMatch,
+          hasScoreChanged || hasPenaltiesChanged
+            ? 'SCORE_UPDATED'
+            : 'MINUTE_TICK',
+        )
+      }
+    }
+
+    if (Object.keys(liveScoresHash).length > 0) {
+      await this.redisService.redis.hset(
+        `live_scores:league:${leagueId}`,
+        liveScoresHash,
+      )
+      await this.redisService.redis.expire(
+        `live_scores:league:${leagueId}`,
+        300,
+      )
+
+      await this.redisService.publish('league_live_updates', {
+        leagueId: leagueId,
+        matches: liveScoresHash,
+      })
     }
   }
 
@@ -276,6 +305,32 @@ export class LiveScoreCron {
     })
   }
 
+  /** Invalida la fecha del fixture y pide la tabla de su competición. */
+  private async notifyFinished(
+    matchDb: ActiveMatch,
+    leagueId: number | string,
+  ) {
+    await this.redisService.redis.del(
+      fixturesCacheKey(
+        leagueId,
+        matchDb.season,
+        matchDb.tournament,
+        matchdayKeyOf(matchDb.round),
+      ),
+    )
+
+    this.logger.log(
+      `Partido ${matchDb.id} terminado. Solicitando actualización de Standings...`,
+    )
+
+    const event: MatchFinishedEvent = {
+      leagueId,
+      leagueDbId: matchDb.league.id,
+      season: matchDb.season,
+    }
+    this.eventEmitter.emit(MATCH_FINISHED_EVENT, event)
+  }
+
   private async handleMatchCleanup(matchId: string, leagueId: number | string) {
     await this.redisService.redis.hdel(
       `live_scores:league:${leagueId}`,
@@ -291,11 +346,11 @@ export class LiveScoreCron {
     this.logger.log(`Partido ${matchId} finalizado y limpiado de Redis.`)
   }
 
-  private reconcileMatches<T extends { id: string; status_short: string }>(
-    activeMatchesDb: T[],
+  private reconcileMatches(
+    activeMatchesDb: ActiveMatch[],
     liveMatchesApi: FootballFixture[],
     externalIds: Map<string, number>,
-  ): T[] {
+  ): ActiveMatch[] {
     const apiIds = new Set(liveMatchesApi.map((m) => m.externalId))
 
     return activeMatchesDb.filter((dbMatch) => {
@@ -311,7 +366,7 @@ export class LiveScoreCron {
   }
 
   private async syncSpecificMatch(
-    matchDbId: string,
+    matchDb: ActiveMatch,
     apiFixtureId: number,
     leagueId: number | string,
   ) {
@@ -323,7 +378,7 @@ export class LiveScoreCron {
       const isFinished = FINAL_STATUSES.includes(apiStatus)
 
       await this.prisma.matches.update({
-        where: { id: matchDbId },
+        where: { id: matchDb.id },
         data: {
           home_goals: apiMatch.goals.home,
           away_goals: apiMatch.goals.away,
@@ -335,17 +390,17 @@ export class LiveScoreCron {
       })
 
       if (isFinished) {
-        await this.handleMatchCleanup(matchDbId, leagueId)
+        await this.handleMatchCleanup(matchDb.id, leagueId)
       } else {
         await this.redisService.redis.del(
-          `match:details:v2:${matchDbId}`,
-          matchStatusCacheKey(matchDbId),
+          `match:details:v2:${matchDb.id}`,
+          matchStatusCacheKey(matchDb.id),
         )
       }
 
       // El front se entera del estado nuevo (fin, suspensión) y ajusta el chat.
       await this.publishUpdate(
-        matchDbId,
+        matchDb.id,
         apiMatch,
         isFinished ? 'MATCH_ENDED' : 'MINUTE_TICK',
       )

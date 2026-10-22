@@ -1,5 +1,5 @@
 import { FootballFixture } from '../football.types'
-import { resolveRound } from '../mappers/round'
+import { resolveLigaDivididaRound } from '../formats/liga-dividida.strategy'
 import { EXACT_SCORE, nameScore } from './name-match'
 
 export interface DbTeam {
@@ -158,7 +158,7 @@ export function planLinks(
     f,
     home: internalByExternalTeam.get(f.home.externalId),
     away: internalByExternalTeam.get(f.away.externalId),
-    round: resolveRound(f.league.round, 'N/A').round,
+    round: resolveLigaDivididaRound(f.league.round, 'N/A').round,
     ts: new Date(f.date).getTime(),
   }))
 

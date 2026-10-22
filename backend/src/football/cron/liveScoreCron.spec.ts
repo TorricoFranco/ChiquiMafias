@@ -27,7 +27,19 @@ const activeMatch = {
   home_team_id: 'h',
   away_team_id: 'a',
   season: 2026,
+  round: 'Regular Season - 9',
+  tournament: 'APERTURA',
   league: { id: 'league-1', api_league_id: 128 },
+}
+
+// Partido de otra competición (sin ID de API-Football), en vivo a la vez.
+const copaMatch = {
+  ...activeMatch,
+  id: 'm-copa',
+  api_fixture_id: 3003,
+  round: 'Copa - 32avos',
+  tournament: 'COPA',
+  league: { id: 'league-copa', api_league_id: null },
 }
 
 describe('LiveScoreCron', () => {
@@ -45,7 +57,7 @@ describe('LiveScoreCron', () => {
   const refs = {
     providerName: 'api-football',
     leagueExternalId: jest.fn((league: { api_league_id: number | null }) =>
-      Promise.resolve(league.api_league_id),
+      Promise.resolve(league.api_league_id ?? 777),
     ),
     matchExternalIds: jest.fn(
       (matches: { id: string; api_fixture_id: number | null }[]) =>
@@ -118,6 +130,7 @@ describe('LiveScoreCron', () => {
     expect(redis.del).toHaveBeenCalledWith('fixtures:128:2026:APERTURA:fecha:9')
     expect(eventEmitter.emit).toHaveBeenCalledWith('match.finished', {
       leagueId: 128,
+      leagueDbId: 'league-1',
       season: 2026,
     })
     // Avisa al front: cierra el chat y recarga el partido.
@@ -160,6 +173,24 @@ describe('LiveScoreCron', () => {
     })
   })
 
+  it('No debe consultar partidos trackeados que empezaron hace más de 12 horas', async () => {
+    provider.getLiveFixtures.mockResolvedValue([])
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000)
+
+    await cron.handleLiveScores()
+
+    expect(prisma.matches.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tracked: true,
+          is_live_finished: false,
+          date: { gte: new Date(1_800_000_000_000 - 12 * 60 * 60 * 1000) },
+        },
+      }),
+    )
+    now.mockRestore()
+  })
+
   it('Debe saltear el tick si el proveedor refresca más lento que el cron', async () => {
     provider.liveRefreshMs = 60_000
     provider.getLiveFixtures.mockResolvedValue([])
@@ -190,5 +221,118 @@ describe('LiveScoreCron', () => {
 
     expect(provider.getLiveFixtures).toHaveBeenCalledTimes(2)
     now.mockRestore()
+  })
+
+  describe('varias competiciones', () => {
+    beforeEach(() => {
+      prisma.matches.findMany.mockResolvedValue([activeMatch, copaMatch])
+    })
+
+    it('Debe consultar el feed en vivo una vez por competición', async () => {
+      provider.getLiveFixtures.mockResolvedValue([])
+
+      await cron.handleLiveScores()
+
+      expect(provider.getLiveFixtures).toHaveBeenCalledTimes(2)
+      expect(provider.getLiveFixtures).toHaveBeenCalledWith(128)
+      expect(provider.getLiveFixtures).toHaveBeenCalledWith(777)
+      expect(redis.del).toHaveBeenCalledWith('live_scores:league:128')
+      expect(redis.del).toHaveBeenCalledWith('live_scores:league:league-copa')
+    })
+
+    it('Debe actualizar el partido de cada competición con su propio feed', async () => {
+      provider.getLiveFixtures.mockImplementation((leagueId: number) =>
+        Promise.resolve(
+          leagueId === 128
+            ? [baseFixture()]
+            : [baseFixture({ externalId: 3003, goals: { home: 0, away: 2 } })],
+        ),
+      )
+
+      await cron.handleLiveScores()
+
+      expect(prisma.matches.update).toHaveBeenCalledWith({
+        where: { id: 'm1' },
+        data: expect.objectContaining({
+          home_goals: 1,
+          away_goals: 0,
+        }) as unknown,
+      })
+      expect(prisma.matches.update).toHaveBeenCalledWith({
+        where: { id: 'm-copa' },
+        data: expect.objectContaining({
+          home_goals: 0,
+          away_goals: 2,
+        }) as unknown,
+      })
+      expect(redis.hset).toHaveBeenCalledWith(
+        'live_scores:league:128',
+        expect.objectContaining({ m1: expect.any(String) as unknown }),
+      )
+      expect(redis.hset).toHaveBeenCalledWith(
+        'live_scores:league:league-copa',
+        expect.objectContaining({ 'm-copa': expect.any(String) as unknown }),
+      )
+      expect(redisService.publish).toHaveBeenCalledWith(
+        'league_live_updates',
+        expect.objectContaining({ leagueId: 'league-copa' }),
+      )
+    })
+
+    it('Debe emitir match.finished con la competición y la ronda de cada partido', async () => {
+      const ft = { short: 'FT', long: 'Finished', elapsed: 90 }
+      provider.getLiveFixtures.mockImplementation((leagueId: number) =>
+        Promise.resolve(
+          leagueId === 128
+            ? [baseFixture()]
+            : [baseFixture({ externalId: 3003, status: ft })],
+        ),
+      )
+
+      await cron.handleLiveScores()
+
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(1)
+      expect(eventEmitter.emit).toHaveBeenCalledWith('match.finished', {
+        leagueId: 'league-copa',
+        leagueDbId: 'league-copa',
+        season: 2026,
+      })
+      expect(redis.del).toHaveBeenCalledWith(
+        'fixtures:league-copa:2026:COPA:32avos',
+      )
+    })
+
+    it('Un error en una competición no debe dejar sin marcador a la otra', async () => {
+      provider.getLiveFixtures.mockImplementation((leagueId: number) =>
+        leagueId === 128
+          ? Promise.reject(new Error('Proveedor caído'))
+          : Promise.resolve([baseFixture({ externalId: 3003 })]),
+      )
+
+      await cron.handleLiveScores()
+
+      expect(prisma.matches.update).toHaveBeenCalledTimes(1)
+      expect(prisma.matches.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'm-copa' } }),
+      )
+    })
+
+    it('No debe cruzar partidos entre competiciones', async () => {
+      // El feed de la Liga trae (por error) el partido de la Copa.
+      provider.getLiveFixtures.mockImplementation((leagueId: number) =>
+        Promise.resolve(
+          leagueId === 128 ? [baseFixture({ externalId: 3003 })] : [],
+        ),
+      )
+
+      provider.getFixture.mockResolvedValue(null)
+
+      await cron.handleLiveScores()
+
+      expect(prisma.matches.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'm-copa' } }),
+      )
+      expect(redis.hset).not.toHaveBeenCalled()
+    })
   })
 })
