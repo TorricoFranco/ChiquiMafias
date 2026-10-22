@@ -99,7 +99,23 @@ export const LigaProfesionalView: React.FC<LigaProfesionalViewProps> = ({
                 hasLiveMatches={data.hasLiveMatches}
             />
 
-            {/* Selector de Torneo (Apertura 2026 / Clausura 2026) */}
+            {data.isSeasonError && (
+                <div
+                    role="alert"
+                    className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#1c1b1b] border border-[#353534] rounded-2xl p-4 text-sm text-[#ffb4ab]"
+                >
+                    No se pudo cargar la temporada de la Liga.
+                    <button
+                        type="button"
+                        onClick={data.retrySeason}
+                        className="bg-[#d2f000] hover:bg-[#b8d300] text-[#191e00] font-black uppercase tracking-wider text-xs px-4 py-2 rounded-lg"
+                    >
+                        Reintentar
+                    </button>
+                </div>
+            )}
+
+            {/* Selector de Torneo (Apertura / Clausura) */}
             <TournamentTabs
                 activeTournament={currentTournament}
                 onChangeTournament={handleTournamentChange}
@@ -139,7 +155,7 @@ export const LigaProfesionalView: React.FC<LigaProfesionalViewProps> = ({
             <BracketModal
                 isOpen={bracketOpen}
                 onClose={() => handleBracketToggle(false)}
-                tournamentName={`${currentTournament} 2026`}
+                tournamentName={`${currentTournament} ${data.seasonLabel}`.trim()}
                 brackets={data.playoffBrackets}
             />
         </div>

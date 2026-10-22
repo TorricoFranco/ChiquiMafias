@@ -160,6 +160,16 @@ export interface MatchEvent {
   substitutionLog: SubstitutionLog | null;
 }
 
+/** Competición del partido (`MatchCompetitionDto`). */
+export interface MatchCompetition {
+  slug: string;
+  name: string;
+  shortName: string | null;
+  /** true en cancha neutral: no se muestra local ni visitante. */
+  neutralVenue: boolean;
+  seasonLabel: string;
+}
+
 export interface MatchDetails {
   metadata: MatchMetadata;
   score: MatchScore;
@@ -173,6 +183,8 @@ export interface MatchDetails {
   isLive: boolean;
   chatActive: boolean;
   chatState: MatchChatState;
+  /** Solo en `GET /matches/:id`. */
+  competition?: MatchCompetition;
 }
 
 // Lo decide el backend (backend/src/matches/utils/match-chat.util.ts) según el

@@ -23,12 +23,12 @@ import {
 import { useFixtureWithLive } from '@/features/fixture/hooks/useFixtureWithLive';
 import type { MatchFixture } from '@/features/fixture/types';
 import { useStandings } from '@/features/standings/hooks/useStandings';
+import { LEAGUE_SLUG } from '@/features/competitions/constants';
+import { useCurrentSeason } from '@/features/competitions/hooks/useCompetitions';
 import {
   processStandingsWithSimulations,
 } from './leagueData2026';
 
-const CURRENT_SEASON = '2026';
-const SOCKET_LEAGUE_ID = '128';
 
 const PLAYOFF_LABELS: Record<string, { labelShort: string; labelFull: string }> = {
   'octavos': { labelShort: 'OCT', labelFull: 'Octavos de Final' },
@@ -99,12 +99,23 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
     options?.externalSimulations ?? {}
   );
 
-  const { data: activeMatchdayData } = useActiveMatchday(CURRENT_SEASON, activeTournament);
-  const { data: availableStagesData } = useAvailableStages(CURRENT_SEASON, activeTournament);
-  const { data: bracketsData } = useTournamentBrackets(CURRENT_SEASON, activeTournament);
-  const { data: pendingFixturesData } = usePendingFixtures(CURRENT_SEASON, activeTournament);
+  // La temporada sale de GET /competitions: mientras carga, las consultas esperan.
+  const {
+    season: currentSeason,
+    label: seasonLabel,
+    isLoading: isSeasonLoading,
+    isError: isSeasonError,
+    retry: retrySeason,
+  } = useCurrentSeason(LEAGUE_SLUG);
 
-  const { data: baseStandings, isLoading: isStandingsLoading } = useStandings(Number(CURRENT_SEASON));
+  const { data: activeMatchdayData } = useActiveMatchday(currentSeason, activeTournament);
+  const { data: availableStagesData } = useAvailableStages(currentSeason, activeTournament);
+  const { data: bracketsData } = useTournamentBrackets(currentSeason, activeTournament);
+  const { data: pendingFixturesData } = usePendingFixtures(currentSeason, activeTournament);
+
+  const { data: baseStandings, isLoading: isStandingsLoading } = useStandings(
+    currentSeason ? Number(currentSeason) : undefined,
+  );
 
   const formattedAvailableStages = useMemo<AvailableStages>(() => {
     if (!availableStagesData) return { regular: [], playoffs: [] };
@@ -146,10 +157,10 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
 
   const currentRoundStr = selectedRound?.toString() || '1';
   const { matches: liveMatches, isLoading: isFixtureLoading } = useFixtureWithLive(
-    CURRENT_SEASON,
+    currentSeason,
     activeTournament,
     currentRoundStr,
-    SOCKET_LEAGUE_ID
+    LEAGUE_SLUG
   );
 
   const currentRoundMatches = useMemo<LeagueMatch[]>(() => {
@@ -307,7 +318,11 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
   }, [liveMatches]);
 
   return {
-    isLoading: isFixtureLoading || isStandingsLoading,
+    isLoading: isSeasonLoading || isFixtureLoading || isStandingsLoading,
+    /** Etiqueta de la temporada actual (`2026`); vacía mientras carga. */
+    seasonLabel,
+    isSeasonError,
+    retrySeason,
     hasLiveMatches,
     activeTournament,
     activeZone,

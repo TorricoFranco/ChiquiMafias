@@ -8,6 +8,7 @@ const PUBLIC_ROUTES: { method: string; path: RegExp }[] = [
   { method: "*", path: /^\/fixtures(\/|$)/ },
   { method: "*", path: /^\/matches(\/|$)/ },
   { method: "GET", path: /^\/standings\/seasons\/[^/]+$/ },
+  { method: "GET", path: /^\/competitions(\/[^/]+(\/(matches|live|standings))?)?$/ },
   {
     method: "GET",
     path: /^\/stats\/(top-earners|top-streaks|highest-multipliers|most-active|top-stakers|global|top-active|top-chatters)$/,

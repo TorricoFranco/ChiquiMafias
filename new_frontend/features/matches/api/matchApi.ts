@@ -3,15 +3,11 @@ import { MatchDetails, PreMatchResponse } from '../types';
 
 export const matchApi = {
   /**
-   * Detalle principal del partido
+   * Detalle principal del partido, con su competición.
    */
-  getMatchDetails: async (
-    leagueId: string,
-    season: string,
-    matchId: string,
-  ): Promise<MatchDetails> => {
+  getMatchDetails: async (matchId: string): Promise<MatchDetails> => {
     const res = await apiFetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/matches/leagues/${leagueId}/seasons/${season}/matches/${matchId}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/matches/${encodeURIComponent(matchId)}`,
       {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },

@@ -5,19 +5,11 @@ import { getDerivedMatchState } from '../types';
 import { useMemo } from 'react';
 import { MatchDetails, PreMatchResponse } from '../types';
 
-export const useMatch = ({
-  leagueId,
-  season,
-  matchId,
-}: {
-  leagueId: string;
-  season: string;
-  matchId: string;
-}) => {
-  const main = useMatchDetails(leagueId, season, matchId);
+export const useMatch = ({ matchId }: { matchId: string }) => {
+  const main = useMatchDetails(matchId);
   const pre = usePreMatch(matchId);
 
-  useMatchLive(leagueId, season, matchId);
+  useMatchLive(matchId);
 
   const derived = useMemo(() => {
     const status = main.data?.metadata?.status;

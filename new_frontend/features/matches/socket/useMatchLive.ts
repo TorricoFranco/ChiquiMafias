@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGlobalSocket } from '@/context/SocketContext';
 import { chatStateFor } from '../types';
+import { matchDetailKey } from '../hooks/useMatchDetails';
 import type { MatchDetails, MatchEvent, MatchLiveUpdatePayload, MatchStatus, StatsUpdatedPayload, TimelineUpdatedPayload } from '../types';
 
 // El evento crudo de la API trae `time`, que no es parte del tipo de la app: se guarda con esa forma.
 type RawTimelineEvent = MatchEvent & { time?: { elapsed?: number | null } };
 
-export const useMatchLive = (leagueId: string, season: string, matchId: string) => {
+export const useMatchLive = (matchId: string) => {
   const socket = useGlobalSocket();
   const queryClient = useQueryClient();
 
@@ -18,7 +19,7 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
     const joinMatch = () => socket.emit('join_match', { matchId });
     if (socket.connected) joinMatch();
 
-    const queryKey = ['matchDetail', leagueId, season, matchId];
+    const queryKey = matchDetailKey(matchId);
 
     const updateCache = (updater: (old: MatchDetails | undefined) => MatchDetails | undefined) => {
       queryClient.setQueryData<MatchDetails>(queryKey, updater);
@@ -106,5 +107,5 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
       socket.off('lineups_updated', handleForceUpdate);
       socket.off('match_data_update', handleMatchDataUpdate);
     };
-  }, [socket, leagueId, season, matchId, queryClient]);
+  }, [socket, matchId, queryClient]);
 };

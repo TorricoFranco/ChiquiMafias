@@ -14,13 +14,11 @@ import { chatStateFor } from '../types';
 import type { MatchChatState } from '../types';
 
 interface MatchDetailViewProps {
-    leagueId: string;
-    season: string;
     matchId: string;
     onBack: () => void;
 }
 
-export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, season, matchId, onBack }) => {
+export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBack }) => {
     const {
         matchDetails,
         isLoading,
@@ -32,7 +30,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
         hasLineups,
         refetchMatch,
         refetchPreMatch,
-    } = useMatch({ leagueId, season, matchId });
+    } = useMatch({ matchId });
 
     // El backend decide el estado del chat según el estado del partido.
     const chatState: MatchChatState =

@@ -2,6 +2,7 @@ import React from 'react';
 import { StandingRow, TournamentType, ZoneType } from '../../../type';
 import { TeamRowCell } from '../utils/TeamRowCell';
 import { Sparkles, Radio } from 'lucide-react';
+import { useLeagueSeasonLabel } from '@/features/competitions/hooks/useCompetitions';
 
 interface StandingsTableProps {
     tournament?: TournamentType;
@@ -14,6 +15,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
     zone,
     standings,
 }) => {
+    const seasonLabel = useLeagueSeasonLabel();
     const hasLiveMatch = standings.some((row) => row.live);
 
     return (
@@ -23,7 +25,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
                 <div className="flex items-center gap-2.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-sky-400"></div>
                     <h3 className="font-black text-sm sm:text-base text-[#e5e2e1] uppercase tracking-tight">
-                    {tournament} 2026 (Zona {zone})
+                    {tournament} {seasonLabel} (Zona {zone})
                     </h3>
                 </div>
 

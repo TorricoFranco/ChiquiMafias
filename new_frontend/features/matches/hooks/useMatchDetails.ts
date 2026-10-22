@@ -2,15 +2,13 @@ import { useQuery, UseQueryResult, keepPreviousData } from '@tanstack/react-quer
 import { matchApi } from '../api/matchApi';
 import { MatchDetails } from '../types';
 
-export const useMatchDetails = (
-  leagueId: string,
-  season: string,
-  matchId: string,
-): UseQueryResult<MatchDetails, Error> => {
+export const matchDetailKey = (matchId: string) => ['matchDetail', matchId] as const;
+
+export const useMatchDetails = (matchId: string): UseQueryResult<MatchDetails, Error> => {
   return useQuery({
-    queryKey: ['matchDetail', leagueId, season, matchId],
-    queryFn: () => matchApi.getMatchDetails(leagueId, season, matchId),
-    enabled: !!leagueId && !!season && !!matchId,
+    queryKey: matchDetailKey(matchId),
+    queryFn: () => matchApi.getMatchDetails(matchId),
+    enabled: !!matchId,
     staleTime: 0,
     placeholderData: keepPreviousData,
   });

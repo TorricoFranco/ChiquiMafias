@@ -4,8 +4,8 @@ import { useLeagueLive } from '../socket/useFixtureSocket';
 export const useFixtureWithLive = (
     season: string, 
     tournament: string, 
-    matchday: string, 
-    leagueId: string 
+    matchday: string,
+    slug: string
 ) => {
     const { 
         data: fixtureData, 
@@ -14,7 +14,7 @@ export const useFixtureWithLive = (
 
     const { 
         liveResults 
-    } = useLeagueLive(leagueId);
+    } = useLeagueLive(slug);
 
     const mergedMatches = fixtureData?.matches.map(match => {
         const liveData = liveResults[match.id]; 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Table2, BarChart2, TrendingDown, Calendar, Gamepad2 } from 'lucide-react';
 import { ZoneType } from '../../type';
+import { useLeagueSeasonLabel } from '@/features/competitions/hooks/useCompetitions';
 
 interface SidebarNavigationProps {
     activeZone: ZoneType;
@@ -13,6 +14,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
     simulatedCount = 0,
     onNavigate,
 }) => {
+    const seasonLabel = useLeagueSeasonLabel();
     const navSections = [
         {
             id: 'posiciones',
@@ -23,7 +25,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
         },
         {
             id: 'tabla-anual',
-            label: 'Tabla Anual 2026',
+            label: `Tabla Anual ${seasonLabel}`.trim(),
             icon: BarChart2,
             badge: '30 EQ',
         },
