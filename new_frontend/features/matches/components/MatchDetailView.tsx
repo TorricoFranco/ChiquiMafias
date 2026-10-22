@@ -10,6 +10,8 @@ import { MatchLineups } from './MatchLineups';
 import { MatchChat } from './MatchChat';
 import { ArrowLeft, AlertOctagon, RefreshCw, MessageSquare } from 'lucide-react';
 import { MatchMarketWidget } from '@/features/bets/components/MatchMarketWidget';
+import { chatStateFor } from '../types';
+import type { MatchChatState } from '../types';
 
 interface MatchDetailViewProps {
     leagueId: string;
@@ -32,9 +34,10 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
         refetchPreMatch,
     } = useMatch({ leagueId, season, matchId });
 
-    const isFinished = ['FT', 'FINALIZADO', 'FINISHED'].includes(
-        matchDetails?.metadata?.status?.toUpperCase() || ''
-    );
+    // El backend decide el estado del chat según el estado del partido.
+    const chatState: MatchChatState =
+        matchDetails?.chatState ?? chatStateFor(matchDetails?.metadata?.status);
+    const showChatTab = chatState !== 'CLOSED';
 
     const [selectedTab, setActiveTab] = useState<MatchTabKey>(
         isNotStarted && !hasLineups ? 'pre-partido' : 'resumen'
@@ -42,7 +45,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
 
     // Pre-partido deja de existir al arrancar el partido y el chat al terminar: en ese caso se muestra resumen. Derivado, sin efecto.
     const activeTab: MatchTabKey =
-        (!isNotStarted && selectedTab === 'pre-partido') || (isFinished && selectedTab === 'chat')
+        (!isNotStarted && selectedTab === 'pre-partido') || (!showChatTab && selectedTab === 'chat')
             ? 'resumen'
             : selectedTab;
 
@@ -113,7 +116,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
                         onChangeTab={setActiveTab}
                         isNotStarted={isNotStarted} 
                         hasLineups={hasLineups}
-                        isFinished={isFinished}
+                        showChatTab={showChatTab}
                         chatCount={0}
                         eventsCount={matchDetails.events?.length || 0}
                     />
@@ -154,19 +157,16 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
                         />
                     )}
 
+                    {/* Región viva montada siempre: anuncia cuando el chat se abre, se pausa o se cierra. */}
+                    <p role="status" className="sr-only">
+                        {activeTab === 'chat' ? CHAT_ANNOUNCEMENTS[chatState] : ''}
+                    </p>
+
                     {activeTab === 'chat' && (
-                        false ? (
-                            <div className="flex flex-col items-center justify-center p-16 bg-[#1c1b1b] rounded-2xl border border-[#2b2a2a] text-center shadow-sm">
-                                <MessageSquare className="w-12 h-12 text-[#8e9285] mb-4" />
-                                <h3 className="text-xl font-black text-[#e5e2e1] uppercase tracking-tight">
-                                    El chat inicia cuando arranque el partido
-                                </h3>
-                                <p className="text-[#8e9285] mt-2 max-w-md">
-                                    La sala de discusión se habilitará automáticamente con el pitazo inicial.
-                                </p>
-                            </div>
-                        ) : (
+                        chatState === 'OPEN' ? (
                             <MatchChat matchId={matchId} className="w-full h-[600px] shrink-0" />
+                        ) : (
+                            <ChatNotice state={chatState} />
                         )
                     )}
                 </>
@@ -174,6 +174,41 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ leagueId, seas
         </div>
     );
 };
+
+const CHAT_ANNOUNCEMENTS: Record<MatchChatState, string> = {
+    NOT_STARTED: 'El chat comienza cuando arranque el partido.',
+    OPEN: 'El chat del partido está abierto.',
+    PAUSED: 'Chat pausado: el partido está suspendido.',
+    CLOSED: 'El chat cerró al terminar el partido.',
+};
+
+const CHAT_NOTICES: Record<Exclude<MatchChatState, 'OPEN'>, { title: string; text: string }> = {
+    NOT_STARTED: {
+        title: 'El chat comienza cuando arranque el partido',
+        text: 'La tribuna se abre automáticamente con el pitazo inicial.',
+    },
+    PAUSED: {
+        title: 'Chat pausado: el partido está suspendido',
+        text: 'La tribuna se vuelve a abrir si el partido se reanuda.',
+    },
+    CLOSED: {
+        title: 'El chat cerró al terminar el partido',
+        text: 'La tribuna de este partido ya no recibe mensajes.',
+    },
+};
+
+function ChatNotice({ state }: { state: Exclude<MatchChatState, 'OPEN'> }) {
+    const notice = CHAT_NOTICES[state];
+    return (
+        <div
+            className="flex flex-col items-center justify-center p-16 bg-[#1c1b1b] rounded-2xl border border-[#2b2a2a] text-center shadow-sm"
+        >
+            <MessageSquare className="w-12 h-12 text-[#8e9285] mb-4" aria-hidden="true" />
+            <h3 className="text-xl font-black text-[#e5e2e1] uppercase tracking-tight">{notice.title}</h3>
+            <p className="text-[#8e9285] mt-2 max-w-md">{notice.text}</p>
+        </div>
+    );
+}
 
 
 

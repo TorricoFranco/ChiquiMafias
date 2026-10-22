@@ -249,3 +249,164 @@ test.describe("Chat del partido", () => {
     await expect(chat.message("Charlatán Global")).toBeHidden();
   });
 });
+
+test.describe("Chat del partido según su estado", () => {
+  const chatTab = (page: import("@playwright/test").Page) => page.getByRole("tab", { name: "Chat en Vivo" });
+
+  test("antes de empezar muestra un aviso y no deja escribir", async ({ page, api, session }) => {
+    session.loginAs("USER");
+    const match = buildMatchDetails({ metadata: { status: "NS" } });
+    mockMatch(api, match);
+    const chat = new ChatPanel(page);
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await chatTab(page).click();
+
+    await expect(page.getByRole("heading", { name: "El chat comienza cuando arranque el partido" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "El chat comienza cuando arranque el partido" })).toBeAttached();
+    await expect(chat.input).toBeHidden();
+  });
+
+  test("el chat se abre en vivo con el pitazo inicial", { tag: "@p0" }, async ({ page, api, session, socket }) => {
+    session.loginAs("USER");
+    const match = buildMatchDetails({ metadata: { status: "NS" } });
+    mockMatch(api, match);
+    const chat = new ChatPanel(page);
+    socket.onEmit("join_match", (_data, ctx) => ctx.emit("match_chat_history", []));
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await socket.waitForEmit("join_match");
+    await chatTab(page).click();
+    await expect(chat.input).toBeHidden();
+
+    await socket.emit("match_live_update", {
+      matchId: match.metadata.id,
+      type: "MINUTE_TICK",
+      h: 0,
+      a: 0,
+      status: "1H",
+      elapsed: 1,
+      chatState: "OPEN",
+      chatActive: true,
+    });
+
+    await expect(chat.input).toBeVisible();
+  });
+
+  test("el chat se pausa si el partido se suspende", async ({ page, api, session, socket }) => {
+    session.loginAs("USER");
+    const match = buildMatchDetails({ metadata: { status: "2H" }, score: { home: 1, away: 0, elapsed: 60 } });
+    mockMatch(api, match);
+    const chat = new ChatPanel(page);
+    socket.onEmit("join_match", (_data, ctx) => ctx.emit("match_chat_history", []));
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await socket.waitForEmit("join_match");
+    await chatTab(page).click();
+    await expect(chat.input).toBeVisible();
+
+    await socket.emit("match_live_update", {
+      matchId: match.metadata.id,
+      type: "MINUTE_TICK",
+      h: 1,
+      a: 0,
+      status: "SUSP",
+      elapsed: 60,
+      chatState: "PAUSED",
+      chatActive: false,
+    });
+
+    await expect(page.getByRole("heading", { name: "Chat pausado: el partido está suspendido" })).toBeVisible();
+    // La región viva anuncia el cambio a los lectores de pantalla.
+    await expect(page.getByRole("status").filter({ hasText: "Chat pausado: el partido está suspendido" })).toBeAttached();
+    await expect(chat.input).toBeHidden();
+  });
+
+  test("al terminar el partido desaparece la pestaña de chat", { tag: "@p0" }, async ({ page, api, session, socket }) => {
+    session.loginAs("USER");
+    const match = buildMatchDetails({ metadata: { status: "2H" }, score: { home: 1, away: 0, elapsed: 90 } });
+    mockMatch(api, match);
+    socket.onEmit("join_match", (_data, ctx) => ctx.emit("match_chat_history", []));
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await socket.waitForEmit("join_match");
+    await chatTab(page).click();
+
+    // Como en producción: el backend ya guardó el final, avisa con match_data_update
+    // (el front recarga el detalle) y con match_live_update.
+    mockMatch(api, { ...match, metadata: { ...match.metadata, status: "FT" }, chatState: "CLOSED", chatActive: false });
+    await socket.emit("match_data_update", { matchId: match.metadata.id, type: "MATCH_ENDED", payload: { status: "FT" } });
+    await socket.emit("match_live_update", {
+      matchId: match.metadata.id,
+      type: "MATCH_ENDED",
+      h: 1,
+      a: 0,
+      status: "FT",
+      elapsed: 90,
+      chatState: "CLOSED",
+      chatActive: false,
+    });
+
+    await expect(chatTab(page)).toBeHidden();
+    await expect(page.getByRole("tab", { name: "Resumen" })).toHaveAttribute("aria-selected", "true");
+    // El foco no se pierde: pasa a la pestaña que quedó activa.
+    await expect(page.getByRole("tab", { name: "Resumen" })).toBeFocused();
+  });
+
+  test("un evento en vivo de otro partido no cambia el chat de este", async ({ page, api, session, socket }) => {
+    session.loginAs("USER");
+    const match = buildMatchDetails({ metadata: { status: "2H" }, score: { home: 0, away: 0, elapsed: 70 } });
+    mockMatch(api, match);
+    const chat = new ChatPanel(page);
+    socket.onEmit("join_match", (_data, ctx) => ctx.emit("match_chat_history", []));
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await socket.waitForEmit("join_match");
+    await chatTab(page).click();
+    await expect(chat.input).toBeVisible();
+
+    // El socket compartido puede seguir en la sala de un partido visto antes.
+    await socket.emit("match_live_update", {
+      matchId: "otro-partido",
+      type: "MATCH_ENDED",
+      h: 3,
+      a: 0,
+      status: "FT",
+      elapsed: 90,
+      chatState: "CLOSED",
+      chatActive: false,
+    });
+
+    await expect(chatTab(page)).toBeVisible();
+    await expect(chat.input).toBeVisible();
+    await expect(scoreboard(page)).toHaveAccessibleName("Marcador: Boca Juniors 0, River Plate 0");
+  });
+
+  test("un partido terminado por penales tampoco ofrece chat", async ({ page, api }) => {
+    const match = buildMatchDetails({ metadata: { status: "PEN" }, score: { home: 1, away: 1 } });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+
+    await expect(page.getByRole("tab", { name: "Resumen" })).toBeVisible();
+    await expect(chatTab(page)).toBeHidden();
+  });
+
+  test("si el backend rechaza el mensaje por partido inactivo, avisa al usuario", async ({ page, api, session, socket }) => {
+    session.loginAs("USER");
+    const match = buildMatchDetails({ metadata: { status: "2H" }, score: { home: 0, away: 0, elapsed: 80 } });
+    mockMatch(api, match);
+    const chat = new ChatPanel(page);
+    socket.onEmit("join_match", (_data, ctx) => ctx.emit("match_chat_history", []));
+    socket.onEmit("send_chat_message", (_data, ctx) =>
+      ctx.emit("ws-error", { code: "MATCH_INACTIVE", message: "El partido no está activo, la tribuna está cerrada 🛑" }),
+    );
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await socket.waitForEmit("join_match");
+    await chatTab(page).click();
+    await chat.send("Último mensaje");
+
+    await expect(page.getByText("El partido no está activo, la tribuna está cerrada")).toBeVisible();
+  });
+});

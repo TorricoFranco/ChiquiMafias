@@ -5,6 +5,7 @@ import { RedisService } from 'src/redis/redis.service'
 import { PrematchServiceApi } from 'src/football/services/prematch.api'
 import { FootballRefsService } from 'src/football/services/refs.service'
 import { MatchesMappers } from './matches.mappers'
+import { getMatchChatState } from './utils/match-chat.util'
 
 import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
@@ -32,7 +33,8 @@ export class MatchesService {
     season: string,
     matchId: string,
   ): Promise<MatchDetailsResponseDto> {
-    const cacheKey = `match:details:v1:${matchId}`
+    // v2: suma chatState y chatActive pasó a depender del estado del partido.
+    const cacheKey = `match:details:v2:${matchId}`
     const cached = await this.redisService.redis.get(cacheKey)
     if (cached) return JSON.parse(cached)
 
@@ -163,8 +165,9 @@ export class MatchesService {
             teamLogo: s.teamLogo ?? '',
           })),
           isLive,
-          chatActive:
-            match.lineup_fetched && (isLive || match.status_short === 'PEN'),
+          // El chat depende solo del estado del partido (ERS RF-A14).
+          chatState: getMatchChatState(match.status_short),
+          chatActive: getMatchChatState(match.status_short) === 'OPEN',
         }
 
         const ttl = isLive ? 10 : 3600

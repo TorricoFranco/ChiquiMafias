@@ -9,6 +9,7 @@ import { FINAL_STATUSES, ACTIVE_STATUSES } from '../mappers/API_STATUSES'
 import { fixturesCacheKey, resolveRound } from '../mappers/round'
 import { LiveMatchData } from 'src/fixture/types/fixtures'
 import { FootballRefsService } from '../services/refs.service'
+import { matchStatusCacheKey } from 'src/matches/utils/match-chat.util'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 
 // El cron corre cada 30 s; si el proveedor refresca más lento se saltean ticks.
@@ -137,6 +138,9 @@ export class LiveScoreCron {
 
           await this.handleMatchCleanup(matchDb.id, leagueId)
 
+          // Avisa al front que terminó: cierra el chat y recarga el partido.
+          await this.publishUpdate(matchDb.id, apiMatch, 'MATCH_ENDED')
+
           const { tournament, matchdayKey } = resolveRound(
             apiMatch.league.round,
             '',
@@ -204,7 +208,11 @@ export class LiveScoreCron {
             },
           })
 
-          await this.redisService.redis.del(`match:details:v1:${matchDb.id}`)
+          await this.redisService.redis.del(
+            `match:details:v2:${matchDb.id}`,
+            // El chat consulta el estado con esta caché: se abre o se pausa ya.
+            matchStatusCacheKey(matchDb.id),
+          )
 
           // Notificamos por Socket
           await this.publishUpdate(
@@ -274,8 +282,11 @@ export class LiveScoreCron {
       matchId,
     )
 
-    // Limpiar caché de detalles
-    await this.redisService.redis.del(`match:details:v1:${matchId}`)
+    // Limpiar caché de detalles y del estado que consulta el chat
+    await this.redisService.redis.del(
+      `match:details:v2:${matchId}`,
+      matchStatusCacheKey(matchId),
+    )
 
     this.logger.log(`Partido ${matchId} finalizado y limpiado de Redis.`)
   }
@@ -325,7 +336,19 @@ export class LiveScoreCron {
 
       if (isFinished) {
         await this.handleMatchCleanup(matchDbId, leagueId)
+      } else {
+        await this.redisService.redis.del(
+          `match:details:v2:${matchDbId}`,
+          matchStatusCacheKey(matchDbId),
+        )
       }
+
+      // El front se entera del estado nuevo (fin, suspensión) y ajusta el chat.
+      await this.publishUpdate(
+        matchDbId,
+        apiMatch,
+        isFinished ? 'MATCH_ENDED' : 'MINUTE_TICK',
+      )
 
       this.logger.log(
         `Sincronización manual: Partido ${apiFixtureId} actualizado a ${apiStatus}`,

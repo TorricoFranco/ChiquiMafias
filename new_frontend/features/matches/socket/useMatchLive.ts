@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGlobalSocket } from '@/context/SocketContext';
+import { chatStateFor } from '../types';
 import type { MatchDetails, MatchEvent, MatchLiveUpdatePayload, MatchStatus, StatsUpdatedPayload, TimelineUpdatedPayload } from '../types';
 
 // El evento crudo de la API trae `time`, que no es parte del tipo de la app: se guarda con esa forma.
@@ -23,10 +24,16 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
       queryClient.setQueryData<MatchDetails>(queryKey, updater);
     };
 
+    // El socket compartido puede estar en salas de otros partidos: solo cuenta
+    // lo que es de este.
+    const isThisMatch = (payload: { matchId?: string }) => payload?.matchId === matchId;
+
     const handleMatchLiveUpdate = (payload: MatchLiveUpdatePayload) => {
+      if (!isThisMatch(payload)) return;
       console.log('⚽ match_live_update payload:', payload);
       updateCache((prev) => {
         if (!prev) return prev;
+        const chatState = payload.chatState ?? chatStateFor(payload.status ?? prev.metadata.status);
         return {
           ...prev,
           score: {
@@ -39,11 +46,15 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
             ...prev.metadata,
             status: (payload.status as MatchStatus) ?? prev.metadata.status,
           },
+          // El chat se abre, se pausa o se cierra en vivo, sin recargar.
+          chatState,
+          chatActive: chatState === 'OPEN',
         };
       });
     };
 
     const handleTimelineEventsUpdate = (payload: TimelineUpdatedPayload) => {
+      if (!isThisMatch(payload)) return;
       console.log('📅 timeline_updated payload:', payload);
       updateCache((prev) => {
         if (!prev) return prev;
@@ -61,6 +72,7 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
     };
 
     const handleStatsUpdate = (payload: StatsUpdatedPayload) => {
+      if (!isThisMatch(payload)) return;
       console.log('📈 stats_updated payload:', payload);
       updateCache((prev) => {
         if (!prev) return prev;
@@ -73,7 +85,8 @@ export const useMatchLive = (leagueId: string, season: string, matchId: string) 
       queryClient.invalidateQueries({ queryKey });
     };
 
-    const handleMatchDataUpdate = (payload: { type?: string }) => {
+    const handleMatchDataUpdate = (payload: { matchId?: string; type?: string }) => {
+      if (!isThisMatch(payload)) return;
       if (payload.type === 'MATCH_ENDED') handleForceUpdate();
     };
 

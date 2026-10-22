@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useGlobalSocket } from "@/context/SocketContext";
 import { useUserStore } from "@/store/useUserStore";
 import { apiFetch } from "@/lib/apiFetch";
@@ -143,7 +144,9 @@ export function useMatchSocket(matchId: string) {
                 setTimeoutUntil((prev) => (prev && prev > newTimeout ? prev : newTimeout));
             }
             if (payload?.code === "MATCH_INACTIVE") {
-                console.warn("La tribuna está cerrada:", payload.message);
+                // Respaldo: el front ya oculta la caja fuera del partido, pero el
+                // estado puede cambiar entre que se ve y se envía.
+                toast.error(payload.message ?? "La tribuna está cerrada.", { id: "match-inactive" });
             }
         };
 

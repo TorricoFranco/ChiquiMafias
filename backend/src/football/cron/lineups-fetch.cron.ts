@@ -94,7 +94,7 @@ export class LineupsFetchCron {
           })
         })
 
-        await this.redisService.redis.del(`match:details:v1:${match.id}`)
+        await this.redisService.redis.del(`match:details:v2:${match.id}`)
 
         // NOTIFICACIÓN PUB/SUB
         await this.redisService.publish('match_updates', {

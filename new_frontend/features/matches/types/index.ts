@@ -20,9 +20,13 @@ export type MatchStatus =
   | 'AET'
   // Interrumpidos / Especiales
   | 'SUSP'
+  | 'INT'
   | 'PST'
   | 'CANC'
-  | 'ABD';
+  | 'ABD'
+  // Resueltos en escritorio
+  | 'AWD'
+  | 'WO';
 
 export interface Venue {
   name: string;
@@ -168,6 +172,24 @@ export interface MatchDetails {
   stats: TeamStats[];
   isLive: boolean;
   chatActive: boolean;
+  chatState: MatchChatState;
+}
+
+// Lo decide el backend (backend/src/matches/utils/match-chat.util.ts) según el
+// estado del partido: aviso antes de empezar, abierto en juego, pausado si se
+// suspende y sin chat al terminar.
+export type MatchChatState = 'NOT_STARTED' | 'OPEN' | 'PAUSED' | 'CLOSED';
+
+/**
+ * Misma regla que el backend. Solo se usa como respaldo cuando una respuesta o
+ * un evento no trae `chatState` (por ejemplo, una caché vieja).
+ */
+export function chatStateFor(status: string | null | undefined): MatchChatState {
+  const s = status ?? '';
+  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(s)) return 'OPEN';
+  if (['SUSP', 'INT'].includes(s)) return 'PAUSED';
+  if (['FT', 'AET', 'PEN', 'AWD', 'WO', 'CANC', 'ABD'].includes(s)) return 'CLOSED';
+  return 'NOT_STARTED';
 }
 
 // Pre-match Models
@@ -263,18 +285,20 @@ export interface GoalScoredPayload {
 
 export interface MatchLiveUpdatePayload {
   matchId: string;
-  type: 'SCORE_UPDATED' | 'MINUTE_TICK';
+  type: 'SCORE_UPDATED' | 'MINUTE_TICK' | 'MATCH_ENDED';
   h: number;
   a: number;
   status: string;
   elapsed: number | null;
+  chatState: MatchChatState;
+  chatActive: boolean;
 }
 
 // Helper Classification Constants
 export const LIVE_STATUSES: string[] = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'];
 export const NOT_STARTED_STATUSES: string[] = ['TBD', 'NS', 'SCHEDULED'];
 export const FINISHED_STATUSES: string[] = ['FT', 'AET', 'PEN'];
-export const INTERRUPTED_STATUSES: string[] = ['SUSP', 'PST', 'CANC', 'ABD'];
+export const INTERRUPTED_STATUSES: string[] = ['SUSP', 'INT', 'PST', 'CANC', 'ABD'];
 
 export function getDerivedMatchState(status: MatchStatus) {
   return {

@@ -147,7 +147,7 @@ otro UUID, salvo que la base se haya cargado desde un respaldo de dev.
 
 | ID | Requisito |
 |---|---|
-| **RF-A14** | **El chat de un partido se abre cuando el partido empieza y se cierra cuando termina, siempre.** No depende de las alineaciones ni de ningún otro dato. "Empieza" = deja de estar no empezado; "termina" = estado final (`FT`, `AET`, `PEN`, `AWD`, `WO`, `CANC`, `ABD`). El backend decide y el front solo lo refleja: **hay que cambiar la lógica en los dos lados.** |
+| **RF-A14** | **El chat de un partido se abre cuando el partido empieza y se cierra cuando termina, siempre.** No depende de las alineaciones ni de ningún otro dato. El backend lo decide (`backend/src/matches/utils/match-chat.util.ts`) y lo manda como `chatState` en el detalle y en `match_live_update`; el front solo lo refleja. Estados: `NOT_STARTED` (antes de empezar o postergado: pestaña con aviso), `OPEN` (en juego), `PAUSED` (`SUSP`/`INT`: pestaña con aviso, se reabre si sigue), `CLOSED` (`FT`, `AET`, `PEN`, `AWD`, `WO`, `CANC`, `ABD`: sin pestaña). |
 
 ### 4.6 Seguridad
 
@@ -400,7 +400,7 @@ mismo que uno de la liga (~180 pedidos). Se agrega a la calculadora antes de act
 | D-08 | Mercado de la Copa: 1X2 sobre los 90 minutos; por penales es empate. |
 | D-09 | Postergados, cancelados y resueltos en escritorio se reembolsan al instante (regla actual). |
 | D-10 | El ganador en escritorio (`AWD`, `WO`) avanza en el cuadro. |
-| D-11 | El chat se abre al empezar el partido y se cierra al terminar, siempre (backend y front). |
+| D-11 | El chat se abre al empezar el partido y se cierra al terminar, siempre (backend y front). Antes de empezar se ve la pestaña con un aviso; al terminar desaparece; si el partido se suspende, se pausa. |
 | D-12 | En la Copa no se muestra "local" ni "visitante": siempre es cancha neutral. |
 | D-13 | Solo se muestra la temporada actual de cada competición; las anteriores quedan guardadas. |
 

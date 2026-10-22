@@ -120,6 +120,20 @@ describe('LiveScoreCron', () => {
       leagueId: 128,
       season: 2026,
     })
+    // Avisa al front: cierra el chat y recarga el partido.
+    expect(redisService.publish).toHaveBeenCalledWith(
+      'match_updates',
+      expect.objectContaining({
+        matchId: 'm1',
+        type: 'MATCH_ENDED',
+        payload: expect.objectContaining({ status: 'FT' }) as unknown,
+      }),
+    )
+    // Borra la caché del estado que consulta el chat.
+    expect(redis.del).toHaveBeenCalledWith(
+      'match:details:v2:m1',
+      'match:m1:status',
+    )
   })
 
   it('Debe sincronizar por id un partido en juego que salió del feed en vivo', async () => {
