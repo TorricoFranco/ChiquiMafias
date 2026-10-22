@@ -113,3 +113,21 @@ export class MatchDetailsResponseDto {
   @ApiProperty({ type: [TeamStatsDto] })
   stats: TeamStatsDto[]
 }
+
+export class MatchCompetitionDto {
+  @ApiProperty({ example: 'liga-profesional' }) slug: string
+  @ApiProperty({ example: 'Liga Profesional Argentina' }) name: string
+  @ApiProperty({ type: String, nullable: true, example: 'Liga Profesional' })
+  shortName: string | null
+  @ApiProperty({
+    example: false,
+    description: 'true en cancha neutral: no se muestra local ni visitante',
+  })
+  neutralVenue: boolean
+  @ApiProperty({ example: '2026' }) seasonLabel: string
+}
+
+export class MatchWithCompetitionResponseDto extends MatchDetailsResponseDto {
+  @ApiProperty({ type: MatchCompetitionDto })
+  competition: MatchCompetitionDto
+}

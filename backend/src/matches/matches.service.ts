@@ -7,7 +7,11 @@ import { FootballRefsService } from 'src/football/services/refs.service'
 import { MatchesMappers } from './matches.mappers'
 import { getMatchChatState } from './utils/match-chat.util'
 
-import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
+import {
+  MatchDetailsResponseDto,
+  MatchWithCompetitionResponseDto,
+} from './dto/response/match-details-response.dto'
+import { CompetitionsService } from 'src/competitions/competitions.service'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
 import { StandingsService } from 'src/standings/standings.service'
@@ -26,7 +30,43 @@ export class MatchesService {
     private api: PrematchServiceApi,
     private standingsService: StandingsService,
     private refs: FootballRefsService,
+    private competitions: CompetitionsService,
   ) {}
+
+  /**
+   * Detalle de un partido con su competición. Solo partidos de la temporada
+   * actual de su competición (ERS RF-A04): el resto da 404.
+   */
+  async getMatchDetailsById(
+    matchId: string,
+  ): Promise<MatchWithCompetitionResponseDto> {
+    const match = await this.prisma.matches.findUnique({
+      where: { id: matchId },
+      select: { league_id: true, season: true },
+    })
+    const competition = match
+      ? await this.competitions.findCurrentByLeagueId(match.league_id)
+      : null
+    if (!match || !competition || competition.season !== match.season) {
+      throw new NotFoundException('Partido no encontrado')
+    }
+
+    const details = await this.getMatchDetails(
+      match.league_id,
+      String(match.season),
+      matchId,
+    )
+    return {
+      ...details,
+      competition: {
+        slug: competition.slug,
+        name: competition.name,
+        shortName: competition.shortName,
+        neutralVenue: competition.neutralVenue,
+        seasonLabel: competition.seasonLabel,
+      },
+    }
+  }
 
   async getMatchDetails(
     leagueId: string,

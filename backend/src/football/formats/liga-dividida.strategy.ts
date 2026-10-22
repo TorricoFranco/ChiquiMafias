@@ -61,6 +61,7 @@ export function mapLigaDivididaGroup(groupRaw: string): StandingGroup {
 /** Liga Profesional: Apertura y Clausura, con zonas A y B y playoffs. */
 export const ligaDivididaStrategy: CompetitionFormatStrategy = {
   format: CompetitionFormat.LIGA_DIVIDIDA,
+  stages: ['APERTURA', 'CLAUSURA'],
 
   fixturesWindow(now: Date): FixturesWindow {
     const fromDate = new Date(now)

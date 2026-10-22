@@ -3,11 +3,15 @@ import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger'
 import { StandingsService } from './standings.service'
 import { FullStandingsResponseDto } from './dto/response/full-standings.dto'
 import { Public } from 'src/auth/decorators/auth.decorator'
+import { CompetitionsService } from 'src/competitions/competitions.service'
 
 @ApiTags('Standings (Tablas de Posiciones)')
 @Controller('standings')
 export class StandingsController {
-  constructor(private readonly standingsService: StandingsService) {}
+  constructor(
+    private readonly standingsService: StandingsService,
+    private readonly competitions: CompetitionsService,
+  ) {}
 
   // Datos públicos como el fixture y los rankings: la vista de Ligas se ve sin sesión.
   @Public()
@@ -34,6 +38,8 @@ export class StandingsController {
   async getStandings(
     @Param('season', ParseIntPipe) season: number,
   ): Promise<FullStandingsResponseDto> {
-    return this.standingsService.getStandings(season)
+    // Alias de /competitions/liga-profesional/standings: solo la temporada actual.
+    const { competition } = await this.competitions.resolveLegacy(season)
+    return this.standingsService.getStandings(competition)
   }
 }

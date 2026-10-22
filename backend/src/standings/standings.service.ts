@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 
 import { FullStandingsResponseDto } from './dto/response/full-standings.dto'
+import { CompetitionContext } from 'src/competitions/competitions.service'
 
 import legacyData from './data/legacy-stats.json'
 import {
@@ -19,21 +20,17 @@ export class StandingsService {
     private redis: RedisService,
   ) {}
 
-  async getStandings(season: number): Promise<FullStandingsResponseDto> {
-    const leagueDb = await this.prisma.leagues.findFirst({
-      where: { api_league_id: 128 },
-    })
-
-    if (!leagueDb) {
-      throw new Error('League not found')
-    }
-
-    const cacheKey = `standings:${leagueDb.id}:${season}`
+  /** Tabla de la temporada actual de una competición ya validada. */
+  async getStandings(
+    competition: CompetitionContext,
+  ): Promise<FullStandingsResponseDto> {
+    const { leagueId, season } = competition
+    const cacheKey = `standings:${leagueId}:${season}`
 
     const cached = await this.redis.redis.get(cacheKey)
     if (cached) return JSON.parse(cached) as FullStandingsResponseDto
 
-    const result = await this.calculateFullStandings(leagueDb.id, season)
+    const result = await this.calculateFullStandings(leagueId, season)
 
     await this.redis.redis.set(cacheKey, JSON.stringify(result), 'EX', 600)
 
