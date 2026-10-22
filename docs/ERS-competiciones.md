@@ -139,8 +139,9 @@ otro UUID, salvo que la base se haya cargado desde un respaldo de dev.
 | **RF-A12** | **El mercado se vincula al partido por su id interno** (`Market.match_id`) y se liquida por ahí. `fixtureId` queda como dato histórico. Sin esto, un partido sin `api_fixture_id` no puede tener mercado. |
 | **RF-A13** | **Un mercado nunca acepta apuestas con el partido empezado.** (a) Si cambia la fecha de un partido, se recalcula el cierre de su mercado abierto. (b) El mercado se cierra en cuanto el partido deja de estar "no empezado", sin importar la hora de cierre. Aplica también a la Liga. |
 | **RF-A13b** | El título del mercado sale del nombre de la competición. |
-| **RF-A13c** | Una temporada solo abre mercados si tiene `bets_enabled`. Una competición recién agregada arranca con apuestas apagadas hasta que esté lista. |
-| **RF-A13d** | Se mantiene la regla actual: postergado (`PST`), cancelado, abandonado o resuelto en escritorio (`AWD`, `WO`) **se reembolsa al instante**. |
+| **RF-A13c** | Una temporada solo abre mercados si tiene `bets_enabled` **y** `sync_enabled`, y solo para partidos con ID en el proveedor activo. Un partido que ningún cron actualiza nunca se liquidaría. Una competición recién agregada arranca con apuestas apagadas hasta que esté lista. |
+| **RF-A13d** | Se mantiene la regla actual: postergado (`PST`), cancelado, abandonado o resuelto en escritorio (`AWD`, `WO`) **se reembolsa** en el siguiente ciclo de liquidación (cada 15 minutos). No en el mismo instante del cierre: el worker de BullMQ puede tener apuestas aceptadas todavía sin guardar. |
+| **RF-A13e** | Un mercado cerrado cuyo partido **volvió a "no empezado" con una fecha más de 1 hora posterior a su cierre** se trata como postergado y se reembolsa (cubre el `PST` que dura menos de un ciclo). |
 
 ### 4.5 Chat
 

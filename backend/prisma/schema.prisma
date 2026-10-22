@@ -135,6 +135,7 @@ model Matches {
   league        Leagues            @relation(fields: [league_id], references: [id])
   venue         Venues?            @relation(fields: [venue_id], references: [id])
   stats         Stats_team_match[]
+  markets       Market[]
 
   @@index([date])
   @@index([league_id, season])
@@ -722,7 +723,11 @@ model Market {
   description String?
   metadata    Json?
 
+  // Dato histórico (ID de API-Football). Los mercados automáticos se vinculan
+  // y se liquidan por matchId; los manuales no se vinculan a ningún partido.
   fixtureId Int?
+  matchId   String?
+  match     Matches?     @relation(fields: [matchId], references: [id], onDelete: SetNull)
   isManual  Boolean      @default(false)
   status    MarketStatus @default(OPEN)
   createdAt DateTime     @default(now())
@@ -730,6 +735,8 @@ model Market {
   settledAt DateTime?
 
   options MarketOption[]
+
+  @@index([matchId])
 }
 
 enum MarketStatus {
