@@ -168,7 +168,7 @@ export class EventsFetchCron {
         })
 
         // Borrado detalles en Redis para forzar recálculo con los nuevos eventos en el service
-        await this.redisService.redis.del(`match:details:v1:${match.id}`)
+        await this.redisService.redis.del(`match:details:v2:${match.id}`)
 
         const isFinished = ['FT', 'AET', 'PEN'].includes(match.status_short)
 

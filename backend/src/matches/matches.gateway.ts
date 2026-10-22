@@ -1,4 +1,5 @@
 import { RedisService } from '../redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { ChatService } from '../chat/chat.service'
 import { AuthService } from 'src/auth/auth.service'
 
@@ -28,6 +29,12 @@ import { OnApplicationBootstrap, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 
 import { OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets'
+import {
+  getMatchChatState,
+  isMatchChatOpen,
+  MATCH_STATUS_CACHE_TTL_SECONDS,
+  matchStatusCacheKey,
+} from './utils/match-chat.util'
 
 @UseFilters(AllWsExceptionFilter)
 @WebSocketGateway()
@@ -42,6 +49,7 @@ export class MatchesGateway
     private readonly redisService: RedisService,
     private readonly chatService: ChatService,
     private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async handleConnection(socket: Socket) {
@@ -117,6 +125,8 @@ export class MatchesGateway
 
           case 'MINUTE_TICK':
           case 'SCORE_UPDATED':
+          case 'MATCH_ENDED': {
+            const chatState = getMatchChatState(String(update.payload.status))
             this.server.to(room).emit('match_live_update', {
               matchId: update.matchId,
               type: update.type,
@@ -124,8 +134,11 @@ export class MatchesGateway
               a: update.payload.away_goals,
               status: update.payload.status,
               elapsed: update.payload.elapsed,
+              chatState,
+              chatActive: chatState === 'OPEN',
             })
             break
+          }
         }
       })
     } catch (error) {
@@ -157,6 +170,21 @@ export class MatchesGateway
     client.emit('match_chat_history', parsedHistory)
   }
 
+  /**
+   * El front lo emite al salir de un partido. Sin esto el socket compartido
+   * quedaba en todas las salas visitadas y recibía eventos de otros partidos.
+   */
+  @SubscribeMessage('leave_match')
+  async handleLeaveRoom(
+    @MessageBody() data: string | { matchId?: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const matchId = typeof data === 'string' ? data : data?.matchId
+    if (!matchId) return
+
+    await client.leave(`match_${matchId}`)
+  }
+
   @UseGuards(WsJwtGuard, WsTimeoutGuard)
   @SubscribeMessage('send_chat_message')
   @UsePipes(new ValidationPipe({ transform: true }), new SanitizeMessagePipe())
@@ -167,13 +195,9 @@ export class MatchesGateway
     const { matchId, message, stickerId, useMegaphone } = body
     const user = client.data.user
 
-    const matchStatus = await this.redisService.redis.get(
-      `match:${matchId}:status`,
-    )
+    const matchStatus = await this.getMatchStatus(matchId)
 
-    const activeStatuses = ['1H', '2H', 'HT', 'ET', 'PEN']
-
-    if (!matchStatus || !activeStatuses.includes(matchStatus)) {
+    if (!isMatchChatOpen(matchStatus)) {
       throw new WsException({
         code: 'MATCH_INACTIVE',
         message: 'El partido no está activo, la tribuna está cerrada 🛑',
@@ -282,6 +306,31 @@ export class MatchesGateway
   }
 
   // Agregá este método al final de tu clase MatchesGateway
+  /**
+   * Estado del partido para decidir si el chat acepta mensajes. Se cachea unos
+   * segundos para no consultar la base por cada mensaje; LiveScoreCron borra la
+   * caché cuando el estado cambia. Un partido inexistente cuenta como cerrado.
+   */
+  private async getMatchStatus(matchId: string): Promise<string | null> {
+    const key = matchStatusCacheKey(matchId)
+    const cached = await this.redisService.redis.get(key)
+    if (cached) return cached
+
+    const match = await this.prisma.matches.findUnique({
+      where: { id: matchId },
+      select: { status_short: true },
+    })
+    if (!match) return null
+
+    await this.redisService.redis.set(
+      key,
+      match.status_short,
+      'EX',
+      MATCH_STATUS_CACHE_TTL_SECONDS,
+    )
+    return match.status_short
+  }
+
   private async sendBotGoalMessage(
     matchId: string,
     teamName: string,

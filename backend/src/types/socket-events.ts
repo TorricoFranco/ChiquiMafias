@@ -23,11 +23,15 @@ export type LeagueLiveUpdatePayload = Record<string, LeagueLiveScore>
 
 export interface MatchLiveUpdatePayload {
   matchId: string
-  type: 'SCORE_UPDATED' | 'MINUTE_TICK'
+  // MATCH_ENDED: el partido terminó (cierra el chat y el front recarga el detalle)
+  type: 'SCORE_UPDATED' | 'MINUTE_TICK' | 'MATCH_ENDED'
   h: number
   a: number
   status: string
-  elapsed: number
+  elapsed: number | null
+  // Ver backend/src/matches/utils/match-chat.util.ts
+  chatState: 'NOT_STARTED' | 'OPEN' | 'PAUSED' | 'CLOSED'
+  chatActive: boolean
 }
 
 export interface StatsUpdatedPayload {

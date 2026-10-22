@@ -92,7 +92,17 @@ export class MatchDetailsResponseDto {
 
   @ApiProperty() isLive: boolean
 
-  @ApiProperty() chatActive: boolean
+  @ApiProperty({
+    description: 'true solo con el partido en juego (chatState OPEN)',
+  })
+  chatActive: boolean
+
+  @ApiProperty({
+    enum: ['NOT_STARTED', 'OPEN', 'PAUSED', 'CLOSED'],
+    description:
+      'Estado del chat: aviso antes de empezar, abierto en juego, pausado si se suspende, sin chat al terminar',
+  })
+  chatState: 'NOT_STARTED' | 'OPEN' | 'PAUSED' | 'CLOSED'
 
   @ApiProperty({ type: [Object] })
   events: any[]

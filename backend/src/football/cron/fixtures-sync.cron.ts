@@ -190,7 +190,7 @@ export class FixturesSyncCron {
         }
       }
 
-      await this.redis.redis.del(`match:details:v1:${updatedMatch.id}`)
+      await this.redis.redis.del(`match:details:v2:${updatedMatch.id}`)
 
       matchdaysToInvalidate.add(
         fixturesCacheKey(this.LEAGUE_ID, this.SEASON, tournament, matchdayKey),
