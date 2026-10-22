@@ -132,6 +132,11 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
+  join_competition: (
+    data: { slug: string },
+    callback?: (response: { status: 'ok' } | { status: 'error' }) => void,
+  ) => void
+  leave_competition: (data: { slug: string }) => void
   join_league: (
     data: { leagueId: string },
     callback?: (error: any) => void,

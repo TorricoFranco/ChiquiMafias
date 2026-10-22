@@ -16,7 +16,12 @@ import { LiveMatchData } from 'src/fixture/types/fixtures'
 import { FootballRefsService } from '../services/refs.service'
 import { matchStatusCacheKey } from 'src/matches/utils/match-chat.util'
 import { EventEmitter2 } from '@nestjs/event-emitter'
-import { MATCH_FINISHED_EVENT, MatchFinishedEvent } from '../football.events'
+import {
+  LEAGUE_LIVE_UPDATES_CHANNEL,
+  LeagueLiveUpdateMessage,
+  MATCH_FINISHED_EVENT,
+  MatchFinishedEvent,
+} from '../football.events'
 
 // El cron corre cada 30 s; si el proveedor refresca más lento se saltean ticks.
 const TICK_MS = 30_000
@@ -46,6 +51,7 @@ const ACTIVE_MATCH_SELECT = {
     select: {
       id: true,
       api_league_id: true,
+      slug: true,
     },
   },
 } satisfies Prisma.MatchesSelect
@@ -269,10 +275,12 @@ export class LiveScoreCron {
         300,
       )
 
-      await this.redisService.publish('league_live_updates', {
-        leagueId: leagueId,
+      const update: LeagueLiveUpdateMessage = {
+        leagueId,
+        slug: league.slug,
         matches: liveScoresHash,
-      })
+      }
+      await this.redisService.publish(LEAGUE_LIVE_UPDATES_CHANNEL, update)
     }
   }
 
