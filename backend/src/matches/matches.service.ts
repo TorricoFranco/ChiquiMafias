@@ -34,12 +34,11 @@ export class MatchesService {
   ) {}
 
   /**
-   * Detalle de un partido con su competición. Solo partidos de la temporada
-   * actual de su competición (ERS RF-A04): el resto da 404.
+   * El partido y su competición, solo si es de la temporada actual de su
+   * competición (ERS RF-A04). Si no, 404: la API pública no expone temporadas
+   * anteriores.
    */
-  async getMatchDetailsById(
-    matchId: string,
-  ): Promise<MatchWithCompetitionResponseDto> {
+  async findCurrentSeasonMatch(matchId: string) {
     const match = await this.prisma.matches.findUnique({
       where: { id: matchId },
       select: { league_id: true, season: true },
@@ -50,6 +49,17 @@ export class MatchesService {
     if (!match || !competition || competition.season !== match.season) {
       throw new NotFoundException('Partido no encontrado')
     }
+    return { match, competition }
+  }
+
+  /**
+   * Detalle de un partido con su competición. Solo partidos de la temporada
+   * actual de su competición (ERS RF-A04): el resto da 404.
+   */
+  async getMatchDetailsById(
+    matchId: string,
+  ): Promise<MatchWithCompetitionResponseDto> {
+    const { match, competition } = await this.findCurrentSeasonMatch(matchId)
 
     const details = await this.getMatchDetails(
       match.league_id,
