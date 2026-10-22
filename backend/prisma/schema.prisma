@@ -158,6 +158,52 @@ model Leagues {
   leagueTeams        LeagueTeams[]
   matches            Matches[]
   teamSeasonStats    TeamSeasonStats[]
+
+  // Identidad estable de la competición, igual en todos los entornos y ajena al
+  // proveedor de datos ('liga-profesional', 'copa-argentina').
+  slug              String?             @unique
+  short_name        String?
+  // true en competiciones a cancha neutral (Copa Argentina): no hay local/visitante.
+  neutral_venue     Boolean             @default(false)
+  // Temporada que se muestra al usuario. Una sola por competición, por diseño.
+  current_season_id String?             @unique
+  current_season    CompetitionSeason?  @relation("CurrentSeason", fields: [current_season_id], references: [id])
+  seasons           CompetitionSeason[] @relation("LeagueSeasons")
+}
+
+enum CompetitionFormat {
+  LIGA_DIVIDIDA // Apertura / Clausura (Liga Profesional)
+  LIGA // todos contra todos
+  ELIMINACION // Copa Argentina
+  GRUPOS_Y_ELIMINACION // Libertadores, Sudamericana
+}
+
+// Una edición de una competición. Agregar un año es agregar una fila.
+model CompetitionSeason {
+  id                     String            @id @default(uuid())
+  league_id              String
+  // Año de inicio de la temporada.
+  season                 Int
+  // Lo que se muestra: '2026' o '2026/27'.
+  label                  String
+  format                 CompetitionFormat
+  sync_enabled           Boolean           @default(true)
+  // Una competición recién agregada no abre mercados hasta activarlo.
+  bets_enabled           Boolean           @default(false)
+  fixtures_sync_minutes  Int               @default(10)
+  // null = el formato no tiene tabla de posiciones.
+  standings_sync_minutes Int?
+  starts_on              DateTime?
+  ends_on                DateTime?
+  last_fixtures_sync_at  DateTime?
+  last_standings_sync_at DateTime?
+  created_at             DateTime          @default(now())
+  updated_at             DateTime          @updatedAt
+
+  league          Leagues  @relation("LeagueSeasons", fields: [league_id], references: [id])
+  currentOfLeague Leagues? @relation("CurrentSeason")
+
+  @@unique([league_id, season])
 }
 
 // Mapeo de entidades internas a los IDs que les asigna cada proveedor de datos
