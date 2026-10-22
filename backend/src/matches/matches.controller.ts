@@ -85,8 +85,9 @@ export class MatchesController {
     description: 'Eventos no encontrados o partido inexistente',
   })
   async getMatchEvents(
-    @Param('matchId') matchId: string,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
   ): Promise<MatchEventResponseDto[]> {
+    await this.matchesService.findCurrentSeasonMatch(matchId)
     const events = await this.matchesService.getMatchEvents(matchId)
 
     if (!events || events.length === 0) {
@@ -113,8 +114,10 @@ export class MatchesController {
       'El partido no existe en el sistema local para mapear la consulta.',
   })
   async getPreMatchInfo(
-    @Param('matchId') matchId: string,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
   ): Promise<PreMatchResponseDto> {
+    // Antes de leer la caché: un partido de otra temporada tampoco sale de Redis.
+    await this.matchesService.findCurrentSeasonMatch(matchId)
     return await this.matchesService.getAggregatedData(matchId)
   }
 }
