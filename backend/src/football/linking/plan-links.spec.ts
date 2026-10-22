@@ -2,7 +2,11 @@ import { FootballFixture } from '../football.types'
 import { nameScore, normalizeName } from './name-match'
 import { DbMatch, DbTeam, planLinks } from './plan-links'
 
-const team = (id: string, name: string): DbTeam => ({ id, name })
+const team = (
+  id: string,
+  name: string,
+  linkedExternalId: number | null = null,
+): DbTeam => ({ id, name, linkedExternalId })
 
 const source = (
   externalId: number,
@@ -56,7 +60,7 @@ describe('nameScore', () => {
   })
 })
 
-describe('planLinks', () => {
+describe('planLinks: partidos', () => {
   const teams = [team('t1', 'Boca Juniors'), team('t2', 'River Plate')]
 
   it('Debe vincular equipos por nombre y partidos por local, visitante y ronda', () => {
@@ -156,7 +160,28 @@ describe('planLinks', () => {
     ])
   })
 
-  it('Debe vincular un equipo con otro nombre por calendario', () => {
+  it('Debe comparar contra la ronda traducida por la estrategia del formato', () => {
+    const plan = planLinks(
+      teams,
+      [dbMatch('m1', 't1', 't2', '2026-03-01T20:00:00Z', 'Regular Season - 9')],
+      [
+        source(
+          900,
+          [10, 'Boca Juniors'],
+          [20, 'River Plate'],
+          '2026-05-01T20:00:00Z',
+          'Apertura - 9',
+        ),
+      ],
+      { rounds: ['Regular Season - 9'] },
+    )
+
+    expect(plan.matches).toEqual([
+      expect.objectContaining({ matchId: 'm1', sameRound: true }),
+    ])
+  })
+
+  it('Debe proponer para confirmar un equipo con otro nombre que coincide por calendario', () => {
     const plan = planLinks(
       [team('t1', 'Boca Juniors'), team('t2', 'Equipo Raro SA')],
       [dbMatch('m1', 't1', 't2', '2026-10-25T20:00:00Z')],
@@ -170,8 +195,15 @@ describe('planLinks', () => {
       ],
     )
 
-    const raro = plan.teams.find((t) => t.teamId === 't2')
-    expect(raro).toMatchObject({ externalId: 20, how: 'calendario' })
+    expect(plan.teams.find((t) => t.teamId === 't2')).toBeUndefined()
+    expect(plan.teamsToConfirm).toEqual([
+      {
+        source: expect.objectContaining({ externalId: 20 }) as unknown,
+        candidates: [
+          expect.objectContaining({ teamId: 't2', reason: 'calendario' }),
+        ],
+      },
+    ])
   })
 
   it('Debe informar los partidos sin equivalente y los que solo tiene el proveedor', () => {
@@ -217,5 +249,249 @@ describe('planLinks', () => {
 
     const ids = plan.teams.map((t) => t.externalId)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('planLinks: equipos (RF-A09 y RF-A10)', () => {
+  const copa = (home: [number, string], away: [number, string]) =>
+    source(1, home, away, '2026-03-01T20:00:00Z', 'Round of 64')
+
+  it('Debe usar el vínculo existente aunque el nombre sea distinto', () => {
+    const plan = planLinks(
+      [team('t1', 'Estudiantes L.P.', 450)],
+      [],
+      [copa([450, 'Estudiantes de La Plata'], [999, 'Club Nuevo'])],
+    )
+
+    expect(plan.teams).toEqual([
+      expect.objectContaining({
+        teamId: 't1',
+        externalId: 450,
+        how: 'vínculo',
+      }),
+    ])
+  })
+
+  it('Un equipo ya vinculado no debe ser candidato para otro nombre igual', () => {
+    const plan = planLinks(
+      [team('t1', 'Gimnasia', 434)],
+      [],
+      [copa([434, 'Gimnasia La Plata'], [777, 'Gimnasia'])],
+    )
+
+    expect(plan.teams.map((t) => t.externalId)).toEqual([434])
+    expect(plan.teamsToCreate.map((t) => t.source.externalId)).toEqual([777])
+  })
+
+  it('Debe vincular solo un nombre exacto y único', () => {
+    const plan = planLinks(
+      [team('t1', 'Tigre')],
+      [],
+      [copa([10, 'Club Atlético Tigre'], [20, 'Midland'])],
+    )
+
+    expect(plan.teams).toEqual([
+      expect.objectContaining({ teamId: 't1', externalId: 10, how: 'nombre' }),
+    ])
+    expect(plan.teamsToCreate.map((t) => t.name)).toEqual(['Midland'])
+  })
+
+  it('Dos equipos de la base con el mismo nombre deben ir a confirmar', () => {
+    const plan = planLinks(
+      [team('t1', 'San Martín'), team('t2', 'San Martin')],
+      [],
+      [copa([10, 'San Martín'], [20, 'Midland'])],
+    )
+
+    expect(plan.teams).toEqual([])
+    expect(plan.teamsToConfirm).toHaveLength(1)
+    expect(
+      plan.teamsToConfirm[0].candidates.map((c) => c.teamId).sort(),
+    ).toEqual(['t1', 't2'])
+  })
+
+  it('Dos equipos del proveedor con el mismo nombre deben ir a confirmar', () => {
+    const plan = planLinks(
+      [team('t1', 'San Martín')],
+      [],
+      [copa([10, 'San Martín'], [20, 'San Martin'])],
+    )
+
+    expect(plan.teams).toEqual([])
+    expect(plan.teamsToConfirm.map((t) => t.source.externalId).sort()).toEqual([
+      10, 20,
+    ])
+  })
+
+  it('Un nombre aproximado no debe vincularse solo', () => {
+    const plan = planLinks(
+      [team('t1', 'Gimnasia L.P.')],
+      [],
+      [copa([10, 'Gimnasia La Plata'], [20, 'Midland'])],
+    )
+
+    expect(plan.teams).toEqual([])
+    expect(plan.teamsToConfirm).toEqual([
+      {
+        source: expect.objectContaining({ externalId: 10 }) as unknown,
+        candidates: [
+          expect.objectContaining({ teamId: 't1', reason: 'nombre' }),
+        ],
+      },
+    ])
+  })
+
+  it('No debe fusionar CA Estudiantes con Estudiantes de La Plata', () => {
+    const plan = planLinks(
+      [team('t1', 'Estudiantes L.P.')],
+      [],
+      [copa([10, 'CA Estudiantes'], [20, 'Midland'])],
+    )
+
+    expect(plan.teams).toEqual([])
+    expect(plan.teamsToConfirm.map((t) => t.source.name)).toEqual([
+      'CA Estudiantes',
+    ])
+  })
+
+  it('Un parecido bajo con un equipo libre debe ir a confirmar, no crearse', () => {
+    // En una base sin vincular, crearlo solo duplicaría un club de la Liga.
+    const plan = planLinks(
+      [team('t1', 'Sarmiento Junin')],
+      [],
+      [copa([10, 'Sarmiento de Junín de Buenos Aires'], [20, 'Midland'])],
+    )
+
+    expect(plan.teamsToConfirm).toEqual([
+      expect.objectContaining({
+        candidates: [expect.objectContaining({ teamId: 't1' })],
+      }),
+    ])
+    expect(plan.teamsToCreate.map((t) => t.name)).toEqual(['Midland'])
+  })
+
+  it('Debe crear un equipo cuyo único parecido ya está vinculado, mostrando el parecido', () => {
+    const plan = planLinks(
+      [team('t1', 'Gimnasia L.P.', 434)],
+      [],
+      [copa([434, 'Gimnasia La Plata'], [10, 'Gimnasia Jujuy'])],
+    )
+
+    expect(plan.teamsToCreate).toEqual([
+      expect.objectContaining({
+        name: 'Gimnasia Jujuy',
+        closest: expect.objectContaining({ teamId: 't1' }) as unknown,
+      }),
+    ])
+  })
+
+  it('Debe guardar el logo y el país del proveedor para crear el equipo', () => {
+    const fixture = copa([10, 'Midland'], [20, 'Atlanta'])
+    fixture.home.logo = 'https://img.example/10.png'
+    fixture.home.country = 'Argentina'
+
+    const plan = planLinks([], [], [fixture])
+
+    expect(plan.teamsToCreate[0]).toEqual({
+      source: {
+        externalId: 10,
+        name: 'Midland',
+        logo: 'https://img.example/10.png',
+        country: 'Argentina',
+      },
+      name: 'Midland',
+      closest: null,
+    })
+  })
+
+  describe('decisiones', () => {
+    it('Debe vincular el equipo elegido a mano', () => {
+      const plan = planLinks(
+        [team('t1', 'Gimnasia L.P.')],
+        [],
+        [copa([10, 'Gimnasia La Plata'], [20, 'Midland'])],
+        { decisions: { 10: { action: 'link', teamId: 't1' } } },
+      )
+
+      expect(plan.teams).toEqual([
+        expect.objectContaining({ teamId: 't1', how: 'confirmado' }),
+      ])
+      expect(plan.teamsToConfirm).toEqual([])
+    })
+
+    it('Debe crear con el nombre corregido', () => {
+      const plan = planLinks(
+        [],
+        [],
+        [copa([10, 'CA Estudiantes'], [20, 'Midland'])],
+        {
+          decisions: {
+            10: { action: 'create', name: ' Estudiantes de Buenos Aires ' },
+          },
+        },
+      )
+
+      expect(plan.teamsToCreate.map((t) => t.name)).toEqual([
+        'Estudiantes de Buenos Aires',
+        'Midland',
+      ])
+    })
+
+    it('Debe saltear el equipo y dejar pendiente el que no tiene decisión', () => {
+      const plan = planLinks(
+        [team('t1', 'Gimnasia L.P.')],
+        [],
+        [copa([10, 'Gimnasia La Plata'], [20, 'Midland'])],
+        { decisions: { 10: { action: 'pending' }, 20: { action: 'skip' } } },
+      )
+
+      expect(plan.teamsSkipped.map((t) => t.externalId)).toEqual([20])
+      expect(plan.teamsToConfirm.map((t) => t.source.externalId)).toEqual([10])
+    })
+
+    it('Debe rechazar vincular a un equipo ya vinculado a otro ID', () => {
+      const plan = planLinks(
+        [team('t1', 'Gimnasia L.P.', 434)],
+        [],
+        [copa([10, 'Gimnasia La Plata'], [20, 'Midland'])],
+        { decisions: { 10: { action: 'link', teamId: 't1' } } },
+      )
+
+      expect(plan.teams.map((t) => t.externalId)).not.toContain(10)
+      expect(plan.decisionErrors).toEqual([
+        expect.stringContaining('ya está vinculado a 434'),
+      ])
+    })
+
+    it('Debe rechazar elegir el mismo equipo para dos IDs', () => {
+      const plan = planLinks(
+        [team('t1', 'San Martín')],
+        [],
+        [copa([10, 'San Martín'], [20, 'San Martin'])],
+        {
+          decisions: {
+            10: { action: 'link', teamId: 't1' },
+            20: { action: 'link', teamId: 't1' },
+          },
+        },
+      )
+
+      expect(plan.teams).toEqual([
+        expect.objectContaining({ teamId: 't1', externalId: 10 }),
+      ])
+      expect(plan.decisionErrors).toEqual([
+        expect.stringContaining('ya fue elegido'),
+      ])
+    })
+
+    it('Debe rechazar un equipo que no existe', () => {
+      const plan = planLinks([], [], [copa([10, 'Midland'], [20, 'Atlanta'])], {
+        decisions: { 10: { action: 'link', teamId: 'no-existe' } },
+      })
+
+      expect(plan.decisionErrors).toEqual([
+        expect.stringContaining('no existe el equipo no-existe'),
+      ])
+    })
   })
 })
