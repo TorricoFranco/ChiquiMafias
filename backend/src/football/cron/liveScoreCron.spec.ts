@@ -173,6 +173,96 @@ describe('LiveScoreCron', () => {
     })
   })
 
+  it('Debe cerrar el último partido en juego aunque el feed en vivo venga vacío', async () => {
+    provider.getLiveFixtures.mockResolvedValue([])
+    prisma.matches.findMany.mockResolvedValue([
+      { ...activeMatch, status_short: '2H' },
+    ])
+    provider.getFixture.mockResolvedValue(
+      baseFixture({
+        status: { short: 'PEN', long: 'Penalties', elapsed: 120 },
+        goals: { home: 1, away: 1 },
+        penalty: { home: 4, away: 3 },
+      }),
+    )
+
+    await cron.handleLiveScores()
+
+    expect(provider.getFixture).toHaveBeenCalledWith(1001)
+    expect(prisma.matches.update).toHaveBeenCalledWith({
+      where: { id: 'm1' },
+      data: {
+        home_goals: 1,
+        away_goals: 1,
+        status_short: 'PEN',
+        home_penalty_goals: 4,
+        away_penalty_goals: 3,
+        elapsed: 120,
+        is_live_finished: true,
+        tracked: false,
+      },
+    })
+    expect(redisService.publish).toHaveBeenCalledWith(
+      'match_updates',
+      expect.objectContaining({ matchId: 'm1', type: 'MATCH_ENDED' }),
+    )
+    expect(redis.del).toHaveBeenCalledWith('live_scores:league:128')
+  })
+
+  it('Un partido cerrado por la reconciliación debe invalidar la fecha y pedir la tabla', async () => {
+    provider.getLiveFixtures.mockResolvedValue([])
+    prisma.matches.findMany.mockResolvedValue([
+      { ...activeMatch, status_short: '2H' },
+    ])
+    provider.getFixture.mockResolvedValue(
+      baseFixture({ status: { short: 'FT', long: 'Finished', elapsed: 90 } }),
+    )
+
+    await cron.handleLiveScores()
+
+    expect(redis.del).toHaveBeenCalledWith('fixtures:128:2026:APERTURA:fecha:9')
+    expect(eventEmitter.emit).toHaveBeenCalledWith('match.finished', {
+      leagueId: 128,
+      leagueDbId: 'league-1',
+      season: 2026,
+    })
+  })
+
+  it('No debe emitir match.finished si la reconciliación encuentra el partido suspendido', async () => {
+    provider.getLiveFixtures.mockResolvedValue([])
+    prisma.matches.findMany.mockResolvedValue([
+      { ...activeMatch, status_short: '2H' },
+    ])
+    provider.getFixture.mockResolvedValue(
+      baseFixture({
+        status: { short: 'SUSP', long: 'Suspended', elapsed: 60 },
+      }),
+    )
+
+    await cron.handleLiveScores()
+
+    expect(prisma.matches.update).toHaveBeenCalledWith({
+      where: { id: 'm1' },
+      data: expect.objectContaining({
+        status_short: 'SUSP',
+        is_live_finished: false,
+        tracked: true,
+      }) as unknown,
+    })
+    expect(eventEmitter.emit).not.toHaveBeenCalled()
+  })
+
+  it('Con el feed vacío no debe consultar partidos que todavía no empezaron', async () => {
+    provider.getLiveFixtures.mockResolvedValue([])
+    prisma.matches.findMany.mockResolvedValue([
+      { ...activeMatch, status_short: 'NS' },
+    ])
+
+    await cron.handleLiveScores()
+
+    expect(provider.getFixture).not.toHaveBeenCalled()
+  })
+
   it('No debe consultar partidos trackeados que empezaron hace más de 12 horas', async () => {
     provider.getLiveFixtures.mockResolvedValue([])
     const now = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000)

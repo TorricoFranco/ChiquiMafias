@@ -150,12 +150,9 @@ export class LiveScoreCron {
 
     const liveMatchesApi = await this.provider.getLiveFixtures(leagueExternalId)
 
-    if (liveMatchesApi.length === 0) {
-      await this.redisService.redis.del(`live_scores:league:${leagueId}`)
-      return
-    }
-
-    // Reconciliación para partidos que terminaron o desaparecieron del feed live
+    // Reconciliación para partidos que terminaron o desaparecieron del feed live.
+    // Va antes de mirar si el feed está vacío: API-Football saca del feed el
+    // partido que terminó, y si era el último de la competición nunca se cerraba.
     const missingMatches = this.reconcileMatches(
       activeMatchesDb,
       liveMatchesApi,
@@ -164,6 +161,11 @@ export class LiveScoreCron {
 
     for (const match of missingMatches) {
       await this.syncSpecificMatch(match, externalIds.get(match.id)!, leagueId)
+    }
+
+    if (liveMatchesApi.length === 0) {
+      await this.redisService.redis.del(`live_scores:league:${leagueId}`)
+      return
     }
 
     const liveScoresHash: Record<string, string> = {}
@@ -380,9 +382,11 @@ export class LiveScoreCron {
       await this.prisma.matches.update({
         where: { id: matchDb.id },
         data: {
-          home_goals: apiMatch.goals.home,
-          away_goals: apiMatch.goals.away,
+          home_goals: apiMatch.goals.home ?? 0,
+          away_goals: apiMatch.goals.away ?? 0,
           status_short: apiStatus,
+          home_penalty_goals: apiMatch.penalty.home,
+          away_penalty_goals: apiMatch.penalty.away,
           elapsed: apiMatch.status.elapsed,
           is_live_finished: isFinished,
           tracked: !isFinished,
@@ -404,6 +408,9 @@ export class LiveScoreCron {
         apiMatch,
         isFinished ? 'MATCH_ENDED' : 'MINUTE_TICK',
       )
+
+      // Igual que un final visto en el feed: fecha del fixture y tabla.
+      if (isFinished) await this.notifyFinished(matchDb, leagueId)
 
       this.logger.log(
         `Sincronización manual: Partido ${apiFixtureId} actualizado a ${apiStatus}`,
