@@ -1,5 +1,3 @@
-import { ROUND_MAP } from './roundTranslation'
-
 export interface ResolvedRound {
   /** Ronda traducida, tal como se guarda en `Matches.round`. */
   round: string
@@ -9,27 +7,27 @@ export interface ResolvedRound {
 }
 
 /**
- * Traduce la etiqueta de ronda del proveedor y deriva torneo y fecha.
- * Antes esta lógica estaba copiada en `FixturesSyncCron` y `LiveScoreCron`.
+ * Parte de la clave de caché de una ronda ya traducida: `Clausura - 9` da
+ * `fecha:9` y `Clausura - cuartos` da `cuartos`.
  */
-export function resolveRound(
-  rawRound: string | null | undefined,
-  fallback: string,
-): ResolvedRound {
-  const round = (rawRound && ROUND_MAP[rawRound]) || rawRound || fallback
-
-  const tournament = round.toUpperCase().includes('CLAUSURA')
-    ? 'CLAUSURA'
-    : 'APERTURA'
-
+export function matchdayKeyOf(round: string): string {
   const parts = round.split(' - ')
   const detail = (parts.length >= 2 ? parts[1] : parts[0]).trim()
 
-  const matchdayKey = !isNaN(Number(detail))
+  return !isNaN(Number(detail))
     ? `fecha:${detail}`
     : detail.toLowerCase().replace(/\s+/g, '_')
+}
 
-  return { round, tournament, matchdayKey }
+/**
+ * Clave de la competición en Redis y en los eventos: el ID de API-Football
+ * para la Liga (las claves de siempre) y el uuid para las competiciones nuevas.
+ */
+export function leagueCacheKey(league: {
+  id: string
+  api_league_id: number | null
+}): number | string {
+  return league.api_league_id ?? league.id
 }
 
 /** Clave de Redis con los partidos de una fecha. */

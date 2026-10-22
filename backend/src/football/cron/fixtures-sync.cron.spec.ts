@@ -1,6 +1,20 @@
 import { FixturesSyncCron } from './fixtures-sync.cron'
 import { FootballFixture } from '../football.types'
 
+const NOW = new Date('2026-10-22T15:00:00.000Z')
+
+const ligaSeason = (over: Record<string, unknown> = {}) => ({
+  id: 'season-liga',
+  league_id: 'league-1',
+  season: 2026,
+  label: '2026',
+  format: 'LIGA_DIVIDIDA',
+  fixtures_sync_minutes: 10,
+  last_fixtures_sync_at: null as Date | null,
+  league: { id: 'league-1', name: 'LPA', api_league_id: 128 },
+  ...over,
+})
+
 const fixture: FootballFixture = {
   externalId: 5001,
   date: '2026-10-25T20:00:00.000Z',
@@ -18,7 +32,7 @@ const fixture: FootballFixture = {
 
 describe('FixturesSyncCron', () => {
   const prisma = {
-    leagues: { findUnique: jest.fn() },
+    competitionSeason: { findMany: jest.fn(), updateMany: jest.fn() },
     matches: {
       upsert: jest.fn(),
       update: jest.fn(),
@@ -49,7 +63,9 @@ describe('FixturesSyncCron', () => {
       Promise.resolve(cb(prisma)),
     )
     prisma.matches.findFirst.mockResolvedValue(null)
-    prisma.leagues.findUnique.mockResolvedValue({ id: 'league-1', name: 'LPA' })
+    jest.useFakeTimers({ now: NOW })
+    prisma.competitionSeason.findMany.mockResolvedValue([ligaSeason()])
+    prisma.competitionSeason.updateMany.mockResolvedValue({ count: 1 })
     refs.leagueExternalId.mockResolvedValue(128)
     refs.resolveTeam.mockImplementation((_c: unknown, t: { name: string }) =>
       Promise.resolve({ id: `team-${t.name}`, name: t.name }),
@@ -63,6 +79,10 @@ describe('FixturesSyncCron', () => {
     )
   })
 
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
   it('Debe pedir los partidos con el ID de la liga del proveedor activo', async () => {
     prisma.matches.upsert.mockResolvedValue({
       id: 'm1',
@@ -73,9 +93,12 @@ describe('FixturesSyncCron', () => {
 
     await cron.handle()
 
-    expect(provider.getFixtures).toHaveBeenCalledWith(
-      expect.objectContaining({ leagueExternalId: 109712, season: 2026 }),
-    )
+    expect(provider.getFixtures).toHaveBeenCalledWith({
+      leagueExternalId: 109712,
+      season: 2026,
+      from: '2026-10-12',
+      to: '2026-10-29',
+    })
   })
 
   it('Con API-Football debe hacer upsert por api_fixture_id', async () => {
@@ -251,5 +274,139 @@ describe('FixturesSyncCron', () => {
     await cron.handle()
 
     expect(provider.getFixtures).not.toHaveBeenCalled()
+  })
+
+  describe('temporadas', () => {
+    it('Debe recorrer solo las temporadas con sync_enabled', async () => {
+      await cron.handle()
+
+      expect(prisma.competitionSeason.findMany).toHaveBeenCalledWith({
+        where: { sync_enabled: true },
+        include: { league: true },
+      })
+    })
+
+    it('Debe reclamar la temporada antes de sincronizarla', async () => {
+      prisma.matches.upsert.mockResolvedValue({ id: 'm1' })
+
+      await cron.handle()
+
+      expect(prisma.competitionSeason.updateMany).toHaveBeenCalledWith({
+        where: { id: 'season-liga', last_fixtures_sync_at: null },
+        data: { last_fixtures_sync_at: NOW },
+      })
+      expect(provider.getFixtures).toHaveBeenCalledTimes(1)
+    })
+
+    it('No debe sincronizar si otro tick ya reclamó la temporada', async () => {
+      prisma.competitionSeason.updateMany.mockResolvedValue({ count: 0 })
+
+      await cron.handle()
+
+      expect(provider.getFixtures).not.toHaveBeenCalled()
+    })
+
+    it('Debe respetar la frecuencia de cada temporada', async () => {
+      prisma.matches.upsert.mockResolvedValue({ id: 'm1' })
+      prisma.competitionSeason.findMany.mockResolvedValue([
+        // Hace 5 minutos, cada 10: no le toca.
+        ligaSeason({
+          last_fixtures_sync_at: new Date(NOW.getTime() - 5 * 60_000),
+        }),
+        // Hace 10 minutos (con el atraso del scheduler), cada 10: le toca.
+        ligaSeason({
+          id: 'season-b',
+          last_fixtures_sync_at: new Date(NOW.getTime() - 9.8 * 60_000),
+          league: { id: 'league-b', name: 'B Nacional', api_league_id: null },
+        }),
+        // Una vez por día, sincronizada hace 2 horas: no le toca.
+        ligaSeason({
+          id: 'season-diaria',
+          fixtures_sync_minutes: 1440,
+          last_fixtures_sync_at: new Date(NOW.getTime() - 120 * 60_000),
+        }),
+      ])
+
+      await cron.handle()
+
+      expect(prisma.competitionSeason.updateMany).toHaveBeenCalledTimes(1)
+      expect(prisma.competitionSeason.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'season-b' }) as unknown,
+        }),
+      )
+      expect(provider.getFixtures).toHaveBeenCalledTimes(1)
+    })
+
+    it('Debe usar el uuid como clave de caché de una competición sin ID de API-Football', async () => {
+      prisma.competitionSeason.findMany.mockResolvedValue([
+        ligaSeason({
+          id: 'season-b',
+          league: { id: 'league-b', name: 'B Nacional', api_league_id: null },
+        }),
+      ])
+      prisma.matches.upsert.mockResolvedValue({ id: 'm1' })
+
+      await cron.handle()
+
+      expect(redis.redis.del).toHaveBeenCalledWith(
+        'fixtures:league-b:2026:CLAUSURA:fecha:14',
+      )
+    })
+
+    it('Debe mantener la clave de caché de siempre para la Liga', async () => {
+      prisma.matches.upsert.mockResolvedValue({ id: 'm1' })
+
+      await cron.handle()
+
+      expect(redis.redis.del).toHaveBeenCalledWith(
+        'fixtures:128:2026:CLAUSURA:fecha:14',
+      )
+    })
+
+    it('Debe saltear sin reclamar una temporada con un formato sin estrategia', async () => {
+      prisma.competitionSeason.findMany.mockResolvedValue([
+        ligaSeason({ id: 'season-copa', format: 'ELIMINACION' }),
+      ])
+
+      await cron.handle()
+
+      expect(prisma.competitionSeason.updateMany).not.toHaveBeenCalled()
+      expect(provider.getFixtures).not.toHaveBeenCalled()
+    })
+
+    it('Un error en una temporada no debe cortar a las demás', async () => {
+      prisma.matches.upsert.mockResolvedValue({ id: 'm1' })
+      prisma.competitionSeason.findMany.mockResolvedValue([
+        ligaSeason(),
+        ligaSeason({
+          id: 'season-b',
+          league: { id: 'league-b', name: 'B Nacional', api_league_id: null },
+        }),
+      ])
+      provider.getFixtures
+        .mockRejectedValueOnce(new Error('Proveedor caído'))
+        .mockResolvedValueOnce([fixture])
+
+      await cron.handle()
+
+      expect(provider.getFixtures).toHaveBeenCalledTimes(2)
+      expect(prisma.matches.upsert).toHaveBeenCalledTimes(1)
+    })
+
+    it('Un error en un partido no debe cortar a los demás', async () => {
+      provider.getFixtures.mockResolvedValue([
+        fixture,
+        { ...fixture, externalId: 5002 },
+      ])
+      prisma.matches.upsert
+        .mockRejectedValueOnce(new Error('Conflicto'))
+        .mockResolvedValueOnce({ id: 'm2' })
+
+      await cron.handle()
+
+      expect(prisma.matches.upsert).toHaveBeenCalledTimes(2)
+      expect(redis.redis.del).toHaveBeenCalledWith('match:details:v2:m2')
+    })
   })
 })

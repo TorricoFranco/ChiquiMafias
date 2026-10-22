@@ -116,6 +116,7 @@ Pico de ritmo: ~11 pedidos por minuto con 7 partidos a la vez.
 Con las 5 ligas activas (Copa Argentina, B Nacional, Libertadores y Sudamericana son **estimaciones**) un
 día sin partidos gasta ~42 % y el pico llega a ~85 % con la config actual; con la optimizada, ~50 %.
 
-Optimizaciones disponibles (no aplicadas): `fixtures-sync` cada 30 min en vez de 10, pedir eventos
+Optimizaciones disponibles (no aplicadas): `fixtures-sync` cada 30 min en vez de 10 (es un dato de la
+temporada: `CompetitionSeason.fixtures_sync_minutes`), pedir eventos
 solo desde el pitazo, y tomar las estadísticas del detalle del partido (`/matches/{id}` ya trae
 eventos y estadísticas en una sola llamada).

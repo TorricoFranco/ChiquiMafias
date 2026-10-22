@@ -1,38 +1,25 @@
-import { fixturesCacheKey, resolveRound } from './round'
+import { fixturesCacheKey, leagueCacheKey, matchdayKeyOf } from './round'
 
-describe('resolveRound', () => {
-  it('Debe resolver una fecha numerada del Apertura', () => {
-    expect(resolveRound('Apertura - 9', 'N/A')).toEqual({
-      round: 'Regular Season - 9',
-      tournament: 'APERTURA',
-      matchdayKey: 'fecha:9',
-    })
-  })
-
-  it('Debe resolver una fecha del Clausura', () => {
-    expect(resolveRound('Clausura - 12', 'N/A')).toEqual({
-      round: 'Clausura - 12',
-      tournament: 'CLAUSURA',
-      matchdayKey: 'fecha:12',
-    })
-  })
-
-  it('Debe resolver una fase de playoff como clave de texto', () => {
-    expect(resolveRound('Clausura - Quarter-finals', 'N/A')).toEqual({
-      round: 'Clausura - cuartos',
-      tournament: 'CLAUSURA',
-      matchdayKey: 'cuartos',
-    })
-  })
-
-  it('Debe usar el fallback si no hay ronda', () => {
-    expect(resolveRound(undefined, 'N/A').round).toBe('N/A')
-    expect(resolveRound(null, 'Unknown Round').round).toBe('Unknown Round')
+describe('round', () => {
+  it.each([
+    ['Regular Season - 9', 'fecha:9'],
+    ['Regular Sesaon - 10', 'fecha:10'],
+    ['Clausura - cuartos', 'cuartos'],
+    ['Clausura - Round of 16', 'round_of_16'],
+  ])('Debe derivar la clave de la fecha de "%s"', (round, expected) => {
+    expect(matchdayKeyOf(round)).toBe(expected)
   })
 
   it('Debe armar la clave de caché de la fecha', () => {
     expect(fixturesCacheKey(128, 2026, 'APERTURA', 'fecha:9')).toBe(
       'fixtures:128:2026:APERTURA:fecha:9',
+    )
+  })
+
+  it('Debe usar el ID de API-Football como clave de la Liga y el uuid en las demás', () => {
+    expect(leagueCacheKey({ id: 'uuid-liga', api_league_id: 128 })).toBe(128)
+    expect(leagueCacheKey({ id: 'uuid-copa', api_league_id: null })).toBe(
+      'uuid-copa',
     )
   })
 })

@@ -253,7 +253,7 @@ flowchart LR
 
 | Frecuencia | Job | Qué hace |
 |---|---|---|
-| 30 s | `liveScoreCron` | Marcadores en vivo → pub/sub → sockets |
+| 30 s | `liveScoreCron` | Marcadores en vivo → pub/sub → sockets. Una consulta por competición con partidos activos |
 | 1 min | `events-fetch`, `prematch-tracker` | Eventos de partido (goles, tarjetas) y partidos por empezar |
 | 1 min | `bets-cron` | Cierra los mercados `OPEN → LOCKED` |
 | 1 min | `polls/task.service` | Abre y cierra encuestas según su horario |
@@ -261,7 +261,7 @@ flowchart LR
 | 3 min | `stats-sync` | Estadísticas de partido |
 | 5 min | `lineups-fetch` | Formaciones |
 | 5 min | `stats/*` | Rankings de chat y de rachas |
-| 10 min | `fixtures-sync`, `standings` | Fixture y tabla de posiciones |
+| 1 min (tick) | `fixtures-sync`, `standings` | Fixture y tabla de cada `CompetitionSeason` con `sync_enabled`, cada una según su `fixtures_sync_minutes` / `standings_sync_minutes` (la Liga, cada 10 min). La lógica de cada formato está en `football/formats/` |
 | 15 min | `bets-cron` | Liquida los mercados de partidos terminados |
 | 30 min | `bets-cron` | Crea mercados automáticamente para los próximos partidos |
 | 1 h | `subscriptions.cron` | Conciliación de suscripciones vencidas |
