@@ -20,6 +20,37 @@ export class CloudinaryService {
     })
   }
 
+  /**
+   * Copia a Cloudinary una imagen pública (por ejemplo, el escudo que da el
+   * proveedor de datos) y devuelve su URL. El `publicId` fijo hace que volver a
+   * subirla la reemplace en vez de duplicarla.
+   */
+  async uploadRemoteImage(
+    url: string,
+    folder: string,
+    publicId: string,
+  ): Promise<string> {
+    if (!url.startsWith('https://')) {
+      throw new Error(`Solo se copian imágenes por https: ${url}`)
+    }
+    const result = await cloudinary.uploader.upload(url, {
+      folder,
+      public_id: publicId,
+      overwrite: true,
+      resource_type: 'image',
+      allowed_formats: ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'],
+    })
+    return result.secure_url
+  }
+
+  /** true si la URL ya es una imagen de nuestra cuenta de Cloudinary. */
+  isHostedUrl(url: string | null | undefined): boolean {
+    const cloudName = this.configService.get('CLOUDINARY_CLOUD_NAME', {
+      infer: true,
+    })
+    return !!url?.startsWith(`https://res.cloudinary.com/${cloudName}/`)
+  }
+
   generateSignature(folderName: string = 'support_tickets') {
     const apiSecret = this.configService.get('CLOUDINARY_API_SECRET', {
       infer: true,
