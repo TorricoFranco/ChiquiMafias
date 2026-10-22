@@ -1,16 +1,29 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger'
 import { MatchesService } from './matches.service'
-import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
+import {
+  MatchDetailsResponseDto,
+  MatchWithCompetitionResponseDto,
+} from './dto/response/match-details-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
 import { Public } from 'src/auth/decorators/auth.decorator'
+import { CompetitionsService } from 'src/competitions/competitions.service'
 
 @ApiTags('Matches')
 @Controller('matches')
 @Public()
 export class MatchesController {
-  constructor(private readonly matchesService: MatchesService) {}
+  constructor(
+    private readonly matchesService: MatchesService,
+    private readonly competitions: CompetitionsService,
+  ) {}
 
   @Get('leagues/:leagueId/seasons/:season/matches/:matchId')
   @ApiOperation({
@@ -27,11 +40,34 @@ export class MatchesController {
   })
   @ApiResponse({ status: 404, description: 'El partido no existe.' })
   async getMatchDetails(
-    @Param('leagueId') leagueId: string,
+    @Param('leagueId', ParseUUIDPipe) leagueId: string,
     @Param('season') season: string,
-    @Param('matchId') matchId: string,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
   ): Promise<MatchDetailsResponseDto> {
+    // Alias de GET /matches/:matchId: solo la Liga y su temporada actual (RF-A04).
+    const { competition } = await this.competitions.resolveLegacy(season)
+    if (leagueId !== competition.leagueId) {
+      throw new NotFoundException('Partido no encontrado')
+    }
     return this.matchesService.getMatchDetails(leagueId, season, matchId)
+  }
+
+  @Get(':matchId')
+  @ApiOperation({
+    summary: 'Detalles completos de un partido con su competición',
+    description:
+      'No hace falta mandar liga ni temporada. Solo partidos de la temporada actual de su competición.',
+  })
+  @ApiParam({ name: 'matchId', description: 'ID del partido (uuid)' })
+  @ApiResponse({ status: 200, type: MatchWithCompetitionResponseDto })
+  @ApiResponse({
+    status: 404,
+    description: 'El partido no existe o no es de la temporada actual.',
+  })
+  async getMatchDetailsById(
+    @Param('matchId', ParseUUIDPipe) matchId: string,
+  ): Promise<MatchWithCompetitionResponseDto> {
+    return this.matchesService.getMatchDetailsById(matchId)
   }
 
   @Get(':matchId/events')

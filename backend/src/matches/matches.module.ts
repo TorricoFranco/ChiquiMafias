@@ -7,10 +7,17 @@ import { StandingsModule } from 'src/standings/standings.module'
 import { AuthModule } from 'src/auth/auth.module'
 import { FootballModule } from 'src/football/football.module'
 import { ChatModule } from 'src/chat/chat.module'
+import { CompetitionsModule } from 'src/competitions/competitions.module'
 
 @Module({
   controllers: [MatchesController, TestEventsController],
   providers: [MatchesService, MatchesGateway],
-  imports: [AuthModule, FootballModule, ChatModule, StandingsModule],
+  imports: [
+    AuthModule,
+    FootballModule,
+    ChatModule,
+    StandingsModule,
+    CompetitionsModule,
+  ],
 })
 export class MatchesModule {}

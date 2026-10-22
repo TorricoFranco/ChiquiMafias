@@ -22,6 +22,9 @@ export interface StandingGroup {
 export interface CompetitionFormatStrategy {
   readonly format: CompetitionFormat
 
+  /** Fases de la temporada, como se guardan en `Matches.tournament`. */
+  readonly stages: readonly string[]
+
   /** Qué partidos traer en cada sincronización del fixture. */
   fixturesWindow(now: Date): FixturesWindow
 

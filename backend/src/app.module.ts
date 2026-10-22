@@ -20,6 +20,7 @@ import { RedisModule } from './redis/redis.module'
 import { ScheduleModule } from '@nestjs/schedule'
 import { StandingsModule } from './standings/standings.module'
 import { FixtureModule } from './fixture/fixture.module'
+import { CompetitionsApiModule } from './competitions/competitions-api.module'
 import { UsersModule } from './users/users.module'
 import { TeamsModule } from './teams/teams.module'
 import { WalletModule } from './wallet/wallet.module'
@@ -76,6 +77,7 @@ import { PricingModule } from './pricing/pricing.module'
     ScheduleModule.forRoot(),
     StandingsModule,
     FixtureModule,
+    CompetitionsApiModule,
     TeamsModule,
     WalletModule,
     BetsModule,
