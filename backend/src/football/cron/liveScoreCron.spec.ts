@@ -29,7 +29,7 @@ const activeMatch = {
   season: 2026,
   round: 'Regular Season - 9',
   tournament: 'APERTURA',
-  league: { id: 'league-1', api_league_id: 128 },
+  league: { id: 'league-1', api_league_id: 128, slug: 'liga-profesional' },
 }
 
 // Partido de otra competición (sin ID de API-Football), en vivo a la vez.
@@ -39,7 +39,7 @@ const copaMatch = {
   api_fixture_id: 3003,
   round: 'Copa - 32avos',
   tournament: 'COPA',
-  league: { id: 'league-copa', api_league_id: null },
+  league: { id: 'league-copa', api_league_id: null, slug: 'copa-argentina' },
 }
 
 describe('LiveScoreCron', () => {
@@ -365,7 +365,14 @@ describe('LiveScoreCron', () => {
       )
       expect(redisService.publish).toHaveBeenCalledWith(
         'league_live_updates',
-        expect.objectContaining({ leagueId: 'league-copa' }),
+        expect.objectContaining({
+          leagueId: 'league-copa',
+          slug: 'copa-argentina',
+        }),
+      )
+      expect(redisService.publish).toHaveBeenCalledWith(
+        'league_live_updates',
+        expect.objectContaining({ leagueId: 128, slug: 'liga-profesional' }),
       )
     })
 
