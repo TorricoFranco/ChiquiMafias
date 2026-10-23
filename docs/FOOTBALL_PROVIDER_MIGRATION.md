@@ -107,6 +107,42 @@ con `null`.
   publica un array). Es anterior a esta migración.
 - `lineups-fetch` no tiene ventana de fecha: un partido viejo sin vínculo vuelve a avisar cada 5 min.
 
+## Activar la Copa Argentina
+
+La Copa se crea apagada (migración `add_copa_argentina`): ni sincroniza ni tiene apuestas, pero ya
+aparece en `GET /competitions` y en el menú de Ligas. Pasos, con `FOOTBALL_PROVIDER=highlightly`:
+
+1. **Migraciones** (`migrate deploy` en prod): `add_copa_argentina`, `add_bracket_slots` y
+   `add_bracket_draw_and_audit`. Son aditivas.
+2. **Vincular la liga y dar de alta los equipos** con el script de vinculación. La primera vez lleva
+   `--league-ext 111414`; revisá el archivo de decisiones antes del `--apply`:
+
+   ```bash
+   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/link-provider-ids.ts \
+     --slug copa-argentina --season 2026 --league-ext 111414 --decisions /tmp/copa.json
+   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/link-provider-ids.ts \
+     --slug copa-argentina --season 2026 --decisions /tmp/copa.json --apply
+   ```
+
+   Crea los equipos que faltan con su escudo en Cloudinary y registra los 64 participantes.
+3. **Activar la sincronización** (una vez por día):
+
+   ```sql
+   UPDATE "CompetitionSeason" cs SET sync_enabled = true, last_fixtures_sync_at = NULL
+   FROM "Leagues" l WHERE l.id = cs.league_id AND l.slug = 'copa-argentina' AND cs.season = 2026;
+   ```
+
+   `last_fixtures_sync_at = NULL` hace que sincronice en el minuto siguiente. La primera corrida crea los
+   partidos de la temporada, con la ronda deducida por cantidad de partidos, y arma el cuadro
+   reconstruyéndolo desde lo jugado.
+4. **Sorteo (opcional).** Si el cuadro reconstruido queda espejado respecto del oficial, o en una
+   temporada nueva sin rondas jugadas, el presidente carga el orden oficial con
+   `POST /admin/competitions/copa-argentina/bracket/draw`. Una llave mal resuelta (por ejemplo un W.O.
+   sin marcador) se corrige con `PATCH .../bracket/slots/:ronda/:lugar`. Todo queda auditado en
+   `GET .../bracket/changes`.
+5. **Apuestas**: recién cuando se decida, `bets_enabled = true` en la misma temporada. El mercado es 1X2
+   sobre los 90 minutos y un partido definido por penales es empate.
+
 ## Cuota de pedidos (Highlightly: 7.500 por día)
 
 Calculadora: `node scripts/dev/football-quota.mjs`. Hace cero pedidos; los intervalos salen de los
@@ -124,8 +160,12 @@ Liga Profesional sola (15 partidos por fecha, límite 7.500):
 
 Pico de ritmo: ~11 pedidos por minuto con 7 partidos a la vez.
 
-Con las 5 ligas activas (Copa Argentina, B Nacional, Libertadores y Sudamericana son **estimaciones**) un
-día sin partidos gasta ~42 % y el pico llega a ~85 % con la config actual; con la optimizada, ~50 %.
+**Con la Copa Argentina** (datos reales: 63 partidos, sincroniza una vez por día y no tiene tabla) un día
+sin partidos suma 1 pedido. Un día con 7 partidos de Liga y 2 de Copa gasta ~49 %; el peor día (15 de Liga
+7 a la vez + 4 de Copa 2 a la vez) llega a ~78 % con la config actual y ~54 % con la optimizada.
+
+B Nacional, Libertadores y Sudamericana siguen como **estimaciones** en la calculadora
+(`node scripts/dev/football-quota.mjs`): completalas con datos reales antes de activarlas.
 
 Optimizaciones disponibles (no aplicadas): `fixtures-sync` cada 30 min en vez de 10 (es un dato de la
 temporada: `CompetitionSeason.fixtures_sync_minutes`), pedir eventos
