@@ -22,6 +22,7 @@ describe('BetsCronService', () => {
     matches: {
       findMany: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
   }
 
@@ -113,6 +114,8 @@ describe('BetsCronService', () => {
     service = module.get<BetsCronService>(BetsCronService)
 
     jest.clearAllMocks()
+    // Por defecto el reclamo del partido sale bien (ningún otro cron lo tomó).
+    mockPrisma.matches.updateMany.mockResolvedValue({ count: 1 })
   })
 
   describe('handleMarketAutoCreation', () => {
@@ -155,6 +158,35 @@ describe('BetsCronService', () => {
         { name: 'River Plate', initialProb: 33, logoUrl: '435' },
       ])
       expect(data.options.create[1]).not.toHaveProperty('logoUrl')
+    })
+
+    it('Debe reclamar el partido antes de crear el mercado', async () => {
+      await runWith()
+
+      expect(mockPrisma.matches.updateMany).toHaveBeenCalledWith({
+        where: { id: 'match-row-1', market_created: false },
+        data: { market_created: true },
+      })
+      expect(
+        mockPrisma.matches.updateMany.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockPrisma.market.create.mock.invocationCallOrder[0])
+    })
+
+    it('No debe abrir un segundo mercado si otra corrida ya reclamó el partido', async () => {
+      mockPrisma.competitionSeason.findMany.mockResolvedValue([
+        { league_id: 'league-1', season: 2026 },
+      ])
+      mockPrisma.matches.findMany.mockResolvedValue([upcoming()])
+      mockPrisma.$transaction.mockImplementationOnce(
+        (cb: (tx: unknown) => unknown) => Promise.resolve(cb(mockPrisma)),
+      )
+      mockPrisma.matches.updateMany.mockResolvedValue({ count: 0 })
+
+      await service.handleMarketAutoCreation()
+
+      expect(mockPrisma.market.create).not.toHaveBeenCalled()
+      expect(mockRedisService.redis.hset).not.toHaveBeenCalled()
+      expect(mockBetsGateway.emitMarketCreated).not.toHaveBeenCalled()
     })
 
     it('No debe filtrar por api_team_id al buscar partidos', async () => {
