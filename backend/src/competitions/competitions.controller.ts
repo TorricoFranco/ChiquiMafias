@@ -13,6 +13,8 @@ import { GetLiveScoresResponseDto } from 'src/fixture/dto/response/live-score.dt
 import { StandingsService } from 'src/standings/standings.service'
 import { FullStandingsResponseDto } from 'src/standings/dto/response/full-standings.dto'
 import { CompetitionsService } from './competitions.service'
+import { BracketService } from 'src/bracket/bracket.service'
+import { BracketResponseDto } from 'src/bracket/dto/bracket-response.dto'
 import { CompetitionResponseDto } from './dto/competition-response.dto'
 import { CompetitionMatchesQueryDto } from './dto/competition-matches-query.dto'
 
@@ -28,6 +30,7 @@ export class CompetitionsController {
     private readonly competitions: CompetitionsService,
     private readonly fixtures: FixtureService,
     private readonly standings: StandingsService,
+    private readonly bracket: BracketService,
   ) {}
 
   @Get()
@@ -95,5 +98,22 @@ export class CompetitionsController {
       )
     }
     return this.standings.getStandings(competition)
+  }
+
+  @Get(':slug/bracket')
+  @ApiOperation({
+    summary: 'Cuadro de la temporada actual',
+    description:
+      'Todas las llaves desde la primera ronda, con los lugares por definir y los marcadores en vivo.',
+  })
+  @ApiParam({ name: 'slug', example: 'copa-argentina' })
+  @ApiResponse({ status: 200, type: BracketResponseDto })
+  @ApiResponse({ status: 404, description: 'El formato no tiene cuadro' })
+  async bracketOf(@Param('slug') slug: string): Promise<BracketResponseDto> {
+    const competition = await this.competitions.resolveCurrent(slug)
+    if (!competition.strategy?.bracketRounds) {
+      throw new NotFoundException('Esta competición no tiene cuadro')
+    }
+    return this.bracket.getBracket(competition)
   }
 }

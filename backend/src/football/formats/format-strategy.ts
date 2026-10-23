@@ -8,6 +8,16 @@ export interface FixturesWindow {
   to: string
 }
 
+/** Una ronda de un cuadro de eliminación directa. */
+export interface BracketRound {
+  /** Partidos de la ronda: 32, 16, 8, 4, 2, 1. */
+  matches: number
+  /** Como se guarda en `Matches.round`: `32avos de final`. */
+  round: string
+  /** Clave corta: `32avos`, `final`. */
+  key: string
+}
+
 /** Fase y grupo de una fila de la tabla (`TeamSeasonStats`). */
 export interface StandingGroup {
   stage: string
@@ -37,4 +47,7 @@ export interface CompetitionFormatStrategy {
 
   /** Fase y grupo de una fila de la tabla. Sin este método no hay tabla. */
   mapStandingGroup?(rawGroup: string): StandingGroup
+
+  /** Rondas del cuadro, de la primera a la final. Sin esto no hay cuadro. */
+  readonly bracketRounds?: readonly BracketRound[]
 }
