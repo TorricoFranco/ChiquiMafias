@@ -157,6 +157,48 @@ describe('BetsCronService', () => {
       expect(data.options.create[1]).not.toHaveProperty('logoUrl')
     })
 
+    it('No debe filtrar por api_team_id al buscar partidos', async () => {
+      await runWith()
+
+      const where = firstArg(mockPrisma.matches.findMany).where
+      expect(where).not.toHaveProperty('home_team')
+      expect(where).not.toHaveProperty('away_team')
+    })
+
+    it('Con equipos sin ID de API-Football debe usar su escudo de Cloudinary', async () => {
+      const data = await runWith(
+        upcoming({
+          home_team: {
+            name: 'Midland',
+            short_code: null,
+            api_team_id: null,
+            logo_url:
+              'https://res.cloudinary.com/chiqui/image/upload/team_1.png',
+          },
+          away_team: {
+            name: 'Atlanta',
+            short_code: null,
+            api_team_id: null,
+            logo_url: null,
+          },
+        }),
+      )
+
+      expect(data.options.create[0]).toEqual({
+        name: 'Midland',
+        initialProb: 33,
+        logoUrl: 'https://res.cloudinary.com/chiqui/image/upload/team_1.png',
+      })
+      // Sin escudo: la opción va sin logoUrl y la metadata con null.
+      expect(data.options.create[2].logoUrl).toBeUndefined()
+      expect(data.metadata).toMatchObject({
+        homeTeam: {
+          logoUrl: 'https://res.cloudinary.com/chiqui/image/upload/team_1.png',
+        },
+        awayTeam: { logoUrl: null },
+      })
+    })
+
     it('Debe vincular el mercado al partido por matchId y titularlo con la competición', async () => {
       const data = await runWith()
 
