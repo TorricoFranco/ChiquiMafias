@@ -1,6 +1,7 @@
 import {
   computeSlots,
   KnockoutMatch,
+  layoutFromDraw,
   layoutFromMatches,
   matchWinner,
 } from './bracket-builder'
@@ -189,5 +190,144 @@ describe('layoutFromMatches y computeSlots (cuadro de 8, 3 rondas)', () => {
 
     expect(unplaced).toEqual([])
     expect(positions.flat().filter(Boolean)).toEqual([])
+  })
+})
+
+describe('layoutFromDraw (cuadro de 8, 3 rondas)', () => {
+  // Sorteo: llave 1 c-d, llave 2 a-b, llave 3 g-h, llave 4 e-f.
+  const pairs = [
+    ['c', 'd'],
+    ['a', 'b'],
+    ['g', 'h'],
+    ['e', 'f'],
+  ] as const
+
+  it('Debe ubicar cada partido en la llave que reúne a sus dos equipos', () => {
+    const { positions, unplaced } = layoutFromDraw(
+      [
+        match(1, 'a', 'b'),
+        match(1, 'e', 'f'),
+        match(2, 'a', 'c'),
+        match(3, 'e', 'a'),
+      ],
+      3,
+      pairs,
+    )
+
+    expect(unplaced).toEqual([])
+    expect(positions[1].map((m) => m?.id)).toEqual([
+      undefined,
+      'm1-a-b',
+      undefined,
+      'm1-e-f',
+    ])
+    expect(positions[2].map((m) => m?.id)).toEqual(['m2-a-c', undefined])
+    expect(positions[3].map((m) => m?.id)).toEqual(['m3-e-a'])
+  })
+
+  it('Un partido entre equipos que el sorteo no cruza en esa ronda queda aparte', () => {
+    // a y g recién se pueden cruzar en la final, no en semis.
+    const { unplaced } = layoutFromDraw([match(2, 'a', 'g')], 3, pairs)
+
+    expect(unplaced.map((m) => m.id)).toEqual(['m2-a-g'])
+  })
+
+  it('Un equipo que no está en el sorteo queda aparte', () => {
+    const { unplaced } = layoutFromDraw([match(1, 'a', 'z')], 3, pairs)
+
+    expect(unplaced.map((m) => m.id)).toEqual(['m1-a-z'])
+  })
+
+  it('Las llaves de primera ronda sin partido muestran los equipos del sorteo', () => {
+    const { positions } = layoutFromDraw([], 3, pairs)
+    const slots = computeSlots(positions, 3, new Map(), pairs)
+
+    expect(
+      slots
+        .filter((s) => s.roundOrder === 1)
+        .map((s) => [s.homeTeamId, s.awayTeamId]),
+    ).toEqual(pairs.map((p) => [...p]))
+  })
+})
+
+describe('llaves corregidas a mano', () => {
+  const fixed = (
+    roundOrder: number,
+    position: number,
+    home: string,
+    away: string,
+    winner: string | null,
+  ) => ({
+    roundOrder,
+    position,
+    matchId: null,
+    homeTeamId: home,
+    awayTeamId: away,
+    winnerTeamId: winner,
+  })
+
+  it('Sin sorteo, una llave corregida no hace desaparecer otro partido', () => {
+    // Solo primera ronda, por fecha: a-b, c-d, e-f, g-h. Se corrige la llave 1 (a-b).
+    const corrected = new Map([['1:1', fixed(1, 1, 'a', 'b', 'b')]])
+    const matches = [match(1, 'c', 'd'), match(1, 'e', 'f'), match(1, 'g', 'h')]
+
+    const { positions, unplaced } = layoutFromMatches(matches, 3, corrected)
+    const slots = computeSlots(positions, 3, corrected)
+
+    expect(unplaced).toEqual([])
+    expect(
+      slots
+        .filter((s) => s.roundOrder === 1)
+        .map((s) => [s.homeTeamId, s.awayTeamId]),
+    ).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+      ['e', 'f'],
+      ['g', 'h'],
+    ])
+    // Avanza el ganador de la corrección.
+    expect(
+      slots.find((s) => s.roundOrder === 2 && s.position === 1)?.homeTeamId,
+    ).toBe('b')
+  })
+
+  it('Una corrección en una ronda alta ubica debajo los partidos de sus equipos', () => {
+    // Semi corregida a-c (gana c): los cuartos de a y de c van debajo de ella.
+    const corrected = new Map([['2:1', fixed(2, 1, 'a', 'c', 'c')]])
+    const matches = [
+      match(1, 'e', 'f'),
+      match(1, 'c', 'd'),
+      match(1, 'a', 'b'),
+      match(1, 'g', 'h'),
+    ]
+
+    const { positions, unplaced } = layoutFromMatches(matches, 3, corrected)
+
+    expect(unplaced).toEqual([])
+    expect(positions[1].map((m) => m?.id)).toEqual([
+      'm1-a-b',
+      'm1-c-d',
+      'm1-e-f',
+      'm1-g-h',
+    ])
+    expect(computeSlots(positions, 3, corrected).at(-1)?.homeTeamId).toBe('c')
+  })
+
+  it('Con sorteo, un partido que cae en una llave corregida queda aparte', () => {
+    const pairs = [
+      ['a', 'b'],
+      ['c', 'd'],
+    ] as const
+    const corrected = new Map([['1:2', fixed(1, 2, 'c', 'd', 'd')]])
+
+    const { positions, unplaced } = layoutFromDraw(
+      [match(1, 'c', 'd'), match(1, 'a', 'b')],
+      2,
+      pairs,
+      corrected,
+    )
+
+    expect(unplaced.map((m) => m.id)).toEqual(['m1-c-d'])
+    expect(positions[1].map((m) => m?.id)).toEqual(['m1-a-b', undefined])
   })
 })

@@ -34,7 +34,11 @@ const matchRow = (
 
 describe('BracketService', () => {
   const tx = {
-    bracketSlot: { deleteMany: jest.fn(), createMany: jest.fn() },
+    bracketSlot: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+      update: jest.fn(),
+    },
   }
   const prisma = {
     competitionSeason: {
@@ -42,6 +46,7 @@ describe('BracketService', () => {
       findUniqueOrThrow: jest.fn(),
     },
     bracketSlot: { findMany: jest.fn() },
+    bracketDraw: { findUnique: jest.fn() },
     matches: { findMany: jest.fn() },
     $transaction: jest.fn((cb: (t: typeof tx) => unknown) =>
       Promise.resolve(cb(tx)),
@@ -67,6 +72,7 @@ describe('BracketService', () => {
     seq = 0
     prisma.competitionSeason.findUnique.mockResolvedValue(SEASON)
     prisma.bracketSlot.findMany.mockResolvedValue([])
+    prisma.bracketDraw.findUnique.mockResolvedValue(null)
     prisma.matches.findMany.mockResolvedValue([])
     redis.hgetall.mockResolvedValue({})
     service = new BracketService(prisma as never, { redis } as never)
@@ -109,6 +115,43 @@ describe('BracketService', () => {
       expect(redis.del).toHaveBeenCalledWith('bracket:v1:season-copa')
     })
 
+    it('Con sorteo cargado debe ordenar el cuadro según él', async () => {
+      // 32 cruces: el sorteo pone c-d arriba y a-b en el segundo lugar.
+      const pairs = [
+        ['c', 'd'],
+        ['a', 'b'],
+        ...Array.from({ length: 30 }, (_, i) => [`x${i}`, `y${i}`]),
+      ]
+      prisma.bracketDraw.findUnique.mockResolvedValue({ pairs })
+      prisma.matches.findMany.mockResolvedValue([
+        matchRow('32avos de final', 'a', 'b'),
+      ])
+
+      await service.syncSeason('season-copa')
+
+      const slots = createdSlots()
+      expect(
+        slots.find((s) => s.round_order === 1 && s.position === 2),
+      ).toEqual(
+        expect.objectContaining({ match_id: 'm-a-b', winner_team_id: 'a' }),
+      )
+      // Sin partido todavía, la llave 1 ya muestra los equipos del sorteo.
+      expect(
+        slots.find((s) => s.round_order === 1 && s.position === 1),
+      ).toEqual(
+        expect.objectContaining({
+          match_id: null,
+          home_team_id: 'c',
+          away_team_id: 'd',
+        }),
+      )
+      expect(
+        slots.find((s) => s.round_order === 2 && s.position === 1),
+      ).toEqual(
+        expect.objectContaining({ home_team_id: null, away_team_id: 'a' }),
+      )
+    })
+
     it('No debe hacer nada en un formato sin cuadro', async () => {
       prisma.competitionSeason.findUnique.mockResolvedValue({
         ...SEASON,
@@ -147,6 +190,81 @@ describe('BracketService', () => {
       expect(slots.find((s) => s.round_order === 6)).toEqual(
         expect.objectContaining({ home_team_id: 'b' }),
       )
+    })
+
+    it('Una llave corregida antes de que exista su partido debe tomarlo cuando aparece', async () => {
+      prisma.bracketSlot.findMany.mockResolvedValue([
+        {
+          round_order: 5,
+          position: 1,
+          match_id: null,
+          home_team_id: 'a',
+          away_team_id: 'b',
+          winner_team_id: null,
+          manually_corrected: true,
+        },
+      ])
+      prisma.matches.findMany.mockResolvedValue([
+        matchRow('Semifinal', 'b', 'a'),
+        matchRow('Semifinal', 'c', 'd'),
+      ])
+
+      await service.syncSeason('season-copa')
+
+      expect(tx.bracketSlot.update).toHaveBeenCalledWith({
+        where: {
+          competition_season_id_round_order_position: {
+            competition_season_id: 'season-copa',
+            round_order: 5,
+            position: 1,
+          },
+        },
+        data: { match_id: 'm-b-a' },
+      })
+      const slots = createdSlots()
+      // El partido no se duplica en otra llave y la otra semi sigue en su lugar.
+      expect(slots.filter((s) => s.match_id === 'm-b-a')).toEqual([])
+      expect(
+        slots.find((s) => s.round_order === 5 && s.position === 2),
+      ).toEqual(expect.objectContaining({ match_id: 'm-c-d' }))
+    })
+
+    it('Una corrección debe esperar a que termine el rearmado en curso', async () => {
+      const order: string[] = []
+      let release!: () => void
+      prisma.matches.findMany.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = () => {
+              order.push('rearmado')
+              resolve([])
+            }
+          }),
+      )
+
+      const sync = service.syncSeason('season-copa')
+      const correction = service.runExclusive('season-copa', () => {
+        order.push('corrección')
+        return Promise.resolve()
+      })
+      await new Promise((r) => setImmediate(r))
+      expect(order).toEqual([])
+
+      release()
+      await Promise.all([sync, correction])
+      expect(order).toEqual(['rearmado', 'corrección'])
+    })
+
+    it('Un error dentro del bloqueo no debe trabar las operaciones siguientes', async () => {
+      await expect(
+        service.runExclusive('season-copa', () =>
+          Promise.reject(new Error('falló')),
+        ),
+      ).rejects.toThrow('falló')
+
+      await expect(
+        service.runExclusive('season-copa', () => Promise.resolve('ok')),
+      ).resolves.toBe('ok')
     })
 
     it('Dos sincronizaciones juntas de la misma temporada deben correr una después de la otra', async () => {

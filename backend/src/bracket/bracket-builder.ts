@@ -68,10 +68,14 @@ const byDate = (a: KnockoutMatch, b: KnockoutMatch) =>
  * El cuadro queda con las llaves reales; puede quedar espejado respecto del
  * dibujo oficial. Devuelve el partido de cada llave, por ronda (índice 0 =
  * llave 1). Los que no entran en ningún lugar se devuelven aparte.
+ *
+ * Las llaves corregidas a mano quedan ocupadas: nunca se pisan, y los partidos
+ * de los que salieron sus equipos se ubican debajo de ellas.
  */
 export function layoutFromMatches(
   matches: KnockoutMatch[],
   roundCount: number,
+  corrected: CorrectedSlots = new Map(),
 ): { positions: (KnockoutMatch | null)[][]; unplaced: KnockoutMatch[] } {
   const byRound = new Map<number, KnockoutMatch[]>()
   for (const m of matches) {
@@ -90,13 +94,22 @@ export function layoutFromMatches(
   }
   const unplaced: KnockoutMatch[] = []
 
-  const rounds = [...byRound.keys()]
+  // Desde la ronda más alta con partidos o con una corrección: la corrección
+  // también reparte equipos hacia abajo.
+  const rounds = [
+    ...byRound.keys(),
+    ...[...corrected.values()].map((s) => s.roundOrder),
+  ].filter((r) => r >= 1 && r <= roundCount)
   if (rounds.length === 0) return { positions, unplaced }
   const top = Math.max(...rounds)
 
+  const isCorrected = (r: number, i: number) => corrected.has(`${r}:${i + 1}`)
+
   const placeInFree = (r: number, list: KnockoutMatch[], allowed: number[]) => {
     for (const m of list) {
-      const free = allowed.find((i) => positions[r][i] === null)
+      const free = allowed.find(
+        (i) => positions[r][i] === null && !isCorrected(r, i),
+      )
       if (free === undefined) unplaced.push(m)
       else positions[r][free] = m
     }
@@ -119,16 +132,76 @@ export function layoutFromMatches(
 
     const underEmptyParent: number[] = []
     positions[r + 1].forEach((parent, q) => {
-      if (!parent) {
-        underEmptyParent.push(2 * q, 2 * q + 1)
-        return
-      }
-      positions[r][2 * q] = take(parent.homeTeamId)
-      positions[r][2 * q + 1] = take(parent.awayTeamId)
+      // Una llave corregida reparte sus equipos como si tuviera partido.
+      const fixed = corrected.get(`${r + 1}:${q + 1}`)
+      const teams = fixed
+        ? [fixed.homeTeamId, fixed.awayTeamId]
+        : parent
+          ? [parent.homeTeamId, parent.awayTeamId]
+          : [null, null]
+      teams.forEach((teamId, side) => {
+        const child = 2 * q + side
+        if (isCorrected(r, child)) return
+        if (teamId) positions[r][child] = take(teamId)
+        else underEmptyParent.push(child)
+      })
     })
     placeInFree(r, pending, underEmptyParent)
   }
 
+  return { positions, unplaced }
+}
+
+/** Cruces de la primera ronda según el sorteo, de arriba hacia abajo: [local, visitante]. */
+export type DrawPairs = readonly (readonly [string, string])[]
+
+/** Llaves corregidas a mano, por `${ronda}:${lugar}`. */
+export type CorrectedSlots = Map<string, BracketSlotState>
+
+/**
+ * Ubica cada partido según el sorteo: la llave `p` de la ronda `r` reúne a los
+ * equipos de los cruces de primera ronda que cuelgan de ella, así que un
+ * partido va a la única llave que contiene a sus dos equipos. Si sus equipos
+ * no pueden cruzarse en esa ronda según el sorteo (o no están en él), o si su
+ * llave está corregida a mano, queda aparte para revisar.
+ */
+export function layoutFromDraw(
+  matches: KnockoutMatch[],
+  roundCount: number,
+  pairs: DrawPairs,
+  corrected: CorrectedSlots = new Map(),
+): { positions: (KnockoutMatch | null)[][]; unplaced: KnockoutMatch[] } {
+  const positions: (KnockoutMatch | null)[][] = []
+  for (let r = 1; r <= roundCount; r++) {
+    positions[r] = Array<KnockoutMatch | null>(
+      slotsInRound(roundCount, r),
+    ).fill(null)
+  }
+  const firstRoundIndex = new Map<string, number>()
+  pairs.forEach(([home, away], i) => {
+    firstRoundIndex.set(home, i)
+    firstRoundIndex.set(away, i)
+  })
+
+  const unplaced: KnockoutMatch[] = []
+  for (const m of [...matches].sort(byDate)) {
+    const h = firstRoundIndex.get(m.homeTeamId)
+    const a = firstRoundIndex.get(m.awayTeamId)
+    if (m.roundOrder < 1 || m.roundOrder > roundCount) continue
+    const size = 2 ** (m.roundOrder - 1)
+    const slot = h === undefined ? -1 : Math.floor(h / size)
+    if (
+      h === undefined ||
+      a === undefined ||
+      slot !== Math.floor(a / size) ||
+      positions[m.roundOrder][slot] !== null ||
+      corrected.has(`${m.roundOrder}:${slot + 1}`)
+    ) {
+      unplaced.push(m)
+      continue
+    }
+    positions[m.roundOrder][slot] = m
+  }
   return { positions, unplaced }
 }
 
@@ -139,8 +212,10 @@ export function layoutFromMatches(
 export function computeSlots(
   positions: (KnockoutMatch | null)[][],
   roundCount: number,
-  /** Llaves corregidas a mano por `${ronda}:${lugar}`: se respetan y su ganador avanza. */
-  corrected: Map<string, BracketSlotState> = new Map(),
+  /** Llaves corregidas a mano: se respetan y su ganador avanza. */
+  corrected: CorrectedSlots = new Map(),
+  /** Con sorteo, los equipos de las llaves de primera ronda que todavía no tienen partido. */
+  firstRoundPairs?: DrawPairs,
 ): BracketSlotState[] {
   const slots: BracketSlotState[][] = []
   for (let r = 1; r <= roundCount; r++) {
@@ -158,12 +233,13 @@ export function computeSlots(
         }
       }
       const children = r > 1 ? slots[r - 1] : null
+      const drawn = r === 1 ? firstRoundPairs?.[i] : undefined
       return {
         roundOrder: r,
         position: i + 1,
         matchId: null,
-        homeTeamId: children?.[2 * i]?.winnerTeamId ?? null,
-        awayTeamId: children?.[2 * i + 1]?.winnerTeamId ?? null,
+        homeTeamId: drawn?.[0] ?? children?.[2 * i]?.winnerTeamId ?? null,
+        awayTeamId: drawn?.[1] ?? children?.[2 * i + 1]?.winnerTeamId ?? null,
         winnerTeamId: null,
       }
     })

@@ -205,11 +205,54 @@ model CompetitionSeason {
   created_at             DateTime          @default(now())
   updated_at             DateTime          @updatedAt
 
-  league          Leagues       @relation("LeagueSeasons", fields: [league_id], references: [id])
-  currentOfLeague Leagues?      @relation("CurrentSeason")
+  league          Leagues            @relation("LeagueSeasons", fields: [league_id], references: [id])
+  currentOfLeague Leagues?           @relation("CurrentSeason")
   bracketSlots    BracketSlot[]
+  bracketDraw     BracketDraw?
+  bracketChanges  BracketChangeLog[]
 
   @@unique([league_id, season])
+}
+
+// Orden oficial de la primera ronda del cuadro (ERS §7.4). Se carga una vez por
+// temporada; sin sorteo, el cuadro se reconstruye desde lo jugado.
+model BracketDraw {
+  id                    String   @id @default(uuid())
+  competition_season_id String   @unique
+  /// Cruces de la primera ronda de arriba hacia abajo: [[localId, visitanteId], …].
+  pairs                 Json
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  competition_season CompetitionSeason @relation(fields: [competition_season_id], references: [id], onDelete: Cascade)
+}
+
+enum BracketChangeAction {
+  LOAD_DRAW
+  CORRECT_SLOT
+  CLEAR_CORRECTION
+}
+
+// Auditoría de la carga del sorteo y de las correcciones de llaves (RNF-S04).
+model BracketChangeLog {
+  id                    String              @id @default(uuid())
+  competition_season_id String
+  action                BracketChangeAction
+  round_order           Int?
+  position              Int?
+  before                Json?
+  after                 Json?
+  reason                String?
+  changedById           String?
+  changedBy             User?               @relation("BracketChanges", fields: [changedById], references: [id], onDelete: SetNull)
+  /// Snapshot del autor, para que el historial siga siendo legible si se borra el usuario.
+  changedByUsername     String
+  createdAt             DateTime            @default(now())
+
+  competition_season CompetitionSeason @relation(fields: [competition_season_id], references: [id], onDelete: Cascade)
+
+  @@index([competition_season_id, createdAt(sort: Desc)])
+  @@index([changedById])
 }
 
 // Una llave del cuadro de una temporada de eliminación directa (ERS §6.3).
@@ -570,7 +613,8 @@ model User {
   commentReactions CommentReaction[]
   coinOrders       CoinOrder[]
   /// Cambios de precio que aplicó como presidente.
-  priceChanges     PriceChangeLog[]  @relation("PriceChanges")
+  priceChanges     PriceChangeLog[]   @relation("PriceChanges")
+  bracketChanges   BracketChangeLog[] @relation("BracketChanges")
 
   @@map("users")
 }
