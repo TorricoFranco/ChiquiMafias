@@ -60,11 +60,13 @@ describe('CompetitionsService', () => {
     )
   })
 
-  it('Debe incluir la estrategia solo si el formato la tiene', async () => {
+  it('Debe incluir la estrategia del formato', async () => {
     expect(
       (await service.resolveCurrent('liga-profesional')).strategy?.stages,
     ).toEqual(['APERTURA', 'CLAUSURA'])
-    expect((await service.resolveCurrent('copa-argentina')).strategy).toBeNull()
+    expect(
+      (await service.resolveCurrent('copa-argentina')).strategy?.stages,
+    ).toEqual(['ELIMINACION'])
   })
 
   it.each([

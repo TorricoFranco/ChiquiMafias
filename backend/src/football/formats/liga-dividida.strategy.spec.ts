@@ -62,7 +62,7 @@ describe('ligaDivididaStrategy', () => {
   })
 
   it('Los formatos sin implementar no deben tener estrategia', () => {
-    expect(getFormatStrategy('ELIMINACION')).toBeNull()
+    expect(getFormatStrategy('GRUPOS_Y_ELIMINACION')).toBeNull()
   })
 
   it('Debe pedir del día de hace 10 días al de dentro de 7', () => {

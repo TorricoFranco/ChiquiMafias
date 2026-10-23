@@ -1,11 +1,13 @@
 import { CompetitionFormat } from '@prisma/client'
 import { CompetitionFormatStrategy } from './format-strategy'
+import { eliminacionStrategy } from './eliminacion.strategy'
 import { ligaDivididaStrategy } from './liga-dividida.strategy'
 
 const STRATEGIES: Partial<
   Record<CompetitionFormat, CompetitionFormatStrategy>
 > = {
   [CompetitionFormat.LIGA_DIVIDIDA]: ligaDivididaStrategy,
+  [CompetitionFormat.ELIMINACION]: eliminacionStrategy,
 }
 
 /**

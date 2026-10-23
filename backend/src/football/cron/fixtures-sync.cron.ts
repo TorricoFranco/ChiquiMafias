@@ -103,7 +103,7 @@ export class FixturesSyncCron {
     const fixtures = await this.provider.getFixtures({
       leagueExternalId,
       season: season.season,
-      ...strategy.fixturesWindow(now),
+      ...strategy.fixturesWindow(now, season.season),
     })
 
     this.logger.debug(

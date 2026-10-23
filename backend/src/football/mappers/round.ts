@@ -1,7 +1,8 @@
 export interface ResolvedRound {
   /** Ronda traducida, tal como se guarda en `Matches.round`. */
   round: string
-  tournament: 'APERTURA' | 'CLAUSURA'
+  /** Fase, como se guarda en `Matches.tournament`: APERTURA, CLAUSURA, ELIMINACION. */
+  tournament: string
   /** Parte de la clave de caché de la fecha: `fecha:9`, `final`, `octavos`… */
   matchdayKey: string
 }

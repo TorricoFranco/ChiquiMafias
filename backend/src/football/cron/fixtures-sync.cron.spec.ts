@@ -366,7 +366,10 @@ describe('FixturesSyncCron', () => {
 
     it('Debe saltear sin reclamar una temporada con un formato sin estrategia', async () => {
       prisma.competitionSeason.findMany.mockResolvedValue([
-        ligaSeason({ id: 'season-copa', format: 'ELIMINACION' }),
+        ligaSeason({
+          id: 'season-libertadores',
+          format: 'GRUPOS_Y_ELIMINACION',
+        }),
       ])
 
       await cron.handle()
