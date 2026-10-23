@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { competitionsApi } from '../api/competitionsApi';
 import { LEAGUE_SLUG } from '../constants';
-import type { Competition } from '../types';
+import type { BracketResponse, Competition, CompetitionMatchesResponse } from '../types';
 
 export const competitionKeys = {
   all: ['competitions'] as const,
+  bracket: (slug: string) => ['competitions', slug, 'bracket'] as const,
+  roundMatches: (slug: string, round: string) =>
+    ['competitions', slug, 'matches', round] as const,
 };
 
 /** Las competiciones cambian muy de vez en cuando (alta de temporada). */
@@ -49,3 +52,22 @@ export const useCurrentSeason = (slug: string) => {
 
 /** Etiqueta de la temporada actual de la Liga (`2026`); vacía mientras carga. */
 export const useLeagueSeasonLabel = () => useCurrentSeason(LEAGUE_SLUG).label;
+
+/** Cuadro de una competición de eliminación directa. */
+export const useCompetitionBracket = (slug: string, enabled = true) =>
+  useQuery<BracketResponse, Error>({
+    queryKey: competitionKeys.bracket(slug),
+    queryFn: () => competitionsApi.bracket(slug),
+    staleTime: 60 * 1000,
+    enabled: !!slug && enabled,
+  });
+
+/** Partidos de una ronda (por su nombre, `32avos de final`). */
+export const useRoundMatches = (slug: string, round: string | null) =>
+  useQuery<CompetitionMatchesResponse, Error>({
+    queryKey: competitionKeys.roundMatches(slug, round ?? ''),
+    queryFn: () => competitionsApi.matchesOfRound(slug, round!),
+    staleTime: 60 * 1000,
+    enabled: !!slug && !!round,
+  });
+

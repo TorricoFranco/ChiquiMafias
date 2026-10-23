@@ -136,6 +136,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
                                 events={matchDetails.events}
                                 homeTeam={matchDetails.teams.home}
                                 awayTeam={matchDetails.teams.away}
+                                neutralVenue={matchDetails.competition?.neutralVenue}
                             />
                             {matchDetails.stats && matchDetails.stats.length > 0 && (
                                 <MatchStats
