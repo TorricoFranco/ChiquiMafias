@@ -19,6 +19,7 @@ import {
   HlTeamBasic,
   HlTeamStatistics,
 } from './raw/highlightly.raw'
+import { warnUnmapped } from './highlightly.diagnostics'
 
 // Highlightly usa otro vocabulario que el que guarda la DB y lee el front. Todo
 // lo que sigue traduce a los códigos canónicos descriptos en football.types.ts.
@@ -46,9 +47,10 @@ const STATUS_BY_DESCRIPTION: Record<string, string> = {
 }
 
 export function mapStatusShort(description: string | null | undefined) {
-  return (
-    STATUS_BY_DESCRIPTION[(description ?? '').trim().toLowerCase()] ?? 'TBD'
-  )
+  const key = (description ?? '').trim().toLowerCase()
+  const short = STATUS_BY_DESCRIPTION[key]
+  if (short === undefined && key) warnUnmapped('Estado', key)
+  return short ?? 'TBD'
 }
 
 const isKnownStatus = (description: string | null | undefined) =>
@@ -220,6 +222,8 @@ export function mapEvents(raw: HlEvent[]): FootballEvent[] {
         if (key in VAR_DETAILS) {
           type = 'Var'
           detail = VAR_DETAILS[key]
+        } else {
+          warnUnmapped('Evento', key, `minuto ${e.time}`)
         }
     }
 
@@ -305,10 +309,41 @@ const pct = (value: number | null) =>
  * Devuelve las claves que lee el front (las de API-Football en snake_case) en
  * un orden fijo, así `StatsSyncCron` puede comparar con `JSON.stringify`.
  */
+const KNOWN_STATISTICS = [
+  'shots on target',
+  'shots off target',
+  'blocked shots',
+  'shots within penalty area',
+  'shots outside penalty area',
+  'fouls',
+  'corners',
+  'offsides',
+  'possession',
+  'yellow cards',
+  'red cards',
+  'goalkeeper saves',
+  'total passes',
+  'successful passes',
+  'expected goals',
+]
+
 export function mapStatistics(raw: HlTeamStatistics): FootballTeamStatistics {
   const byName = new Map<string, number | string | null>()
   for (const s of raw.statistics ?? []) {
     byName.set(s.displayName.trim().toLowerCase(), s.value)
+  }
+  // Una estadística que esperamos y no vino suele ser un nombre cambiado: el
+  // aviso lista los nombres recibidos para encontrarlo.
+  if (byName.size > 0) {
+    for (const name of KNOWN_STATISTICS) {
+      if (!byName.has(name)) {
+        warnUnmapped(
+          'Estadística',
+          name,
+          `recibidas: ${[...byName.keys()].join(', ')}`,
+        )
+      }
+    }
   }
   const get = (name: string) => num(byName.get(name))
 

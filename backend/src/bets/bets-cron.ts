@@ -57,9 +57,7 @@ export class BetsCronService {
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async handleMarketAutoCreation() {
-    this.logger.log(
-      '=== [CRON] Buscando partidos para mercados de apuestas ===',
-    )
+    this.logger.debug('[APUESTAS] Buscando partidos para abrir mercados')
 
     const now = new Date()
     const endWindow = new Date(now.getTime() + this.FOUR_HOURS)
@@ -72,7 +70,9 @@ export class BetsCronService {
     })
 
     if (seasonsWithBets.length === 0) {
-      this.logger.log('[CRON] Ninguna competición tiene apuestas activadas.')
+      this.logger.debug(
+        '[APUESTAS] Ninguna competición tiene apuestas activadas.',
+      )
       return
     }
 
@@ -97,8 +97,8 @@ export class BetsCronService {
     })
 
     if (upcomingMatches.length === 0) {
-      this.logger.log(
-        '[CRON] No hay partidos próximos que requieran abrir mercados.',
+      this.logger.debug(
+        '[APUESTAS] No hay partidos próximos que requieran abrir mercados.',
       )
       return
     }
@@ -110,13 +110,13 @@ export class BetsCronService {
     for (const match of upcomingMatches) {
       if (!externalIds.has(match.id)) {
         this.logger.warn(
-          `[AUTO-MARKET] Partido ${match.id} sin ID en el proveedor: no se abre mercado`,
+          `[APUESTAS] ${match.home_team.name} vs ${match.away_team.name} (partido ${match.id}) sin ID en el proveedor: no se abre mercado`,
         )
         continue
       }
       try {
-        this.logger.log(
-          `[AUTO-MARKET] Generando pozo para: ${match.home_team.name} vs ${match.away_team.name}`,
+        this.logger.debug(
+          `[APUESTAS] Generando pozo para: ${match.home_team.name} vs ${match.away_team.name}`,
         )
 
         const initialProbabilities = { home: 33, draw: 34, away: 33 }
@@ -190,7 +190,7 @@ export class BetsCronService {
 
         if (!newMarketCreated) {
           this.logger.log(
-            `[AUTO-MARKET] Otra corrida ya abrió el mercado del partido ${match.id}; se saltea.`,
+            `[APUESTAS] Otra corrida ya abrió el mercado del partido ${match.id}; se saltea.`,
           )
           continue
         }
@@ -221,7 +221,7 @@ export class BetsCronService {
         }
 
         this.logger.log(
-          `[AUTO-MARKET] Mercado creado exitosamente [partido ${match.id}]`,
+          `[APUESTAS] Mercado abierto: ${newMarketCreated.title} · cierra ${closesAt.toISOString()} [partido ${match.id}]`,
         )
 
         this.betsGateway.emitMarketCreated(
@@ -229,7 +229,7 @@ export class BetsCronService {
         )
       } catch (error: any) {
         this.logger.error(
-          `Error al crear mercado automático para el partido ID: ${match.id}`,
+          `[APUESTAS] Error al crear mercado automático para el partido ID: ${match.id}`,
           error.stack,
         )
       }
@@ -253,7 +253,7 @@ export class BetsCronService {
     const [byTime, byMatchStarted] = await Promise.all([
       this.prisma.market.findMany({
         where: { status: 'OPEN', closesAt: { lte: now } },
-        select: { id: true },
+        select: { id: true, title: true },
       }),
       this.prisma.market.findMany({
         where: {
@@ -261,31 +261,27 @@ export class BetsCronService {
           isManual: false,
           match: { status_short: { notIn: NOT_STARTED_STATUSES } },
         },
-        select: { id: true },
+        select: { id: true, title: true },
       }),
     ])
 
-    const toLock = new Set([...byTime, ...byMatchStarted].map((m) => m.id))
-
-    if (toLock.size > 0) {
-      this.logger.log(
-        `[CRON] Bloqueando ${toLock.size} mercados que entraron en juego`,
-      )
-    }
+    const toLock = new Map(
+      [...byTime, ...byMatchStarted].map((m) => [m.id, m.title]),
+    )
 
     // Un error en un mercado no puede dejar abiertos a los demás.
-    for (const marketId of toLock) {
+    for (const [marketId, title] of toLock) {
       try {
-        await this.lockMarket(marketId)
+        await this.lockMarket(marketId, title)
       } catch (error) {
         this.logger.error(
-          `Error al bloquear el mercado ${marketId}`,
+          `[APUESTAS] Error al bloquear el mercado ${title} (${marketId})`,
           error instanceof Error ? error.stack : String(error),
         )
       }
     }
 
-    await this.rescheduleOpenMarkets(now, toLock)
+    await this.rescheduleOpenMarkets(now, new Set(toLock.keys()))
   }
 
   /**
@@ -293,7 +289,7 @@ export class BetsCronService {
    *  la base con update condicional. Si la base falla, el mercado ya no acepta
    *  apuestas y el próximo ciclo completa el cierre.
    */
-  private async lockMarket(marketId: string) {
+  private async lockMarket(marketId: string, title: string) {
     await this.redisService.redis.eval(
       LOCK_MARKET_LUA_SCRIPT,
       1,
@@ -307,6 +303,7 @@ export class BetsCronService {
     })
 
     if (count > 0) {
+      this.logger.log(`[APUESTAS] Mercado cerrado: ${title} (${marketId})`)
       this.betsGateway.emitMarketStatusChange(marketId, 'LOCKED')
     }
   }
@@ -321,6 +318,7 @@ export class BetsCronService {
       where: { status: 'OPEN', isManual: false, matchId: { not: null } },
       select: {
         id: true,
+        title: true,
         closesAt: true,
         match: { select: { date: true } },
       },
@@ -336,7 +334,7 @@ export class BetsCronService {
 
       try {
         if (closesAt <= now) {
-          await this.lockMarket(market.id)
+          await this.lockMarket(market.id, market.title)
           continue
         }
 
@@ -353,12 +351,12 @@ export class BetsCronService {
 
         if (count > 0) {
           this.logger.log(
-            `[CRON] Mercado ${market.id} reprogramado: cierra ${closesAt.toISOString()}`,
+            `[APUESTAS] Mercado reprogramado: ${market.title} · cierra ${closesAt.toISOString()} (${market.id})`,
           )
         }
       } catch (error) {
         this.logger.error(
-          `Error al reprogramar el mercado ${market.id}`,
+          `[APUESTAS] Error al reprogramar el mercado ${market.title} (${market.id})`,
           error instanceof Error ? error.stack : String(error),
         )
       }
@@ -421,7 +419,7 @@ export class BetsCronService {
 
         if (!match) {
           this.logger.warn(
-            `[SETTLEMENT] No se encontró el partido ${market.matchId ?? market.fixtureId} del mercado ${market.id}`,
+            `[APUESTAS] No se encontró el partido ${market.matchId ?? market.fixtureId} del mercado ${market.title} (${market.id})`,
           )
           continue
         }
@@ -447,7 +445,7 @@ export class BetsCronService {
 
         if (outcome === 'VOID') {
           this.logger.warn(
-            `Partido ${market.title} quedó en ${match.status_short}. Ejecutando REEMBOLSO masivo`,
+            `[APUESTAS] Reembolso: ${market.title} quedó en ${match.status_short}${rescheduledAfterLock ? ' (reprogramado después del cierre)' : ''} (${market.id})`,
           )
           await this.betsService.settleMarket(market.id, {
             status: 'REFUNDED',
@@ -466,13 +464,13 @@ export class BetsCronService {
 
         if (!winningOption) {
           this.logger.error(
-            `[SETTLEMENT] El mercado ${market.id} no tiene la opción "${winnerName}". Queda LOCKED para revisión manual`,
+            `[APUESTAS] El mercado ${market.title} (${market.id}) no tiene la opción "${winnerName}". Queda LOCKED para revisión manual`,
           )
           continue
         }
 
         this.logger.log(
-          `Liquidando mercado ${market.title}. Ganador: ${winnerName}`,
+          `[APUESTAS] Liquidando: ${market.title} · ${match.home_goals}-${match.away_goals} ${match.status_short} · ganador ${winnerName} (${market.id})`,
         )
 
         await this.betsService.settleMarket(market.id, {
@@ -481,7 +479,7 @@ export class BetsCronService {
         })
       } catch (error) {
         this.logger.error(
-          `Error al liquidar el mercado ${market.id}`,
+          `[APUESTAS] Error al liquidar el mercado ${market.title} (${market.id})`,
           error instanceof Error ? error.stack : String(error),
         )
       }
