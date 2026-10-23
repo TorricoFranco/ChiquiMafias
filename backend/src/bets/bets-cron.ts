@@ -126,6 +126,15 @@ export class BetsCronService {
         const competitionName = match.league.short_name ?? match.league.name
 
         const newMarketCreated = await this.prisma.$transaction(async (tx) => {
+          // Reclamo del partido antes de crear: si dos corridas se pisan (otra
+          // instancia del backend, o una corrida de más de 30 min), la segunda
+          // encuentra market_created en true y no abre un segundo pozo.
+          const claimed = await tx.matches.updateMany({
+            where: { id: match.id, market_created: false },
+            data: { market_created: true },
+          })
+          if (claimed.count === 0) return null
+
           const market = await tx.market.create({
             data: {
               title: `${match.home_team.name} vs ${match.away_team.name} - ${competitionName}`,
@@ -176,13 +185,15 @@ export class BetsCronService {
             include: { options: true },
           })
 
-          await tx.matches.update({
-            where: { id: match.id },
-            data: { market_created: true },
-          })
-
           return market
         })
+
+        if (!newMarketCreated) {
+          this.logger.log(
+            `[AUTO-MARKET] Otra corrida ya abrió el mercado del partido ${match.id}; se saltea.`,
+          )
+          continue
+        }
 
         const redis = this.redisService.redis
         const marketKey = `market:${newMarketCreated.id}`
