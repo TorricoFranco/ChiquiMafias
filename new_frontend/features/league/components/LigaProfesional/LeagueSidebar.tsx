@@ -10,6 +10,18 @@ import { SidebarNavigation } from '../sidebar/SidebarNavigation';
 import { SimulationBadge } from '../sidebar/SimulationBadge';
 import { ComingSoonState } from '../sidebar/ComingSoonState';
 import { SidebarFooter } from '../sidebar/SidebarFooter';
+import { LEAGUE_SLUG } from '@/features/competitions/constants';
+import { useCompetitions } from '@/features/competitions/hooks/useCompetitions';
+
+/**
+ * Competiciones que todavía no están en la API: se muestran como "próximamente".
+ * Cuando una aparece en `GET /competitions`, pasa a salir de ahí.
+ */
+const UPCOMING_COMPETITIONS = [
+  { slug: 'primera-nacional', label: 'Primera Nacional' },
+  { slug: 'copa-libertadores', label: 'Libertadores' },
+  { slug: 'copa-sudamericana', label: 'Sudamericana' },
+];
 
 interface LeagueSidebarProps {
   activeTournament: TournamentType;
@@ -29,14 +41,22 @@ interface LeagueSidebarProps {
 }
 
 export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
-  const isLPF = props.selectedLeagueId === 'lpf-2026';
+  const isLPF = props.selectedLeagueId === LEAGUE_SLUG;
+  const { data: competitions = [] } = useCompetitions();
+  const fromApi = competitions
+    .filter((c) => c.slug !== LEAGUE_SLUG)
+    .map((c) => ({ slug: c.slug, label: c.shortName ?? c.name }));
+  const otherCompetitions = [
+    ...fromApi,
+    ...UPCOMING_COMPETITIONS.filter((u) => !fromApi.some((c) => c.slug === u.slug)),
+  ];
 
   const [isLpfExpanded, setIsLpfExpanded] = useState(isLPF);
 
   const handleLeagueClick = (leagueId: string) => {
     props.onSelectLeague(leagueId);
 
-    if (leagueId === 'lpf-2026') {
+    if (leagueId === LEAGUE_SLUG) {
       setIsLpfExpanded(!isLpfExpanded);
     } else {
       setIsLpfExpanded(false);
@@ -58,7 +78,7 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
 
         <div className="flex flex-col mb-1">
           <button
-            onClick={() => handleLeagueClick('lpf-2026')}
+            onClick={() => handleLeagueClick(LEAGUE_SLUG)}
             className={`w-full flex items-center justify-between p-2 rounded-lg font-medium transition-colors ${isLPF ? 'text-[#d2f000]' : 'text-[#e5e2e1] hover:bg-[#2a2a2a]'
               }`}
           >
@@ -101,33 +121,20 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
           )}
         </div>
 
-        <button
-          onClick={() => handleLeagueClick('primera-nacional')}
-          className={`w-full flex items-center p-2 rounded-lg font-medium transition-colors mb-1 ${props.selectedLeagueId === 'primera-nacional' ? 'text-[#d2f000]' : 'text-[#e5e2e1] hover:bg-[#2a2a2a]'
-            }`}
-        >
-          Primera Nacional
-        </button>
-
-        <button
-          onClick={() => handleLeagueClick('libertadores')}
-          className={`w-full flex items-center p-2 rounded-lg font-medium transition-colors mb-1 ${props.selectedLeagueId === 'libertadores' ? 'text-[#d2f000]' : 'text-[#e5e2e1] hover:bg-[#2a2a2a]'
-            }`}
-        >
-          Libertadores
-        </button>
-
-        <button
-          onClick={() => handleLeagueClick('sudamericana')}
-          className={`w-full flex items-center p-2 rounded-lg font-medium transition-colors ${props.selectedLeagueId === 'sudamericana' ? 'text-[#d2f000]' : 'text-[#e5e2e1] hover:bg-[#2a2a2a]'
-            }`}
-        >
-          Sudamericana
-        </button>
+        {otherCompetitions.map((competition) => (
+          <button
+            key={competition.slug}
+            onClick={() => handleLeagueClick(competition.slug)}
+            className={`w-full flex items-center p-2 rounded-lg font-medium transition-colors mb-1 ${props.selectedLeagueId === competition.slug ? 'text-[#d2f000]' : 'text-[#e5e2e1] hover:bg-[#2a2a2a]'
+              }`}
+          >
+            {competition.label}
+          </button>
+        ))}
 
         {!isLPF && (
           <div className="mt-6">
-            <ComingSoonState onBackToLPF={() => handleLeagueClick('lpf-2026')} />
+            <ComingSoonState onBackToLPF={() => handleLeagueClick(LEAGUE_SLUG)} />
           </div>
         )}
       </div>

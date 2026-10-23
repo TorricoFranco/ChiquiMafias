@@ -9,7 +9,7 @@ import { BASE_URL } from "../../../support/env";
 import { ChatPanel } from "../../../pages/chat-panel";
 
 function mockMatch(api: ApiMock, match: MatchDetails) {
-  api.on("GET", "/matches/leagues/:leagueId/seasons/:season/matches/:matchId", match);
+  api.on("GET", "/matches/:matchId", match);
   api.on("GET", "/matches/pre-match/:matchId", buildPreMatch());
 }
 
@@ -108,7 +108,7 @@ test.describe("Detalle de partido", () => {
   test("si el detalle no carga se puede reintentar", async ({ page, api }) => {
     const match = buildMatchDetails();
     let available = false;
-    api.handle("GET", "/matches/leagues/:leagueId/seasons/:season/matches/:matchId", () =>
+    api.handle("GET", "/matches/:matchId", () =>
       available ? { body: match } : { status: 503, body: { statusCode: 503, message: "Servicio de partidos no disponible" } },
     );
     api.on("GET", "/matches/pre-match/:matchId", buildPreMatch());

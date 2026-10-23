@@ -1,4 +1,5 @@
 import { buildCalendar } from "../factories/fixtures";
+import { buildCompetition } from "../factories/competitions";
 import { buildCheckIn } from "../factories/stats";
 import type { ApiMock } from "./api-mock";
 import type { MockSession } from "./session";
@@ -23,5 +24,6 @@ export function installDefaults(api: ApiMock, session: MockSession) {
   api.on("GET", "/teams", []);
 
   api.on("GET", "/fixtures/seasons/:season/calendar", (req) => buildCalendar({}, req.params.season));
-  api.on("GET", "/fixtures/live-scores", []);
+  api.on("GET", "/competitions", () => [buildCompetition()]);
+  api.on("GET", "/competitions/:slug/live", []);
 }

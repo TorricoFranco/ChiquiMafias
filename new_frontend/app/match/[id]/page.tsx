@@ -7,6 +7,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { LeagueSidebar } from '@/features/league/components/LigaProfesional/LeagueSidebar';
 import { TournamentType, ZoneType } from '@/features/league/type';
+import { LEAGUE_SLUG } from '@/features/competitions/constants';
 
 export default function FullMatchPage() {
   const params = useParams();
@@ -14,7 +15,7 @@ export default function FullMatchPage() {
   const matchId = params.id as string;
 
   // 1. Mismos estados que maneja LeagueView
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>('lpf-2026');
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>(LEAGUE_SLUG);
   const [activeTournament, setActiveTournament] = useState<TournamentType>('CLAUSURA');
   const [activeZone, setActiveZone] = useState<ZoneType>('A');
   const [isBracketOpen, setIsBracketOpen] = useState(false);
@@ -66,8 +67,6 @@ export default function FullMatchPage() {
             <div className="p-4 md:p-6 lg:p-8 flex-1">
               <MatchDetailView
                 matchId={matchId}
-                leagueId={selectedLeagueId === 'lpf-2026' ? "6a2a03c5-1054-49e4-96c3-afd2bca9ebd7" : selectedLeagueId}
-                season="2026"
                 onBack={() => router.push('/')}
               />
             </div>

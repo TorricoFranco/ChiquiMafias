@@ -5,11 +5,12 @@ import { useLiveScores } from '../hooks/useFixture';
 import { formatToMapFixtureSocket } from '../utils/formatToMapFixtureSocket';
 import type { LeagueLiveUpdate, LiveResult } from '../types';
 
-export const useLeagueLive = (leagueId: string) => {
+/** Marcadores en vivo de una competición: los iniciales por REST y después por socket. */
+export const useLeagueLive = (slug: string) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const { accessToken } = useUserStore(); 
 
-  const { data: initialLive, isLoading } = useLiveScores();
+  const { data: initialLive, isLoading } = useLiveScores(slug);
   const [liveResults, setLiveResults] = useState<Record<string, LiveResult>>(() =>
     initialLive ? formatToMapFixtureSocket(initialLive) : {}
   );
@@ -27,7 +28,7 @@ export const useLeagueLive = (leagueId: string) => {
   }
 
   useEffect(() => {
-    if (!leagueId) return;
+    if (!slug) return;
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -40,7 +41,7 @@ export const useLeagueLive = (leagueId: string) => {
 
     wsSocket.on("connect", () => {
       console.log(`✅ Conectado al socket de ligas`);
-      wsSocket.emit('join_league', { leagueId });
+      wsSocket.emit('join_competition', { slug });
     });
 
     wsSocket.on("disconnect", () => {
@@ -52,11 +53,11 @@ export const useLeagueLive = (leagueId: string) => {
 
     return () => {
       if (wsSocket.connected) {
-        wsSocket.emit('leave_league', { leagueId });
+        wsSocket.emit('leave_competition', { slug });
       }
       wsSocket.disconnect();
     };
-  }, [accessToken, leagueId]);
+  }, [accessToken, slug]);
 
   const handleLeagueUpdate = useCallback((matches: Record<string, LeagueLiveUpdate>) => {
     console.log('🏆 on_league_update payload:', matches); 

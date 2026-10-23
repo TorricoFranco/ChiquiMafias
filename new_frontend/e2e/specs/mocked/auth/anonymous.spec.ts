@@ -4,7 +4,7 @@ test.describe("Visitante sin sesión", () => {
   test("no pide datos que requieren sesión al cargar la home", { tag: ["@p0", "@mobile"] }, async ({ app, api }) => {
     await app.open();
     await expect(app.loginButton).toBeVisible();
-    await api.waitFor("GET", "/fixtures/live-scores", { includePast: true });
+    await api.waitFor("GET", "/competitions/:slug/live", { includePast: true });
 
     const paths = (method: "GET" | "POST", pattern: string) => api.requests(method, pattern).map((req) => req.path);
     expect(paths("GET", "/inventory")).toHaveLength(0);

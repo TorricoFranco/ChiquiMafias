@@ -58,7 +58,7 @@ test.describe("Accesibilidad (axe, WCAG 2.1 AA)", () => {
 
   test("detalle de partido", async ({ page, api }, testInfo) => {
     const match = buildMatchDetails();
-    api.on("GET", "/matches/leagues/:leagueId/seasons/:season/matches/:matchId", match);
+    api.on("GET", "/matches/:matchId", match);
     api.on("GET", "/matches/pre-match/:matchId", buildPreMatch());
 
     await page.goto(`/match/${match.metadata.id}`);

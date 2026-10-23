@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fixturesApi } from '../api/fixtureApi';
+import { competitionsApi } from '@/features/competitions/api/competitionsApi';
 import {
   GetFixtureMatchdayResponse,
   GetYearlyCalendarResponse,
@@ -105,10 +106,11 @@ export const usePendingFixtures = (season: string, tournament: string) => {
   });
 };
 
-export const useLiveScores = () => {
+export const useLiveScores = (slug: string) => {
   return useQuery<GetLiveScoresResponse[], Error>({
-    queryKey: [...fixtureKeys.all, 'live-scores'],
-    queryFn: () => fixturesApi.getLiveScores(),
+    queryKey: [...fixtureKeys.all, 'live-scores', slug],
+    queryFn: () => competitionsApi.live(slug),
     staleTime: 1 * MINUTE,
+    enabled: !!slug,
   });
 };

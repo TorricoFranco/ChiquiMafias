@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trophy, X } from 'lucide-react';
+import { useLeagueSeasonLabel } from '@/features/competitions/hooks/useCompetitions';
 
 interface SidebarHeaderProps {
     isOpenMobile: boolean;
@@ -10,6 +11,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     isOpenMobile,
     onCloseMobile,
 }) => {
+    const seasonLabel = useLeagueSeasonLabel();
     return (
         <div className="px-1 pb-2 border-b border-[#353534]/70 flex justify-between items-center">
             <div className="flex items-center gap-2">
@@ -21,7 +23,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
                         DASHBOARD LIGAS
                     </h2>
                     <p className="text-[10px] text-[#c6c9ab] font-medium">
-                        Temporada Oficial 2026
+                        Temporada Oficial {seasonLabel}
                     </p>
                 </div>
             </div>

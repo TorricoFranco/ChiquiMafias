@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trophy, GitBranch, Radio } from 'lucide-react';
+import { useLeagueSeasonLabel } from '@/features/competitions/hooks/useCompetitions';
 
 interface HeaderLeagueProps {
   onOpenBrackets: () => void;
@@ -10,6 +11,7 @@ export const HeaderLeague: React.FC<HeaderLeagueProps> = ({
   onOpenBrackets,
   hasLiveMatches,
 }) => {
+  const seasonLabel = useLeagueSeasonLabel();
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-[#1c1b1b] via-[#222221] to-[#1c1b1b] border border-[#353534] rounded-2xl p-4 sm:p-6 shadow-xl">
       <div className="flex items-start gap-3.5">
@@ -20,7 +22,7 @@ export const HeaderLeague: React.FC<HeaderLeagueProps> = ({
         <div className="flex flex-col">
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-black text-[#e5e2e1] uppercase tracking-tight">
-              Clasificación LPF 2026
+              Clasificación LPF {seasonLabel}
             </h1>
             {hasLiveMatches && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-extrabold tracking-wider animate-pulse">

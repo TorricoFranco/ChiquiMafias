@@ -3,13 +3,14 @@ import { LeagueSidebar } from './LigaProfesional/LeagueSidebar';
 import { LigaProfesionalView } from './LigaProfesional/LigaProfesionalView';
 import { UpcomingCompetitionView } from './UpcomingCompetitionView';
 import { TournamentType, ZoneType } from '../type';
+import { LEAGUE_SLUG } from '@/features/competitions/constants';
 
 interface LeagueViewProps {
   onSwitchToSocial: () => void;
 }
 
 export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>('lpf-2026');
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>(LEAGUE_SLUG);
 
   const [activeTournament, setActiveTournament] = useState<TournamentType>('CLAUSURA');
   const [activeZone, setActiveZone] = useState<ZoneType>('A');
@@ -51,7 +52,7 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
       </button>
       <div className="flex-1 w-full md:pl-64 overflow-y-auto bg-[#131313]">
         <div className="p-4 md:p-6 lg:p-8 min-h-full">
-          {selectedLeagueId === 'lpf-2026' ? (
+          {selectedLeagueId === LEAGUE_SLUG ? (
             <LigaProfesionalView
               externalTournament={activeTournament}
               onChangeTournament={setActiveTournament}
@@ -64,7 +65,7 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
           ) : (
             <UpcomingCompetitionView
               competitionId={selectedLeagueId}
-              onBackToLPF={() => setSelectedLeagueId('lpf-2026')}
+              onBackToLPF={() => setSelectedLeagueId(LEAGUE_SLUG)}
             />
           )}
         </div>

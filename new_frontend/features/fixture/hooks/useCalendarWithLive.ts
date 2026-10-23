@@ -3,7 +3,7 @@ import { useYearlyCalendar } from './useFixture';
 import { useLeagueLive } from '../socket/useFixtureSocket';
 import type { MatchFixture } from '../types';
 
-export const useCalendarWithLive = (season: string, leagueId: string) => {
+export const useCalendarWithLive = (season: string, slug: string) => {
   const {
     data: calendarData,
     isLoading: isCalendarLoading
@@ -12,7 +12,7 @@ export const useCalendarWithLive = (season: string, leagueId: string) => {
   const {
     liveResults,
     isLoading: isLiveLoading
-  } = useLeagueLive(leagueId);
+  } = useLeagueLive(slug);
 
   const mergedCalendar = useMemo(() => {
     if (!calendarData) return null;
