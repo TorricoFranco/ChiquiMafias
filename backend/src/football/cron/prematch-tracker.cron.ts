@@ -6,6 +6,8 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 export class PrematchTrackerService {
   private readonly logger = new Logger(PrematchTrackerService.name)
   private readonly MINUTES_BEFORE = 30
+  // Un partido que empezó hace más que esto ya no se sigue en vivo.
+  private readonly LOOKBACK_HOURS = 24
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -13,15 +15,19 @@ export class PrematchTrackerService {
   async trackUpcomingMatches() {
     const now = new Date()
 
-    const startWindow = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    // Sin el límite inferior, cada partido viejo que entra por el sync del
+    // fixture (los de una copa que se activa a mitad de temporada) quedaba
+    // marcado y los crons de alineaciones lo consultaban para siempre.
+    const startWindow = new Date(
+      now.getTime() - this.LOOKBACK_HOURS * 60 * 60 * 1000,
+    )
     const endWindow = new Date(now.getTime() + this.MINUTES_BEFORE * 60 * 1000)
 
     const matches = await this.prisma.matches.findMany({
       where: {
         tracked: false,
-        // is_live_finished: false,
         date: {
-          // gte: startWindow,
+          gte: startWindow,
           lte: endWindow,
         },
 
