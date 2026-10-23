@@ -31,6 +31,9 @@ model Teams {
 
   events          MatchEvents[]
   teamSeasonStats TeamSeasonStats[]
+  bracketHome     BracketSlot[]     @relation("BracketHome")
+  bracketAway     BracketSlot[]     @relation("BracketAway")
+  bracketWins     BracketSlot[]     @relation("BracketWinner")
   venue           Venues?           @relation(fields: [venue_id], references: [id])
   nicknames       Teams_nicknames[]
 
@@ -136,6 +139,7 @@ model Matches {
   venue         Venues?            @relation(fields: [venue_id], references: [id])
   stats         Stats_team_match[]
   markets       Market[]
+  bracketSlot   BracketSlot?
 
   @@index([date])
   @@index([league_id, season])
@@ -201,10 +205,40 @@ model CompetitionSeason {
   created_at             DateTime          @default(now())
   updated_at             DateTime          @updatedAt
 
-  league          Leagues  @relation("LeagueSeasons", fields: [league_id], references: [id])
-  currentOfLeague Leagues? @relation("CurrentSeason")
+  league          Leagues       @relation("LeagueSeasons", fields: [league_id], references: [id])
+  currentOfLeague Leagues?      @relation("CurrentSeason")
+  bracketSlots    BracketSlot[]
 
   @@unique([league_id, season])
+}
+
+// Una llave del cuadro de una temporada de eliminación directa (ERS §6.3).
+// El ganador de la llave `p` de la ronda `r` va a la llave ceil(p / 2) de la
+// ronda r + 1: el 1 con el 2, el 3 con el 4…
+model BracketSlot {
+  id                    String   @id @default(uuid())
+  competition_season_id String
+  // 1 = 32avos … 6 = final.
+  round_order           Int
+  // Lugar dentro de la ronda, de arriba hacia abajo, desde 1.
+  position              Int
+  // Se completa cuando el partido existe.
+  match_id              String?  @unique
+  home_team_id          String?
+  away_team_id          String?
+  winner_team_id        String?
+  // true si el presidente la corrigió a mano: la sincronización no la pisa.
+  manually_corrected    Boolean  @default(false)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  competition_season CompetitionSeason @relation(fields: [competition_season_id], references: [id], onDelete: Cascade)
+  match              Matches?          @relation(fields: [match_id], references: [id], onDelete: SetNull)
+  home_team          Teams?            @relation("BracketHome", fields: [home_team_id], references: [id], onDelete: SetNull)
+  away_team          Teams?            @relation("BracketAway", fields: [away_team_id], references: [id], onDelete: SetNull)
+  winner_team        Teams?            @relation("BracketWinner", fields: [winner_team_id], references: [id], onDelete: SetNull)
+
+  @@unique([competition_season_id, round_order, position])
 }
 
 // Mapeo de entidades internas a los IDs que les asigna cada proveedor de datos

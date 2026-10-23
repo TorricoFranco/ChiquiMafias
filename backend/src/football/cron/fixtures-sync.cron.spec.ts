@@ -46,6 +46,7 @@ describe('FixturesSyncCron', () => {
   }
   const redis = { redis: { del: jest.fn() } }
   const provider = { getFixtures: jest.fn() }
+  const eventEmitter = { emit: jest.fn() }
   const refs = {
     usesLegacyColumns: true,
     providerName: 'api-football',
@@ -76,6 +77,7 @@ describe('FixturesSyncCron', () => {
       provider as never,
       redis as never,
       refs as never,
+      eventEmitter as never,
     )
   })
 
@@ -284,6 +286,24 @@ describe('FixturesSyncCron', () => {
         where: { sync_enabled: true },
         include: { league: true },
       })
+    })
+
+    it('Debe avisar que sincronizó la temporada para rearmar el cuadro', async () => {
+      prisma.matches.upsert.mockResolvedValue({ id: 'm1' })
+
+      await cron.handle()
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith('fixtures.synced', {
+        seasonId: 'season-liga',
+      })
+    })
+
+    it('No debe avisar si la sincronización falló', async () => {
+      provider.getFixtures.mockRejectedValue(new Error('Proveedor caído'))
+
+      await cron.handle()
+
+      expect(eventEmitter.emit).not.toHaveBeenCalled()
     })
 
     it('Debe reclamar la temporada antes de sincronizarla', async () => {

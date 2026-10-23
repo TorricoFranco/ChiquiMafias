@@ -52,6 +52,13 @@ export class CompetitionResponseDto {
   })
   hasStandings: boolean
 
+  @ApiProperty({
+    example: false,
+    description:
+      'true en formatos de eliminación: tiene GET /competitions/:slug/bracket',
+  })
+  hasBracket: boolean
+
   @ApiProperty({ type: CompetitionSeasonDto, description: 'Temporada actual' })
   season: CompetitionSeasonDto
 
@@ -66,6 +73,7 @@ export class CompetitionResponseDto {
       neutralVenue: c.neutralVenue,
       stages: [...(c.strategy?.stages ?? [])],
       hasStandings: !!c.strategy?.mapStandingGroup,
+      hasBracket: !!c.strategy?.bracketRounds,
       season: { year: c.season, label: c.seasonLabel },
     }
   }

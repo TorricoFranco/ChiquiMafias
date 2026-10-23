@@ -20,3 +20,11 @@ export interface LeagueLiveUpdateMessage {
   /** `LiveMatchData` en JSON, por id de partido. */
   matches: Record<string, string>
 }
+
+/** Lo emite `FixturesSyncCron` al terminar de sincronizar una temporada. */
+export const FIXTURES_SYNCED_EVENT = 'fixtures.synced'
+
+export interface FixturesSyncedEvent {
+  /** uuid de `CompetitionSeason`. */
+  seasonId: string
+}

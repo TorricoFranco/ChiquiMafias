@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 import { FootballDataProvider } from '../football-data.provider'
@@ -15,6 +16,7 @@ import {
 import { FootballRefsService } from '../services/refs.service'
 import { upsertVenue } from '../upserts/upsert-venue'
 import { isSyncDue, SyncSeason } from './competition-sync'
+import { FIXTURES_SYNCED_EVENT, FixturesSyncedEvent } from '../football.events'
 
 /**
  * Sincroniza el fixture de cada temporada con `sync_enabled`, cada una con su
@@ -31,6 +33,7 @@ export class FixturesSyncCron {
     private readonly provider: FootballDataProvider,
     private readonly redis: RedisService,
     private readonly refs: FootballRefsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -73,6 +76,9 @@ export class FixturesSyncCron {
 
         try {
           await this.syncSeason(season, strategy, now)
+          // El cuadro (formatos de eliminación) se rearma con los partidos nuevos.
+          const event: FixturesSyncedEvent = { seasonId: season.id }
+          this.eventEmitter.emit(FIXTURES_SYNCED_EVENT, event)
         } catch (error) {
           this.logger.error(
             `Error sincronizando el fixture de ${season.league.name} ${season.label}: ${error instanceof Error ? error.message : String(error)}`,

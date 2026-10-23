@@ -2,20 +2,24 @@ import { CompetitionFormat } from '@prisma/client'
 import { Logger } from '@nestjs/common'
 import { FootballFixture } from '../football.types'
 import { ResolvedRound } from '../mappers/round'
-import { CompetitionFormatStrategy, FixturesWindow } from './format-strategy'
+import {
+  BracketRound,
+  CompetitionFormatStrategy,
+  FixturesWindow,
+} from './format-strategy'
 
 /** Fase de todos los partidos de una competición de eliminación directa. */
 export const ELIMINACION_STAGE = 'ELIMINACION'
 
 /** Rondas de un cuadro de 64 equipos, de la primera a la final. */
-export const KNOCKOUT_ROUNDS = [
+export const KNOCKOUT_ROUNDS: readonly BracketRound[] = [
   { matches: 32, round: '32avos de final', key: '32avos' },
   { matches: 16, round: '16avos de final', key: '16avos' },
   { matches: 8, round: 'Octavos de final', key: 'octavos' },
   { matches: 4, round: 'Cuartos de final', key: 'cuartos' },
   { matches: 2, round: 'Semifinal', key: 'semifinal' },
   { matches: 1, round: 'Final', key: 'final' },
-] as const
+]
 
 const logger = new Logger('EliminacionStrategy')
 
@@ -47,7 +51,7 @@ export function resolveKnockoutRounds(
     (a, b) => firstDate.get(a)! - firstDate.get(b)!,
   )
 
-  const roundOfLabel = new Map<string, (typeof KNOCKOUT_ROUNDS)[number]>()
+  const roundOfLabel = new Map<string, BracketRound>()
   let next = 0
   for (const [i, label] of labels.entries()) {
     let index = next
@@ -89,4 +93,6 @@ export const eliminacionStrategy: CompetitionFormatStrategy = {
   },
 
   resolveRounds: resolveKnockoutRounds,
+
+  bracketRounds: KNOCKOUT_ROUNDS,
 }
