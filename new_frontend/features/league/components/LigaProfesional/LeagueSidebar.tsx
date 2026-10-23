@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { TournamentType, ZoneType } from '../../type';
 import { SidebarHeader } from '../sidebar/SidebarHeader';
@@ -42,13 +43,16 @@ interface LeagueSidebarProps {
 
 export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
   const isLPF = props.selectedLeagueId === LEAGUE_SLUG;
+  const router = useRouter();
   const { data: competitions = [] } = useCompetitions();
   const fromApi = competitions
     .filter((c) => c.slug !== LEAGUE_SLUG)
-    .map((c) => ({ slug: c.slug, label: c.shortName ?? c.name }));
+    .map((c) => ({ slug: c.slug, label: c.shortName ?? c.name, hasPage: c.hasBracket }));
   const otherCompetitions = [
     ...fromApi,
-    ...UPCOMING_COMPETITIONS.filter((u) => !fromApi.some((c) => c.slug === u.slug)),
+    ...UPCOMING_COMPETITIONS.filter((u) => !fromApi.some((c) => c.slug === u.slug)).map(
+      (u) => ({ ...u, hasPage: false }),
+    ),
   ];
 
   const [isLpfExpanded, setIsLpfExpanded] = useState(isLPF);
@@ -124,7 +128,12 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
         {otherCompetitions.map((competition) => (
           <button
             key={competition.slug}
-            onClick={() => handleLeagueClick(competition.slug)}
+            onClick={() =>
+              // Las que tienen página propia (la Copa) se abren en /torneos/<slug>.
+              competition.hasPage
+                ? router.push(`/torneos/${competition.slug}`)
+                : handleLeagueClick(competition.slug)
+            }
             className={`w-full flex items-center p-2 rounded-lg font-medium transition-colors mb-1 ${props.selectedLeagueId === competition.slug ? 'text-[#d2f000]' : 'text-[#e5e2e1] hover:bg-[#2a2a2a]'
               }`}
           >
@@ -132,7 +141,7 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
           </button>
         ))}
 
-        {!isLPF && (
+        {!isLPF && !otherCompetitions.some((c) => c.slug === props.selectedLeagueId && c.hasPage) && (
           <div className="mt-6">
             <ComingSoonState onBackToLPF={() => handleLeagueClick(LEAGUE_SLUG)} />
           </div>

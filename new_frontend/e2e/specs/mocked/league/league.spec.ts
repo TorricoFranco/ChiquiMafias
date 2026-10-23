@@ -81,7 +81,8 @@ test.describe("Ligas: Liga Profesional", () => {
 
   test("una competición nueva de la API aparece en el menú como en preparación", async ({ app, page, api, session }) => {
     session.loginAs("USER");
-    api.on("GET", "/competitions", [buildCompetition(), buildCopaArgentina()]);
+    // Sin cuadro todavía: se queda en Ligas como "en preparación".
+    api.on("GET", "/competitions", [buildCompetition(), buildCopaArgentina({ hasBracket: false })]);
     mockLeague(api);
 
     await app.open("/?tab=ligas");
