@@ -26,7 +26,7 @@ export interface CompetitionFormatStrategy {
   readonly stages: readonly string[]
 
   /** Qué partidos traer en cada sincronización del fixture. */
-  fixturesWindow(now: Date): FixturesWindow
+  fixturesWindow(now: Date, season: number): FixturesWindow
 
   /**
    * Ronda de cada partido, en el mismo orden. Recibe todos los partidos
