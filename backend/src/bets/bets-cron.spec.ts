@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, Logger } from '@nestjs/common'
 import { BetsCronService } from './bets-cron'
 import { PrismaService } from '../prisma/prisma.service'
 import { BetsService } from './bets.service'
@@ -318,12 +318,13 @@ describe('BetsCronService', () => {
     // 3) mercados automáticos abiertos para reprogramar.
     type OpenMarket = {
       id: string
+      title?: string
       closesAt: Date
       match: { date: Date } | null
     }
     const runWith = async ({
-      byTime = [] as { id: string }[],
-      byMatchStarted = [] as { id: string }[],
+      byTime = [] as { id: string; title?: string }[],
+      byMatchStarted = [] as { id: string; title?: string }[],
       open = [] as OpenMarket[],
     }) => {
       mockPrisma.market.findMany
@@ -354,6 +355,34 @@ describe('BetsCronService', () => {
         'market-1',
         'LOCKED',
       )
+    })
+
+    it('Debe loguear [APUESTAS] con el título solo de los mercados que cerró', async () => {
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation()
+      mockPrisma.market.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 })
+
+      await runWith({
+        byTime: [
+          { id: 'market-1', title: 'Boca vs River - Liga Profesional' },
+          {
+            id: 'market-2',
+            title: 'Racing vs Independiente - Liga Profesional',
+          },
+        ],
+      })
+
+      expect(
+        (log.mock.calls as unknown[][]).filter((c) =>
+          String(c[0]).startsWith('[APUESTAS]'),
+        ),
+      ).toEqual([
+        [
+          '[APUESTAS] Mercado cerrado: Boca vs River - Liga Profesional (market-1)',
+        ],
+      ])
+      log.mockRestore()
     })
 
     it('Debe cerrar primero Redis (corta las apuestas) y después la base', async () => {

@@ -1,7 +1,8 @@
-import axios, { AxiosInstance } from 'axios'
-import { Injectable } from '@nestjs/common'
+import axios, { AxiosInstance, isAxiosError } from 'axios'
+import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from 'src/config/interfaces/env.interface'
+import { HighlightlyQuota } from './highlightly.diagnostics'
 
 export interface HighlightlyResponse<T> {
   status: number
@@ -12,6 +13,9 @@ export interface HighlightlyResponse<T> {
 @Injectable()
 export class HighlightlyHttp {
   private client: AxiosInstance
+  private readonly quota = new HighlightlyQuota(
+    new Logger(HighlightlyHttp.name),
+  )
 
   constructor(
     private readonly configService: ConfigService<EnvironmentVariables>,
@@ -32,7 +36,15 @@ export class HighlightlyHttp {
     url: string,
     params?: Record<string, unknown>,
   ): Promise<HighlightlyResponse<T>> {
-    const res = await this.client.get<T>(url, { params })
-    return { status: res.status, data: res.data }
+    try {
+      const res = await this.client.get<T>(url, { params })
+      this.quota.record(url, res.status, res.headers)
+      return { status: res.status, data: res.data }
+    } catch (error) {
+      // Un 5xx también gasta cuota y trae los headers.
+      const response = isAxiosError(error) ? error.response : undefined
+      this.quota.record(url, response?.status ?? 'error', response?.headers)
+      throw error
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common'
 import { LiveScoreCron } from './liveScoreCron'
 import { FootballFixture } from '../football.types'
 
@@ -26,6 +27,8 @@ const activeMatch = {
   elapsed: 30,
   home_team_id: 'h',
   away_team_id: 'a',
+  home_team: { name: 'Boca' },
+  away_team: { name: 'River' },
   season: 2026,
   round: 'Regular Season - 9',
   tournament: 'APERTURA',
@@ -110,6 +113,86 @@ describe('LiveScoreCron', () => {
       'match_updates',
       expect.objectContaining({ matchId: 'm1', type: 'SCORE_UPDATED' }),
     )
+  })
+
+  describe('[VIVO]', () => {
+    let log: jest.SpyInstance
+    const vivo = () =>
+      (log.mock.calls as unknown[][]).filter((c) =>
+        String(c[0]).startsWith('[VIVO]'),
+      )
+
+    beforeEach(() => {
+      log = jest.spyOn(Logger.prototype, 'log').mockImplementation()
+      jest.spyOn(Logger.prototype, 'debug').mockImplementation()
+    })
+    afterEach(() => jest.restoreAllMocks())
+
+    it('Debe loguear el gol con los equipos, el estado y el minuto', async () => {
+      provider.getLiveFixtures.mockResolvedValue([baseFixture()])
+
+      await cron.handleLiveScores()
+
+      expect(vivo()).toEqual([
+        [
+          "[VIVO] Boca 1-0 River · 2H 70' (cambió el marcador) [liga-profesional m1]",
+        ],
+      ])
+    })
+
+    it('No debe loguear si solo avanzó el minuto', async () => {
+      prisma.matches.findMany.mockResolvedValue([
+        { ...activeMatch, home_goals: 1, status_short: '2H', elapsed: 69 },
+      ])
+      provider.getLiveFixtures.mockResolvedValue([baseFixture()])
+
+      await cron.handleLiveScores()
+
+      expect(prisma.matches.update).toHaveBeenCalled()
+      expect(vivo()).toEqual([])
+    })
+
+    it('Debe loguear el final con los penales', async () => {
+      provider.getLiveFixtures.mockResolvedValue([
+        baseFixture({
+          status: { short: 'PEN', long: 'Penalties', elapsed: 120 },
+          goals: { home: 1, away: 1 },
+          penalty: { home: 4, away: 3 },
+        }),
+      ])
+
+      await cron.handleLiveScores()
+
+      expect(vivo()).toEqual([
+        [
+          "[VIVO] Boca 1-1 River (pen. 4-3) · PEN 120' (terminó) [liga-profesional m1]",
+        ],
+      ])
+    })
+
+    it('Fuera del feed, solo debe loguear si el partido cambió', async () => {
+      provider.getLiveFixtures.mockResolvedValue([
+        baseFixture({ externalId: 2002 }),
+      ])
+      prisma.matches.findMany.mockResolvedValue([
+        { ...activeMatch, home_goals: 1, status_short: '2H' },
+      ])
+      provider.getFixture.mockResolvedValue(baseFixture())
+
+      await cron.handleLiveScores()
+      expect(vivo()).toEqual([])
+
+      provider.getFixture.mockResolvedValue(
+        baseFixture({ status: { short: 'FT', long: 'Finished', elapsed: 90 } }),
+      )
+      ;(cron as unknown as { lastRunAt: number }).lastRunAt = 0
+      await cron.handleLiveScores()
+      expect(vivo()).toEqual([
+        [
+          "[VIVO] Boca 1-0 River · FT 90' (salió del feed, consultado por id) [liga-profesional m1]",
+        ],
+      ])
+    })
   })
 
   it('Debe cerrar el partido, limpiar Redis y emitir match.finished al terminar', async () => {

@@ -42,6 +42,8 @@ const ACTIVE_MATCH_SELECT = {
   elapsed: true,
   home_team_id: true,
   away_team_id: true,
+  home_team: { select: { name: true } },
+  away_team: { select: { name: true } },
   season: true,
   // La ronda guardada por el sync del fixture: en formatos de eliminación no
   // se puede deducir de un partido suelto del feed en vivo.
@@ -199,6 +201,7 @@ export class LiveScoreCron {
           },
         })
 
+        this.logLive(matchDb, apiMatch, 'terminó')
         await this.handleMatchCleanup(matchDb.id, leagueId)
 
         // Avisa al front que terminó: cierra el chat y recarga el partido.
@@ -227,6 +230,14 @@ export class LiveScoreCron {
         matchDb.away_goals !== (apiMatch.goals.away ?? 0)
       const hasStatusChanged = matchDb.status_short !== apiMatch.status.short
       const hasMinuteChanged = matchDb.elapsed !== apiMatch.status.elapsed
+
+      if (hasScoreChanged || hasStatusChanged) {
+        this.logLive(
+          matchDb,
+          apiMatch,
+          hasScoreChanged ? 'cambió el marcador' : 'cambió el estado',
+        )
+      }
 
       if (
         hasScoreChanged ||
@@ -294,6 +305,23 @@ export class LiveScoreCron {
     if (now - this.lastRunAt < minGap - TICK_JITTER_MS) return true
     this.lastRunAt = now
     return false
+  }
+
+  /** `[VIVO] Boca 1-0 River · 2H 70' (cambió el marcador)` */
+  private logLive(
+    matchDb: ActiveMatch,
+    apiMatch: FootballFixture,
+    note: string,
+  ) {
+    const penalties =
+      apiMatch.penalty.home !== null
+        ? ` (pen. ${apiMatch.penalty.home}-${apiMatch.penalty.away})`
+        : ''
+    const elapsed =
+      apiMatch.status.elapsed !== null ? ` ${apiMatch.status.elapsed}'` : ''
+    this.logger.log(
+      `[VIVO] ${matchDb.home_team.name} ${apiMatch.goals.home ?? 0}-${apiMatch.goals.away ?? 0} ${matchDb.away_team.name}${penalties} · ${apiMatch.status.short}${elapsed} (${note}) [${matchDb.league.slug} ${matchDb.id}]`,
+    )
   }
 
   private async publishUpdate(
@@ -382,7 +410,12 @@ export class LiveScoreCron {
   ) {
     try {
       const apiMatch = await this.provider.getFixture(apiFixtureId)
-      if (!apiMatch) return
+      if (!apiMatch) {
+        this.logger.warn(
+          `[VIVO] El partido ${matchDb.id} salió del feed y el proveedor no lo encuentra por id (${apiFixtureId})`,
+        )
+        return
+      }
 
       const apiStatus = apiMatch.status.short
       const isFinished = FINAL_STATUSES.includes(apiStatus)
@@ -420,9 +453,20 @@ export class LiveScoreCron {
       // Igual que un final visto en el feed: fecha del fixture y tabla.
       if (isFinished) await this.notifyFinished(matchDb, leagueId)
 
-      this.logger.log(
-        `Sincronización manual: Partido ${apiFixtureId} actualizado a ${apiStatus}`,
-      )
+      // Solo lo que cambió: un partido que el feed en vivo no trae se consulta
+      // en cada tick y no tiene que llenar la consola.
+      const changed =
+        isFinished ||
+        apiStatus !== matchDb.status_short ||
+        (apiMatch.goals.home ?? 0) !== matchDb.home_goals ||
+        (apiMatch.goals.away ?? 0) !== matchDb.away_goals
+      if (changed) {
+        this.logLive(matchDb, apiMatch, 'salió del feed, consultado por id')
+      } else {
+        this.logger.debug(
+          `[VIVO] Partido ${matchDb.id} fuera del feed en vivo, sigue en ${apiStatus}`,
+        )
+      }
     } catch (error) {
       this.logger.error(
         `Error sincronizando partido ${apiFixtureId}: ${error.message}`,
