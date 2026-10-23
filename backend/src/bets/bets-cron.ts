@@ -28,6 +28,20 @@ interface MarketTeamsMetadata {
   awayTeam?: { name?: string }
 }
 
+/**
+ * Escudo de un equipo en el mercado. Con ID de API-Football, ese ID: el front
+ * usa su escudo local (`/escudos-api/<id>.webp`). Sin él (equipos dados de alta
+ * desde otro proveedor), la URL de Cloudinary de `logo_url`. Sin ninguno,
+ * undefined: la opción queda sin escudo.
+ */
+export function teamBadge(team: {
+  api_team_id: number | null
+  logo_url: string | null
+}): string | undefined {
+  if (team.api_team_id !== null) return String(team.api_team_id)
+  return team.logo_url?.startsWith('https://') ? team.logo_url : undefined
+}
+
 @Injectable()
 export class BetsCronService {
   private readonly logger = new Logger(BetsCronService.name)
@@ -69,10 +83,6 @@ export class BetsCronService {
           league_id: s.league_id,
           season: s.season,
         })),
-        // El front arma el escudo del mercado con api_team_id
-        // (/escudos-api/<id>.webp): un equipo sin él no tendría escudo.
-        home_team: { api_team_id: { not: null } },
-        away_team: { api_team_id: { not: null } },
         date: {
           gte: now,
           lte: endWindow,
@@ -133,7 +143,7 @@ export class BetsCronService {
                     match.home_team.short_code ||
                     match.home_team.name.substring(0, 3).toUpperCase(),
                   api_team_id: match.home_team.api_team_id,
-                  logoUrl: `${match.home_team.api_team_id}`,
+                  logoUrl: teamBadge(match.home_team) ?? null,
                 },
                 awayTeam: {
                   name: match.away_team.name,
@@ -141,7 +151,7 @@ export class BetsCronService {
                     match.away_team.short_code ||
                     match.away_team.name.substring(0, 3).toUpperCase(),
                   api_team_id: match.away_team.api_team_id,
-                  logoUrl: `${match.away_team.api_team_id}`,
+                  logoUrl: teamBadge(match.away_team) ?? null,
                 },
               },
               options: {
@@ -149,7 +159,7 @@ export class BetsCronService {
                   {
                     name: match.home_team.name,
                     initialProb: initialProbabilities.home,
-                    logoUrl: `${match.home_team.api_team_id}`,
+                    logoUrl: teamBadge(match.home_team),
                   },
                   {
                     name: DRAW_OPTION_NAME,
@@ -158,7 +168,7 @@ export class BetsCronService {
                   {
                     name: match.away_team.name,
                     initialProb: initialProbabilities.away,
-                    logoUrl: `${match.away_team.api_team_id}`,
+                    logoUrl: teamBadge(match.away_team),
                   },
                 ],
               },

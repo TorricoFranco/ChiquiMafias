@@ -3,9 +3,20 @@ import { Market, MarketMetadata, MarketOption } from '../types';
 
 export interface OptionTeam {
   name: string;
-  /** Id del escudo: se arma `/escudos-api/<logoUrl>.webp`, igual que en la metadata de los mercados. */
+  /**
+   * Escudo: un id de API-Football (`/escudos-api/<id>.webp`) o, para los equipos
+   * sin ese id, la URL de Cloudinary. Usar `badgeSrc` para armar el `src`.
+   */
   logoUrl: string;
 }
+
+/** `src` del escudo de una opción: la URL directa si viene de Cloudinary, o el asset local. */
+export const badgeSrc = (logoUrl: string) =>
+  logoUrl.startsWith('https://') ? logoUrl : `/escudos-api/${logoUrl}.webp`;
+
+// Mercados viejos guardaron el id como texto aunque faltara.
+const hasBadge = (logoUrl: string | null | undefined): logoUrl is string =>
+  !!logoUrl && logoUrl !== 'null' && logoUrl !== 'undefined';
 
 export interface OptionEntry {
   option: MarketOption;
@@ -31,14 +42,14 @@ const teamIdByName = new Map<string, string>(
  * el admin la armaba por posición y podía dejar un escudo pegado a un jugador.
  */
 const resolveOptionTeam = (option: MarketOption, market: Market): OptionTeam | null => {
-  if (option.logoUrl) return { name: option.name, logoUrl: option.logoUrl };
+  if (hasBadge(option.logoUrl)) return { name: option.name, logoUrl: option.logoUrl };
 
   const key = normalizeName(option.name);
   if (!market.isManual) {
     const fromMetadata = [market.metadata?.homeTeam, market.metadata?.awayTeam].find(
       (team): team is NonNullable<MarketMetadata['homeTeam']> => !!team && normalizeName(team.name) === key
     );
-    if (fromMetadata) return { name: option.name, logoUrl: fromMetadata.logoUrl };
+    if (fromMetadata && hasBadge(fromMetadata.logoUrl)) return { name: option.name, logoUrl: fromMetadata.logoUrl };
   }
 
   const logoUrl = teamIdByName.get(key);

@@ -5,7 +5,8 @@ export type MarketStatus = 'OPEN' | 'LOCKED' | 'SETTLED' | 'REFUNDED';
 export interface TeamMetadata {
   name: string;
   short: string;
-  logoUrl: string;
+  /** Igual que `MarketOption.logoUrl`. Null si el equipo no tiene escudo. */
+  logoUrl: string | null;
 }
 
 export interface MarketMetadata {
@@ -20,7 +21,10 @@ export interface MarketOption {
   currentOdds?: number;
   initialProb?: number;
   totalStaked: number;
-  /** Id del escudo del club de la opción (`/escudos-api/<id>.webp`). Null o ausente: sin escudo. */
+  /**
+   * Escudo del club de la opción: un id de API-Football (`/escudos-api/<id>.webp`) o, si el
+   * equipo no tiene ese id, la URL de Cloudinary. Null o ausente: sin escudo.
+   */
   logoUrl?: string | null;
 }
 
