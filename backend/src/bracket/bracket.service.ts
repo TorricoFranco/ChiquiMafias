@@ -16,7 +16,9 @@ import { LiveMatchData } from 'src/fixture/types/fixtures'
 import {
   BracketSlotState,
   computeSlots,
+  DrawPairs,
   KnockoutMatch,
+  layoutFromDraw,
   layoutFromMatches,
 } from './bracket-builder'
 import { BracketResponseDto, BracketTeamDto } from './dto/bracket-response.dto'
@@ -75,19 +77,31 @@ export class BracketService {
 
   /** Rearma y guarda el cuadro de una temporada. No hace nada si el formato no tiene cuadro. */
   async syncSeason(seasonId: string): Promise<void> {
+    await this.runExclusive(seasonId, () => this.rebuildInsideLock(seasonId))
+  }
+
+  /**
+   * Corre `fn` sin que se pise con otro rearmado o corrección de la misma
+   * temporada: el rearmado borra y recrea las llaves, así que nada puede
+   * escribirlas en el medio.
+   */
+  async runExclusive<T>(seasonId: string, fn: () => Promise<T>): Promise<T> {
     const previous = this.running.get(seasonId) ?? Promise.resolve()
-    const next = previous
-      .catch(() => undefined)
-      .then(() => this.rebuild(seasonId))
-    this.running.set(seasonId, next)
+    const next = previous.catch(() => undefined).then(fn)
+    const done = next.then(
+      () => undefined,
+      () => undefined,
+    )
+    this.running.set(seasonId, done)
     try {
-      await next
+      return await next
     } finally {
-      if (this.running.get(seasonId) === next) this.running.delete(seasonId)
+      if (this.running.get(seasonId) === done) this.running.delete(seasonId)
     }
   }
 
-  private async rebuild(seasonId: string): Promise<void> {
+  /** Rearma el cuadro. Llamar solo dentro de `runExclusive`. */
+  async rebuildInsideLock(seasonId: string): Promise<void> {
     const season = await this.prisma.competitionSeason.findUnique({
       where: { id: seasonId },
       select: { id: true, league_id: true, season: true, format: true },
@@ -136,9 +150,9 @@ export class BracketService {
         away_penalty_goals: true,
       },
     })
-    const matches: KnockoutMatch[] = rows.flatMap((m) => {
+    const allMatches: KnockoutMatch[] = rows.flatMap((m) => {
       const roundOrder = orderOfRound.get(m.round)
-      if (!roundOrder || pinnedMatches.has(m.id)) return []
+      if (!roundOrder) return []
       return [
         {
           id: m.id,
@@ -155,17 +169,65 @@ export class BracketService {
       ]
     })
 
-    const { positions, unplaced } = layoutFromMatches(matches, rounds.length)
+    // Una llave corregida antes de que existiera su partido lo toma cuando
+    // aparece uno con los mismos equipos: así muestra marcador y ganador.
+    const attached = new Map<string, string>()
+    const sameTeams = (a: (string | null)[], b: string[]) =>
+      a.every((t) => t !== null) &&
+      [...a].sort().join('|') === [...b].sort().join('|')
+    for (const [key, slot] of corrected) {
+      if (slot.matchId) continue
+      const match = allMatches.find(
+        (m) =>
+          m.roundOrder === slot.roundOrder &&
+          !pinnedMatches.has(m.id) &&
+          sameTeams(
+            [slot.homeTeamId, slot.awayTeamId],
+            [m.homeTeamId, m.awayTeamId],
+          ),
+      )
+      if (!match) continue
+      corrected.set(key, { ...slot, matchId: match.id })
+      attached.set(key, match.id)
+      pinnedMatches.add(match.id)
+    }
+    const matches = allMatches.filter((m) => !pinnedMatches.has(m.id))
+
+    // Con sorteo cargado, el orden sale de él; si no, se reconstruye de lo jugado.
+    const draw = await this.prisma.bracketDraw.findUnique({
+      where: { competition_season_id: seasonId },
+      select: { pairs: true },
+    })
+    const pairs = draw ? (draw.pairs as unknown as DrawPairs) : undefined
+    const { positions, unplaced } = pairs
+      ? layoutFromDraw(matches, rounds.length, pairs, corrected)
+      : layoutFromMatches(matches, rounds.length, corrected)
     for (const m of unplaced) {
       this.logger.warn(
         `El partido ${m.id} no entra en ningún lugar del cuadro de la temporada ${seasonId}`,
       )
     }
-    const slots = computeSlots(positions, rounds.length, corrected).filter(
-      (s) => !corrected.has(`${s.roundOrder}:${s.position}`),
-    )
+    const slots = computeSlots(
+      positions,
+      rounds.length,
+      corrected,
+      pairs,
+    ).filter((s) => !corrected.has(`${s.roundOrder}:${s.position}`))
 
     await this.prisma.$transaction(async (tx) => {
+      for (const [key, matchId] of attached) {
+        const [round_order, position] = key.split(':').map(Number)
+        await tx.bracketSlot.update({
+          where: {
+            competition_season_id_round_order_position: {
+              competition_season_id: seasonId,
+              round_order,
+              position,
+            },
+          },
+          data: { match_id: matchId },
+        })
+      }
       await tx.bracketSlot.deleteMany({
         where: { competition_season_id: seasonId, manually_corrected: false },
       })
