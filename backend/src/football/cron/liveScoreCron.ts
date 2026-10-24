@@ -177,6 +177,8 @@ export class LiveScoreCron {
     }
 
     const liveScoresHash: Record<string, string> = {}
+    // Partidos cuyo detalle cacheado quedó viejo en este tick.
+    const changedMatchIds: string[] = []
 
     for (const apiMatch of liveMatchesApi) {
       const matchDb = dbByExternalId.get(apiMatch.externalId)
@@ -259,6 +261,7 @@ export class LiveScoreCron {
           },
         })
 
+        changedMatchIds.push(matchDb.id)
         await this.redisService.redis.del(
           `match:details:v2:${matchDb.id}`,
           // El chat consulta el estado con esta caché: se abre o se pausa ya.
@@ -285,6 +288,16 @@ export class LiveScoreCron {
         `live_scores:league:${leagueId}`,
         300,
       )
+
+      // El detalle del partido pisa el marcador con este hash. Un pedido que
+      // llegó entre el aviso y el hset (por ejemplo el refetch del front al
+      // recibir un gol) lo armó con el marcador del tick anterior y lo dejó
+      // cacheado: se borra otra vez ahora que el hash está al día.
+      if (changedMatchIds.length > 0) {
+        await this.redisService.redis.del(
+          ...changedMatchIds.map((id) => `match:details:v2:${id}`),
+        )
+      }
 
       const update: LeagueLiveUpdateMessage = {
         leagueId,

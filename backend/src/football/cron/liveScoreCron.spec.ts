@@ -115,6 +115,38 @@ describe('LiveScoreCron', () => {
     )
   })
 
+  it('Debe borrar el detalle cacheado otra vez después de escribir el hash del vivo', async () => {
+    provider.getLiveFixtures.mockResolvedValue([baseFixture()])
+    const order: string[] = []
+    redis.del.mockImplementation((...keys: string[]) => {
+      if (keys.includes('match:details:v2:m1')) order.push('del')
+      return Promise.resolve(1)
+    })
+    redis.hset.mockImplementation(() => {
+      order.push('hset')
+      return Promise.resolve(1)
+    })
+
+    await cron.handleLiveScores()
+
+    // Un pedido entre el primer del y el hset cachearía el marcador del tick
+    // anterior: el último borrado tiene que ir después del hset.
+    expect(order[order.length - 1]).toBe('del')
+    expect(order.lastIndexOf('del')).toBeGreaterThan(order.indexOf('hset'))
+  })
+
+  it('No debe borrar el detalle después del hset si el partido no cambió', async () => {
+    prisma.matches.findMany.mockResolvedValue([
+      { ...activeMatch, home_goals: 1, status_short: '2H', elapsed: 70 },
+    ])
+    provider.getLiveFixtures.mockResolvedValue([baseFixture()])
+
+    await cron.handleLiveScores()
+
+    expect(redis.hset).toHaveBeenCalled()
+    expect(redis.del).not.toHaveBeenCalledWith('match:details:v2:m1')
+  })
+
   describe('[VIVO]', () => {
     let log: jest.SpyInstance
     const vivo = () =>
