@@ -135,12 +135,28 @@ aparece en `GET /competitions` y en el menú de Ligas. Pasos, con `FOOTBALL_PROV
    `last_fixtures_sync_at = NULL` hace que sincronice en el minuto siguiente. La primera corrida crea los
    partidos de la temporada, con la ronda deducida por cantidad de partidos, y arma el cuadro
    reconstruyéndolo desde lo jugado.
-4. **Sorteo (opcional).** Si el cuadro reconstruido queda espejado respecto del oficial, o en una
+4. **Completar eventos y estadísticas de lo ya jugado.** Los crons solo miran partidos recientes
+   (eventos: 3 días; estadísticas: 3 horas), así que los partidos que entran terminados por el sync
+   quedan sin goles, tarjetas ni estadísticas en su detalle. Primero en seco (no hace pedidos), después
+   con `--apply`:
+
+   ```bash
+   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/backfill-match-details.ts \
+     --slug copa-argentina
+   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/backfill-match-details.ts \
+     --slug copa-argentina --apply
+   ```
+
+   Gasta 2 pedidos por partido (60 partidos jugados = 120 pedidos, el 1,6 % de la cuota diaria). Es
+   idempotente y corta en 100 partidos por corrida (`--limit`): si quedan, repetí el comando.
+   Las alineaciones no se piden por defecto porque Highlightly no las tiene para los partidos de copa
+   que se probaron; `--lineups` las intenta (un pedido más por partido) y no guarda nada si vienen vacías.
+5. **Sorteo (opcional).** Si el cuadro reconstruido queda espejado respecto del oficial, o en una
    temporada nueva sin rondas jugadas, el presidente carga el orden oficial con
    `POST /admin/competitions/copa-argentina/bracket/draw`. Una llave mal resuelta (por ejemplo un W.O.
    sin marcador) se corrige con `PATCH .../bracket/slots/:ronda/:lugar`. Todo queda auditado en
    `GET .../bracket/changes`.
-5. **Apuestas**: recién cuando se decida, `bets_enabled = true` en la misma temporada. El mercado es 1X2
+6. **Apuestas**: recién cuando se decida, `bets_enabled = true` en la misma temporada. El mercado es 1X2
    sobre los 90 minutos y un partido definido por penales es empate.
 
 ## Cuota de pedidos (Highlightly: 7.500 por día)

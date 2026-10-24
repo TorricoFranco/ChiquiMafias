@@ -1,6 +1,19 @@
 import { expect, test } from "../../../fixtures/test";
 import { buildMarket } from "../../../factories/bets";
 
+test.describe("Apuestas: grilla pública", () => {
+  // GET /bets/markets es @OptionalAuth(): sin sesión la grilla se ve igual.
+  test("un visitante sin sesión ve los mercados abiertos", async ({ app, page, api }) => {
+    const market = buildMarket({ title: "Mercado público" });
+    api.on("GET", "/bets/markets", [market]);
+
+    await app.open();
+    await app.goToSection("Apuestas");
+
+    await expect(page.getByRole("article", { name: market.title })).toBeVisible();
+  });
+});
+
 test.describe("Apuestas: carga, error y reintento de los mercados", () => {
   test.beforeEach(async ({ session }) => {
     session.loginAs("USER", {}, { balance: 1000 });

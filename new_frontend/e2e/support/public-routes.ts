@@ -13,6 +13,7 @@ const PUBLIC_ROUTES: { method: string; path: RegExp }[] = [
     method: "GET",
     path: /^\/stats\/(top-earners|top-streaks|highest-multipliers|most-active|top-stakers|global|top-active|top-chatters)$/,
   },
+  { method: "GET", path: /^\/bets\/markets$/ },
   { method: "GET", path: /^\/coin-shop\/packs$/ },
   { method: "GET", path: /^\/store(\/all-items)?$/ },
   { method: "GET", path: /^\/polls\/active$/ },
