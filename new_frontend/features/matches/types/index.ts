@@ -281,9 +281,14 @@ export interface StatsUpdatedPayload {
   stats: TeamStats[];
 }
 
+/**
+ * Aviso de eventos nuevos (`timeline_updated`). `lastEvent` es el evento crudo del
+ * proveedor (`EVENTS_UPDATED.lastEvent` del backend) y NO tiene la forma de `MatchEvent`:
+ * el front no lo usa para armar la cronología, solo recarga el detalle del partido.
+ */
 export interface TimelineUpdatedPayload {
   matchId: string;
-  lastEvent: MatchEvent | null;
+  lastEvent: unknown;
   totalEvents: number;
 }
 

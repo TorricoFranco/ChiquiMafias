@@ -3,10 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useGlobalSocket } from '@/context/SocketContext';
 import { chatStateFor } from '../types';
 import { matchDetailKey } from '../hooks/useMatchDetails';
-import type { MatchDetails, MatchEvent, MatchLiveUpdatePayload, MatchStatus, StatsUpdatedPayload, TimelineUpdatedPayload } from '../types';
-
-// El evento crudo de la API trae `time`, que no es parte del tipo de la app: se guarda con esa forma.
-type RawTimelineEvent = MatchEvent & { time?: { elapsed?: number | null } };
+import type { MatchDetails, MatchLiveUpdatePayload, MatchStatus, StatsUpdatedPayload, TimelineUpdatedPayload } from '../types';
 
 export const useMatchLive = (matchId: string) => {
   const socket = useGlobalSocket();
@@ -54,22 +51,13 @@ export const useMatchLive = (matchId: string) => {
       });
     };
 
+    // El evento del socket es el crudo del proveedor (`time.elapsed`, ids de equipo y
+    // jugador del proveedor): no sirve para la cronología, que usa los ids propios y
+    // `minute`. Además los goleadores del marcador (`score.summary`) los arma el backend
+    // a partir de los eventos. Se recarga el detalle, que trae las dos cosas.
     const handleTimelineEventsUpdate = (payload: TimelineUpdatedPayload) => {
       if (!isThisMatch(payload)) return;
-      console.log('📅 timeline_updated payload:', payload);
-      updateCache((prev) => {
-        if (!prev) return prev;
-        const apiEvent = payload.lastEvent as RawTimelineEvent | null;
-        if (!apiEvent) return prev;
-        
-        const eventId = apiEvent.id || `${apiEvent.time?.elapsed}-${apiEvent.team?.id}-${apiEvent.type}`;
-        if (prev.events?.some((e) => e.id === eventId)) return prev;
-        
-        const updatedEvents = ([...(prev.events || []), { ...apiEvent, id: eventId }] as RawTimelineEvent[]).sort(
-          (a, b) => (b.minute || b.time?.elapsed || 0) - (a.minute || a.time?.elapsed || 0),
-        );
-        return { ...prev, events: updatedEvents };
-      });
+      queryClient.invalidateQueries({ queryKey });
     };
 
     const handleStatsUpdate = (payload: StatsUpdatedPayload) => {
