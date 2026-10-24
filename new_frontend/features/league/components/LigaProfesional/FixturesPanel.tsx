@@ -19,6 +19,8 @@ interface FixturesPanelProps {
     selectedRound: number | PlayoffStageKey;
     onSelectRound: (round: number | PlayoffStageKey) => void;
     matches: LeagueMatch[];
+    /** El fixture de la fecha todavía no llegó: no es lo mismo que una fecha sin partidos. */
+    isLoading?: boolean;
 }
 
 
@@ -28,6 +30,7 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
     selectedRound,
     onSelectRound,
     matches,
+    isLoading = false,
 }) => {
 
     const router = useRouter();
@@ -53,6 +56,10 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
 
         if (m.status_short === 'FT') {
             return <span className="text-[9px] font-semibold text-[#8e9285]">Finalizado</span>;
+        }
+
+        if (m.status_short === 'AET') {
+            return <span className="text-[9px] font-semibold text-[#8e9285]">Final (prórroga)</span>;
         }
 
         if (m.status_short === 'PEN') {
@@ -133,7 +140,11 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
 
             {/* Lista de partidos */}
             <div className="divide-y divide-[#2a2a2a]">
-                {matches.length === 0 ? (
+                {isLoading && matches.length === 0 ? (
+                    <div role="status" className="p-4 text-center text-xs text-[#8e9285] animate-pulse">
+                        Cargando partidos...
+                    </div>
+                ) : matches.length === 0 ? (
                     <div className="p-4 text-center text-xs text-[#8e9285]">
                         No hay partidos programados para esta fecha.
                     </div>

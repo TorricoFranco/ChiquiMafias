@@ -138,6 +138,7 @@ export const LigaProfesionalView: React.FC<LigaProfesionalViewProps> = ({
                         selectedRound={data.selectedRound}
                         onSelectRound={data.setSelectedRound}
                         matches={data.currentRoundMatches}
+                        isLoading={data.isFixtureLoading}
                         pendingMatches={data.pendingRegularMatches}
                         simulatedResults={simulations}
                         onUpdateSimulation={handleUpdateSimulation}

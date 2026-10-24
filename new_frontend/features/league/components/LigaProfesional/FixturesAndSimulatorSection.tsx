@@ -16,6 +16,7 @@ interface FixturesAndSimulatorSectionProps {
     selectedRound: number | PlayoffStageKey;
     onSelectRound: (round: number | PlayoffStageKey) => void;
     matches: LeagueMatch[];
+    isLoading?: boolean;
     pendingMatches: LeagueMatch[];
     simulatedResults: Record<string, SimulatedResult>;
     onUpdateSimulation: (
@@ -34,6 +35,7 @@ export const FixturesAndSimulatorSection: React.FC<FixturesAndSimulatorSectionPr
     selectedRound,
     onSelectRound,
     matches,
+    isLoading,
     pendingMatches,
     simulatedResults,
     onUpdateSimulation,
@@ -48,6 +50,7 @@ export const FixturesAndSimulatorSection: React.FC<FixturesAndSimulatorSectionPr
                     selectedRound={selectedRound}
                     onSelectRound={onSelectRound}
                     matches={matches}
+                    isLoading={isLoading}
                 />
             </div>
 
