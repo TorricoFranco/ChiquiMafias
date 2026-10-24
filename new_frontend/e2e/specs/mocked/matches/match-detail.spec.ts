@@ -196,6 +196,25 @@ test.describe("Predicción del partido", () => {
     await expect(page.getByRole("article", { name: "Boca vs River" })).toBeHidden();
   });
 
+  test("sin sesión, elegir una opción pide iniciar sesión en vez de mostrar un aviso", { tag: "@p0" }, async ({ page, api }) => {
+    const match = buildMatchDetails({
+      teams: {
+        home: { id: "team-boca", name: "Boca Juniors", logo: null, short_code: "BOC" },
+        away: { id: "team-river", name: "River Plate", logo: null, short_code: "RIV" },
+      },
+    });
+    const market = buildMatchMarket({ title: "Boca vs River" });
+    api.on("GET", "/bets/markets", [market]);
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await page.getByRole("article", { name: market.title }).getByRole("button", { name: /^Boca / }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Iniciá sesión o registrate" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Entrá para apostar tus Chiqui Coins.")).toBeVisible();
+  });
+
   test("sin mercado para este partido no muestra la predicción", async ({ page, api, session }) => {
     session.loginAs("USER");
     const match = buildMatchDetails({

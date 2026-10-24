@@ -24,9 +24,6 @@ import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 import { SanitizeMessagePipe } from 'src/pipes/sanitize-message.pipe'
 import { randomUUID } from 'crypto'
 import { RedisService } from '../redis/redis.service'
-import { RolesGuard } from 'src/auth/guards/roles.guard'
-import { SystemRole } from 'src/auth/enums/roles.enum'
-import { Roles } from 'src/auth/decorators/roles.decorator'
 import { INotificationResponse } from 'src/notifications/interfaces/notification-response.interface'
 import { OnEvent } from '@nestjs/event-emitter'
 import { CreatePollDto } from 'src/polls/dto/create-poll.dto'
@@ -244,8 +241,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('on-message', messagePayload)
   }
 
-  @UseGuards(WsJwtGuard, RolesGuard)
-  @Roles(SystemRole.MODERATOR, SystemRole.ADMIN)
+  @UseGuards(WsJwtGuard)
   @UseFilters(AllWsExceptionFilter)
   @SubscribeMessage('delete_message')
   async handleDeleteMessage(
@@ -256,10 +252,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new WsException('El messageId es requerido')
     }
 
-    const deleted = await this.chatService.deleteGlobalMessage(data.messageId)
+    const result = await this.chatService.deleteGlobalMessage(
+      data.messageId,
+      client.data.user,
+    )
 
-    if (!deleted) {
+    if (result === 'not_found') {
       throw new WsException('No se encontró el mensaje o ya fue eliminado')
+    }
+    if (result === 'forbidden') {
+      throw new WsException('No podés borrar este mensaje')
     }
 
     this.server.emit('on_message_deleted', { messageId: data.messageId })

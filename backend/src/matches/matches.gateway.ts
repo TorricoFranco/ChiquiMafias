@@ -17,9 +17,6 @@ import { Server, Socket } from 'socket.io'
 import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
 import { WsJwtGuard } from '../auth/guards/ws-jwt.guard'
 import { WsTimeoutGuard } from 'src/auth/guards/ws-timeout.guard'
-import { RolesGuard } from 'src/auth/guards/roles.guard'
-import { Roles } from 'src/auth/decorators/roles.decorator'
-import { SystemRole } from '../auth/enums/roles.enum'
 
 import { SendMatchMessageDto } from './dto/response/send-match-message.dto'
 
@@ -277,8 +274,7 @@ export class MatchesGateway
     this.server.to(`match_${matchId}`).emit('on-message', messagePayload)
   }
 
-  @UseGuards(WsJwtGuard, RolesGuard)
-  @Roles(SystemRole.MODERATOR, SystemRole.ADMIN)
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('delete_message')
   async handleDeleteMatchMessage(
     @MessageBody() data: { matchId: string; messageId: string },
@@ -291,13 +287,17 @@ export class MatchesGateway
     }
 
     // 1. Mandamos al servicio a limpiar Redis
-    const deleted = await this.chatService.deleteMatchMessage(
+    const result = await this.chatService.deleteMatchMessage(
       matchId,
       messageId,
+      client.data.user,
     )
 
-    if (!deleted) {
+    if (result === 'not_found') {
       throw new WsException('No se encontró el mensaje en este partido')
+    }
+    if (result === 'forbidden') {
+      throw new WsException('No podés borrar este mensaje')
     }
 
     this.server.to(`match_${matchId}`).emit('on_message_deleted', { messageId })

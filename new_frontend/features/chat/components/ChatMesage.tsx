@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ShieldOff, MoreVertical, Trash2, Megaphone, Flag } from "lucide-react";
 import clsx from "clsx";
 import { getChatBubbleComponent } from "../config/chatBubbleRegistry";
@@ -8,7 +8,12 @@ import { NAME_COLORS } from "../config/ColorsRegistry";
 import { useCreateReport } from "@/features/supports/hooks/useSupports";
 import { moderationApi } from "@/features/moderation/api/moderationApi";
 import { useUserStore } from "@/store/useUserStore";
+import { useChatMenuStore } from "@/store/useChatMenuStore";
 import { SystemRole, SubscriptionTier, TIER_UI_CONFIG, ROLE_UI_CONFIG } from "@/features/auth/constants/ROLES_SUBSCRIPTION";
+
+// De menor a mayor jerarquía, igual que el backend (ROLE_HIERARCHY).
+const ROLE_ORDER: string[] = [SystemRole.USER, SystemRole.MODERATOR, SystemRole.ADMIN, SystemRole.PRESIDENT];
+const roleRank = (role?: string | null) => Math.max(ROLE_ORDER.indexOf(role ?? SystemRole.USER), 0);
 
 interface ChatMessageProps {
     messageId: string;
@@ -41,8 +46,14 @@ export default function ChatMessage({
     const activeColor = NAME_COLORS[nameColor || "default"] || NAME_COLORS.default;
     const BannerContainer = getChatBubbleComponent(chatBubbleId);
     const currentUserId = useUserStore((state) => state.id);
-    const isMod = currentRole === 'ADMIN' || currentRole === 'MODERATOR';
-    const [showMenu, setShowMenu] = useState(false);
+    // Moderador, admin y presidente moderan; solo sobre usuarios de menor rango (el backend lo exige igual).
+    const canModerate = roleRank(currentRole) >= roleRank(SystemRole.MODERATOR);
+    const canSanctionSender = canModerate && roleRank(currentRole) > roleRank(senderRole as string | null);
+    const openMenuId = useChatMenuStore((state) => state.openMenuId);
+    const setOpenMenuId = useChatMenuStore((state) => state.setOpenMenuId);
+    const showMenu = openMenuId === messageId;
+    const setShowMenu = (open: boolean) => setOpenMenuId(open ? messageId : null);
+    const menuRef = useRef<HTMLDivElement>(null);
     const [showReportModal, setShowReportModal] = useState(false);
 
     const [reportReason, setReportReason] = useState<'TOXIC_CHAT' | 'FRAUD' | 'BAD_BEHAVIOR' | 'OTHER'>('TOXIC_CHAT');
@@ -50,6 +61,24 @@ export default function ChatMessage({
 
     const createReport = useCreateReport();
     const reportFieldId = useId();
+
+    // Con el menú abierto: un clic afuera o Escape lo cierra.
+    useEffect(() => {
+        if (!showMenu) return;
+        const close = () => setOpenMenuId(null);
+        const onPointerDown = (e: PointerEvent) => {
+            if (!menuRef.current?.contains(e.target as Node)) close();
+        };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") close();
+        };
+        document.addEventListener("pointerdown", onPointerDown);
+        document.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.removeEventListener("pointerdown", onPointerDown);
+            document.removeEventListener("keydown", onKeyDown);
+        };
+    }, [showMenu, setOpenMenuId]);
 
     const handleTimeout = async (minutes: number) => {
         if (!userId) return alert("Error: No se encontró el ID del usuario");
@@ -184,7 +213,7 @@ export default function ChatMessage({
 
                             {/* MENU: moderar, borrar y reportar piden sesión; un visitante no ve el menú. */}
                             {userId && currentUserId && (
-                                <div className="relative">
+                                <div className="relative" ref={menuRef}>
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}
                                         aria-label={`Opciones del mensaje de ${user}`}
@@ -201,7 +230,7 @@ export default function ChatMessage({
                                             isOwnMessage ? "right-0" : "left-0"
                                         )}>
 
-                                            {isMod && !isOwnMessage && (
+                                            {canSanctionSender && !isOwnMessage && (
                                                 <>
                                                     <button onClick={() => handleTimeout(15)} className="w-full text-left px-2 py-1.5 hover:bg-gray-700 rounded text-red-400">
                                                         Mutear (15m)
@@ -213,7 +242,7 @@ export default function ChatMessage({
                                                 </>
                                             )}
 
-                                            {(isMod || isOwnMessage) && (
+                                            {(canModerate || isOwnMessage) && (
                                                 <button onClick={handleMessageDeletion} className="w-full flex items-center gap-2 text-left px-2 py-1.5 hover:bg-gray-700 rounded text-red-500">
                                                     <Trash2 className="w-3 h-3" /> Borrar
                                                 </button>

@@ -160,6 +160,72 @@ test.describe("Chat de la tribuna", () => {
     expect(api.lastRequest("POST", "/moderation/timeout")?.body).toEqual({ userId: offender.userId, durationMinutes: 15 });
   });
 
+  test("el presidente puede mutear y borrar los mensajes de otros", async ({ app, page, session, socket }) => {
+    session.loginAs("PRESIDENT");
+    const offender = buildChatMessage({ name: "Troll 3000", message: "spam spam spam" });
+    serveHistory(socket, [offender]);
+    const chat = new ChatPanel(page);
+    await app.open();
+
+    await chat.openMessageMenu("Troll 3000");
+
+    await expect(page.getByRole("button", { name: "Mutear (15m)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Borrar" })).toBeVisible();
+  });
+
+  test("un usuario común no ve borrar ni mutear en el mensaje de otro", async ({ app, page, session, socket }) => {
+    session.loginAs("USER");
+    serveHistory(socket, [buildChatMessage({ name: "Troll 3000" })]);
+    const chat = new ChatPanel(page);
+    await app.open();
+
+    await chat.openMessageMenu("Troll 3000");
+
+    await expect(page.getByRole("button", { name: "Reportar" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Borrar" })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Mutear (15m)" })).toBeHidden();
+  });
+
+  test("un moderador no puede mutear a un admin", async ({ app, page, session, socket }) => {
+    session.loginAs("MODERATOR");
+    serveHistory(socket, [buildChatMessage({ name: "Jefe", role: "ADMIN" })]);
+    const chat = new ChatPanel(page);
+    await app.open();
+
+    await chat.openMessageMenu("Jefe");
+
+    await expect(page.getByRole("button", { name: "Reportar" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mutear (15m)" })).toBeHidden();
+  });
+
+  test("las opciones de un mensaje se cierran al abrir las de otro", async ({ app, page, session, socket }) => {
+    session.loginAs("USER");
+    serveHistory(socket, [buildChatMessage({ name: "Primero" }), buildChatMessage({ name: "Segundo" })]);
+    const chat = new ChatPanel(page);
+    await app.open();
+
+    await chat.openMessageMenu("Primero");
+    await expect(page.getByRole("button", { name: "Reportar" })).toHaveCount(1);
+    await chat.openMessageMenu("Segundo");
+
+    await expect(page.getByRole("button", { name: "Reportar" })).toHaveCount(1);
+    await expect(chat.message("Primero").getByRole("button", { name: "Reportar" })).toBeHidden();
+    await expect(chat.message("Segundo").getByRole("button", { name: "Reportar" })).toBeVisible();
+  });
+
+  test("las opciones se cierran con un clic afuera", async ({ app, page, session, socket }) => {
+    session.loginAs("USER");
+    serveHistory(socket, [buildChatMessage({ name: "Primero" })]);
+    const chat = new ChatPanel(page);
+    await app.open();
+
+    await chat.openMessageMenu("Primero");
+    await expect(page.getByRole("button", { name: "Reportar" })).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await expect(page.getByRole("button", { name: "Reportar" })).toBeHidden();
+  });
+
   test("se puede reportar el mensaje de otro usuario", async ({ app, page, api, session, socket }) => {
     session.loginAs("USER");
     const offender = buildChatMessage({ name: "Troll 3000", message: "insulto" });

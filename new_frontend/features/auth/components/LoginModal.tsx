@@ -21,6 +21,7 @@ const REASON_COPY: Record<LoginModalReason, string> = {
     poll: "Entrá para votar la encuesta.",
     profile: "Entrá para ver y editar tu perfil.",
     store: "Entrá para comprar en la tienda.",
+    bets: "Entrá para apostar tus Chiqui Coins.",
 };
 
 export default function LoginModal({
