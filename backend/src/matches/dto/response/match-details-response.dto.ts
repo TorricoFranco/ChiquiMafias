@@ -80,6 +80,14 @@ class TeamStatsDto {
   @ApiProperty({ type: StatisticsDto }) statistics: StatisticsDto
 }
 
+class ShootoutKickDto {
+  @ApiProperty({ description: 'Ronda: 1.º tiro de cada equipo, 2.º…' })
+  order: number
+  @ApiProperty() teamId: string
+  @ApiProperty() player: string
+  @ApiProperty({ description: 'true si fue gol' }) scored: boolean
+}
+
 export class MatchDetailsResponseDto {
   @ApiProperty({ type: MetadataDto })
   metadata: MetadataDto
@@ -106,6 +114,12 @@ export class MatchDetailsResponseDto {
 
   @ApiProperty({ type: [Object] })
   events: any[]
+
+  @ApiProperty({
+    type: [ShootoutKickDto],
+    description: 'Tanda de penales, vacía si el partido no se definió así',
+  })
+  shootout: ShootoutKickDto[]
 
   @ApiProperty({ type: [Object] })
   lineups: any[]
