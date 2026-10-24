@@ -96,16 +96,39 @@ con `null`.
 
 ## Pendientes conocidos
 
-- **Mercados de apuestas** solo se abren para partidos con `api_fixture_id` (la liquidación busca por
-  ese campo). Un partido que cree solo Highlightly, como un playoff nuevo, no tiene mercado.
-- `LiveScoreCron` toma la liga del primer partido activo: con dos ligas en juego una queda sin
-  actualizar. Se resuelve al configurar las competiciones.
 - Los nombres de jugadores en alineaciones de Highlightly vienen abreviados (`J. Randazzo`) y en eventos
   completos: el nombre guardado puede alternar. Un mismo jugador puede quedar duplicado (uno con ID de
   API-Football, otro de Highlightly).
 - `stats_updated` llega con `stats: undefined` al front (el gateway lee `payload.stats` pero el cron
-  publica un array). Es anterior a esta migración.
-- `lineups-fetch` no tiene ventana de fecha: un partido viejo sin vínculo vuelve a avisar cada 5 min.
+  publica un array, con los ids de equipo del proveedor). Es anterior a esta migración. En el detalle de
+  un partido en vivo el bloque de estadísticas puede desaparecer hasta el próximo refetch. El arreglo
+  va como el de los eventos: que el front recargue el detalle al recibir el aviso.
+- `lineups-fetch` consulta todo partido marcado (`tracked`) sin alineación. Desde el límite de 24 h del
+  tracker de prepartido ya no toma partidos viejos, pero un partido marcado que nunca se vinculó sigue
+  avisando cada 5 min.
+- Highlightly no tiene alineaciones de los partidos de la Copa Argentina que se probaron: el detalle de
+  esos partidos no las muestra.
+- El panel del fixture de la Liga dice "No hay partidos programados" si falla la consulta de la fecha
+  (falta un estado de error con reintento).
+- Los alias de las rutas y salas viejas de la Liga (entre ellos `join_league` y la sala `league_<id>`) se borran después
+  del deploy a producción.
+
+## Qué resuelve cada cron (consumo de cuota)
+
+Todo lo que mira partidos en vivo parte de la marca `tracked`, que pone el tracker de prepartido a los
+partidos que empiezan en 30 minutos o menos (y que empezaron hace menos de 24 horas).
+
+| Cron | Frecuencia | Qué pide |
+|---|---|---|
+| Marcador en vivo | 30 s (Highlightly refresca cada 60 s) | 1 pedido por competición con partidos marcados |
+| Eventos | 1 min | 1 por partido marcado, hasta que termina (se cierra al terminar) |
+| Estadísticas | 3 min | 1 por partido ya empezado |
+| Alineaciones | 5 min | 1 por partido marcado hasta conseguirlas |
+| Fixture de la temporada | `fixtures_sync_minutes` de cada temporada | la temporada completa, paginada |
+| Tabla | `standings_sync_minutes` de cada temporada, y al terminar un partido | 1 |
+
+Los logs `[CUOTA]` (cada hora, con lo que queda de la cuota), `[VIVO]`, `[MAPEO]` y `[APUESTAS]` sirven
+para seguirlo en vivo: `docker logs -f football_backend 2>&1 | grep -E "\[VIVO\]|\[MAPEO\]|\[CUOTA\]|\[APUESTAS\]"`.
 
 ## Activar la Copa Argentina
 
