@@ -163,7 +163,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
 
                     {activeTab === 'chat' && (
                         chatState === 'OPEN' ? (
-                            <MatchChat matchId={matchId} className="w-full h-[600px] shrink-0" />
+                            <MatchChat matchId={matchId} className="w-full h-[80dvh] min-h-[600px] max-h-[900px] shrink-0" />
                         ) : (
                             <ChatNotice state={chatState} />
                         )

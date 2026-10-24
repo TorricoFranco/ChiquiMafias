@@ -239,7 +239,7 @@ export default function ChatMessage({
 
                         {/* CONTENIDO DEL MENSAJE O STICKER */}
                         {stickerId ? (
-                            <div className="mt-1 w-40 h-40 animate-in zoom-in-50 duration-200">
+                            <div className="mt-1 w-28 h-28 animate-in zoom-in-50 duration-200">
                                 <img src={`/cosmetics/stickers/${stickerId}.webp`} alt="Sticker" className="w-full h-full object-contain" />
                             </div>
                         ) : (
