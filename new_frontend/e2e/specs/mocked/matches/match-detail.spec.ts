@@ -1,4 +1,4 @@
-import type { MatchDetails } from "@/features/matches/types";
+import type { MatchDetails, MatchStatistics } from "@/features/matches/types";
 import { expect, test } from "../../../fixtures/test";
 import { buildMarket, buildMatchMarket } from "../../../factories/bets";
 import { buildChatMessage, buildMatchChatMessage } from "../../../factories/chat";
@@ -82,6 +82,49 @@ test.describe("Detalle de partido", () => {
 
     await expect(scoreboard(page)).toHaveAccessibleName("Marcador: Boca Juniors 1, River Plate 0");
     await expect(page.getByText("1T 23'")).toBeVisible();
+  });
+
+  test("un aviso de estadísticas nuevas actualiza el bloque sin hacerlo desaparecer", async ({ page, api, socket }) => {
+    const statistics = (possession: string): MatchStatistics => ({
+      fouls: null,
+      offsides: null,
+      "passes_%": null,
+      red_cards: null,
+      total_shots: 8,
+      corner_kicks: null,
+      total_passes: null,
+      yellow_cards: null,
+      blocked_shots: null,
+      shots_on_goal: null,
+      expected_goals: null,
+      shots_off_goal: null,
+      ball_possession: possession,
+      goals_prevented: null,
+      passes_accurate: null,
+      shots_insidebox: null,
+      goalkeeper_saves: null,
+      shots_outsidebox: null,
+    });
+    const withStats = (possession: string) => [
+      { teamId: "team-boca", teamName: "Boca Juniors", teamLogo: null, statistics: statistics(possession) },
+      { teamId: "team-river", teamName: "River Plate", teamLogo: null, statistics: statistics("38%") },
+    ];
+    const live = buildMatchDetails({ metadata: { status: "2H" }, score: { home: 0, away: 0, elapsed: 60 }, stats: withStats("52%") });
+    let current = live;
+    api.on("GET", "/matches/:matchId", () => current);
+    api.on("GET", "/matches/pre-match/:matchId", buildPreMatch());
+
+    await page.goto(`/match/${live.metadata.id}`);
+    await expect(page.getByText("Posesión del Balón")).toBeVisible();
+    await expect(page.getByText("52%")).toBeVisible();
+    await socket.waitForEmit("join_match");
+
+    current = { ...live, stats: withStats("61%") };
+    // El gateway publica `stats_updated` con `stats` sin definir: en el cable queda solo el `matchId`.
+    await socket.emit("stats_updated", { matchId: live.metadata.id });
+
+    await expect(page.getByText("61%")).toBeVisible();
+    await expect(page.getByText("Posesión del Balón")).toBeVisible();
   });
 
   test("un gol avisado por socket aparece en la cronología y entre los goleadores del marcador", { tag: "@p0" }, async ({ page, api, socket }) => {
