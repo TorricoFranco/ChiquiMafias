@@ -25,6 +25,49 @@ Estado, decisiones y checklist de corte. La rama de integración es
 | `API_FOOTBALL_KEY` | obligatoria con `api-football` |
 | `HIGHLIGHTLY_API_KEY` | obligatoria con `highlightly` |
 
+## Cómo correr los scripts
+
+Los scripts (`scripts/link-provider-ids.ts`, `scripts/backfill-match-details.ts`) necesitan `ts-node`, y
+la imagen de producción no lo trae ni copia `scripts/`. Hay dos formas según el entorno.
+
+**Desarrollo.** El contenedor del backend ya tiene todo (`DATABASE_URL`, `tsconfig-paths`, `CLOUDINARY_*`):
+
+```bash
+docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/<script>.ts <argumentos>
+```
+
+Los archivos de `--decisions` van en `/tmp` del contenedor.
+
+**Producción (VPS).** Se usa una imagen de herramientas armada con el mismo `Dockerfile` (etapa
+`build`). Tiene que correr con **dos redes**: `chiquimafias_data` llega a Postgres pero no tiene salida a
+internet, y `chiquimafias_app` tiene salida (Highlightly, Cloudinary) pero no llega a Postgres. Por eso
+se crea el contenedor en una y se conecta a la otra antes de arrancarlo. Desde `/srv/chiquimafias`:
+
+```bash
+docker build --target build -t chiquimafias-tools ./backend   # repetir después de cada git pull
+mkdir -p tools-work                                           # acá quedan los archivos de decisiones
+
+tool() {
+  docker rm -f tools-run >/dev/null 2>&1
+  docker create --name tools-run --env-file .env --network chiquimafias_app \
+    -v "$PWD/tools-work:/work" chiquimafias-tools \
+    npx ts-node -r tsconfig-paths/register "$@" >/dev/null &&
+  docker network connect chiquimafias_data tools-run &&
+  docker start -a tools-run
+  docker rm -f tools-run >/dev/null 2>&1
+}
+```
+
+Después se usa como `tool scripts/<script>.ts <argumentos>`, con los archivos de decisiones en
+`/work/…` (la carpeta `tools-work/` del host). Notas:
+
+- El archivo de decisiones lo crea el contenedor como `root`: para editarlo, reemplazalo (`cp`, editar y
+  `mv` sobre el original; la carpeta es tuya) en lugar de abrirlo en el lugar.
+- Con `--env-file .env` el script lee las claves sin que se impriman. No pegues el `.env` en ningún chat.
+- Antes de cada `--apply` hacé un backup: `scripts/ops/backup.sh`.
+- En los ejemplos de abajo, el prefijo de desarrollo es `docker exec football_backend npx ts-node -r tsconfig-paths/register`
+  y el de producción es `tool`.
+
 ## Checklist de corte a Highlightly (dev y prod)
 
 **No activar `FOOTBALL_PROVIDER=highlightly` antes de completar los puntos 1 a 3.** Sin vínculos, los
@@ -38,10 +81,14 @@ partidos no se actualizan.
    duplicar:
 
    ```bash
-   # desde el contenedor del backend (tiene la DATABASE_URL, tsconfig-paths y CLOUDINARY_*)
-   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/link-provider-ids.ts      --slug liga-profesional --season 2026 --league-ext 109712 --decisions /tmp/liga.json        # informe
-   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/link-provider-ids.ts      --slug liga-profesional --season 2026 --decisions /tmp/liga.json --apply                    # escribe
+   # desarrollo: docker exec football_backend npx ts-node -r tsconfig-paths/register …  (archivos en /tmp)
+   # producción: tool …  (ver "Cómo correr los scripts"; archivos en /work)
+   tool scripts/link-provider-ids.ts --slug liga-profesional --season 2026 --league-ext 109712 --decisions /work/liga.json            # informe
+   tool scripts/link-provider-ids.ts --slug liga-profesional --season 2026 --league-ext 109712 --decisions /work/liga.json --apply    # escribe
    ```
+
+   Con `--league-ext` en las dos corridas: mientras no se aplica, el vínculo de la liga todavía no existe
+   y sin ese argumento el script se detiene.
 
    - La competición se identifica por su `slug` y la temporada tiene que existir en la base.
      `--league-ext` (ID de la liga en Highlightly) hace falta solo la primera vez.
@@ -76,8 +123,10 @@ partidos no se actualizan.
    ```
 
    Tiene que devolver 0 filas. Idealmente, cortar entre fechas, sin partidos en juego.
-4. Poner `HIGHLIGHTLY_API_KEY` y `FOOTBALL_PROVIDER=highlightly`, reiniciar, y mirar los logs del primer
-   ciclo (`Equipo sin vincular`, `Partido activo … sin ID`).
+4. Poner `HIGHLIGHTLY_API_KEY` y `FOOTBALL_PROVIDER=highlightly`, recrear el backend, y mirar los logs del
+   primer ciclo (`Equipo sin vincular`, `Partido activo … sin ID`). En producción usá
+   `docker compose up -d --force-recreate backend`: `restart` no vuelve a leer el `.env`, y `up -d` a
+   secas puede no recrear el contenedor aunque el `.env` haya cambiado.
 5. Comparar contra API-Football en un partido en vivo: orden de `form` (últimos 5), sustituciones
    (`player` sale, `assist` entra), estados durante el juego.
    - **Orden de `/last-five-games` y `/head-2-head`: verificado, vienen del más reciente al más
@@ -128,7 +177,8 @@ partidos que empiezan en 30 minutos o menos (y que empezaron hace menos de 24 ho
 | Tabla | `standings_sync_minutes` de cada temporada, y al terminar un partido | 1 |
 
 Los logs `[CUOTA]` (cada hora, con lo que queda de la cuota), `[VIVO]`, `[MAPEO]` y `[APUESTAS]` sirven
-para seguirlo en vivo: `docker logs -f football_backend 2>&1 | grep -E "\[VIVO\]|\[MAPEO\]|\[CUOTA\]|\[APUESTAS\]"`.
+para seguirlo en vivo: `docker logs -f football_backend 2>&1 | grep -E "\[VIVO\]|\[MAPEO\]|\[CUOTA\]|\[APUESTAS\]"`
+(en producción: `docker compose logs -f backend`).
 
 ## Activar la Copa Argentina
 
@@ -141,10 +191,8 @@ aparece en `GET /competitions` y en el menú de Ligas. Pasos, con `FOOTBALL_PROV
    `--league-ext 111414`; revisá el archivo de decisiones antes del `--apply`:
 
    ```bash
-   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/link-provider-ids.ts \
-     --slug copa-argentina --season 2026 --league-ext 111414 --decisions /tmp/copa.json
-   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/link-provider-ids.ts \
-     --slug copa-argentina --season 2026 --decisions /tmp/copa.json --apply
+   tool scripts/link-provider-ids.ts --slug copa-argentina --season 2026 --league-ext 111414 --decisions /work/copa.json
+   tool scripts/link-provider-ids.ts --slug copa-argentina --season 2026 --league-ext 111414 --decisions /work/copa.json --apply
    ```
 
    Crea los equipos que faltan con su escudo en Cloudinary y registra los 64 participantes.
@@ -164,10 +212,8 @@ aparece en `GET /competitions` y en el menú de Ligas. Pasos, con `FOOTBALL_PROV
    con `--apply`:
 
    ```bash
-   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/backfill-match-details.ts \
-     --slug copa-argentina
-   docker exec football_backend npx ts-node -r tsconfig-paths/register scripts/backfill-match-details.ts \
-     --slug copa-argentina --apply
+   tool scripts/backfill-match-details.ts --slug copa-argentina
+   tool scripts/backfill-match-details.ts --slug copa-argentina --apply
    ```
 
    Gasta 2 pedidos por partido (60 partidos jugados = 120 pedidos, el 1,6 % de la cuota diaria). Es
