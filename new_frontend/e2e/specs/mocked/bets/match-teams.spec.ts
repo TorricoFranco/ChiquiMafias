@@ -144,4 +144,29 @@ test.describe("Cabecera de partidos con escudos", () => {
     await expect(card.getByRole("img", { name: "Boca Juniors", exact: true })).toBeVisible();
     await expect(card.getByRole("img", { name: "River Plate", exact: true })).toBeVisible();
   });
+
+  test("un equipo sin ID de API-Football muestra su escudo de Cloudinary", async ({ app, page, api }) => {
+    const cloudinaryBadge = "https://res.cloudinary.com/chiqui/image/upload/team-badges/team_midland.png";
+    const market = buildMatchMarket({
+      title: "Midland vs Huracán - Copa Argentina",
+      metadata: {
+        homeTeam: { name: "Midland", short: "MID", logoUrl: cloudinaryBadge },
+        awayTeam: { name: "Huracán", short: "HUR", logoUrl: "445" },
+      },
+      options: [
+        buildOption({ name: "Midland", logoUrl: cloudinaryBadge }),
+        buildOption({ name: "Empate" }),
+        buildOption({ name: "Huracán", logoUrl: "445" }),
+      ],
+    });
+    api.on("GET", "/bets/markets", [market]);
+    const bets = new BetsPage(page);
+
+    await app.open();
+    await app.goToSection("Apuestas");
+    const card = bets.market(market.title);
+
+    await expect(card.getByRole("img", { name: "Midland", exact: true })).toHaveAttribute("src", cloudinaryBadge);
+    await expect(card.getByRole("img", { name: "Huracán", exact: true })).toHaveAttribute("src", "/escudos-api/445.webp");
+  });
 });

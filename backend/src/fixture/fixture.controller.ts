@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common'
+import { Controller, Get, NotFoundException, Param } from '@nestjs/common'
 
 import { ApiResponse, ApiParam, ApiOperation, ApiTags } from '@nestjs/swagger'
 
@@ -12,12 +12,28 @@ import { GetLiveScoresResponseDto } from './dto/response/live-score.dto'
 import { TournamentBracketsResponseDto } from './dto/response/tournament-bracket.dto'
 import { AvailableStagesResponseDto } from './dto/response/available-stages.dto'
 import { Public } from 'src/auth/decorators/auth.decorator'
+import {
+  CompetitionsService,
+  LEGACY_COMPETITION_SLUG,
+} from 'src/competitions/competitions.service'
 
+// Número de fecha o ronda de playoff: lo único que puede llegar a la clave de
+// caché de la fecha (ERS RNF-S01).
+const MATCHDAY_PATTERN = /^(\d{1,2}|octavos|cuartos|semifinal|final)$/
+
+/**
+ * Rutas de la Liga Profesional sin competición en la URL. Quedan como alias de
+ * `/competitions/liga-profesional` hasta que el front nuevo esté en producción:
+ * solo responden la temporada actual y una fase del formato.
+ */
 @ApiTags('Fixtures')
 @Public()
 @Controller('fixtures')
 export class FixtureController {
-  constructor(private readonly fixturesService: FixtureService) {}
+  constructor(
+    private readonly fixturesService: FixtureService,
+    private readonly competitions: CompetitionsService,
+  ) {}
 
   @Get('seasons/:season/tournaments/:tournament/matchday/:matchday')
   @ApiOperation({
@@ -51,10 +67,18 @@ export class FixtureController {
     @Param('tournament') tournament: string,
     @Param('matchday') matchday: string,
   ): Promise<GetFixtureMatchdayResponseDto> {
-    return this.fixturesService.getFixtureByMatchday(
+    const { competition, stage } = await this.competitions.resolveLegacy(
       season,
       tournament,
-      matchday,
+    )
+    const normalized = String(matchday).toLowerCase().trim()
+    if (!MATCHDAY_PATTERN.test(normalized)) {
+      throw new NotFoundException(`La fecha ${matchday} no existe`)
+    }
+    return this.fixturesService.getFixtureByMatchday(
+      competition,
+      stage!,
+      normalized,
     )
   }
 
@@ -78,7 +102,8 @@ export class FixtureController {
   async getYearlyCalendar(
     @Param('season') season: string,
   ): Promise<GetYearlyCalendarResponseDto> {
-    return await this.fixturesService.getYearlyCalendar(season)
+    const { competition } = await this.competitions.resolveLegacy(season)
+    return await this.fixturesService.getYearlyCalendar(competition)
   }
 
   @Get('pendings/seasons/:season/tournaments/:tournament')
@@ -103,10 +128,11 @@ export class FixtureController {
     @Param('season') season: string,
     @Param('tournament') tournament: string,
   ): Promise<GetPendingFixturesResponseDto[]> {
-    return this.fixturesService.getPendingFixtures(
-      parseInt(season, 10),
-      tournament.toUpperCase() as 'APERTURA' | 'CLAUSURA',
+    const { competition, stage } = await this.competitions.resolveLegacy(
+      season,
+      tournament,
     )
+    return this.fixturesService.getPendingFixtures(competition, stage!)
   }
 
   @Get('live-scores')
@@ -122,7 +148,10 @@ export class FixtureController {
     isArray: true,
   })
   async getLiveScores(): Promise<GetLiveScoresResponseDto[]> {
-    return this.fixturesService.getLiveLeagueScores()
+    const competition = await this.competitions.resolveCurrent(
+      LEGACY_COMPETITION_SLUG,
+    )
+    return this.fixturesService.getLiveLeagueScores(competition)
   }
 
   @Get('seasons/:season/tournaments/:tournament/active-matchday')
@@ -146,9 +175,13 @@ export class FixtureController {
     @Param('season') season: string,
     @Param('tournament') tournament: string,
   ): Promise<GetActiveMatchdayResponseDto> {
-    const activeDay = await this.fixturesService.getActiveMatchdayInfo(
+    const { competition, stage } = await this.competitions.resolveLegacy(
       season,
       tournament,
+    )
+    const activeDay = await this.fixturesService.getActiveMatchdayInfo(
+      competition,
+      stage!,
     )
 
     return { active_matchday: activeDay.toString() }
@@ -179,7 +212,11 @@ export class FixtureController {
     @Param('season') season: string,
     @Param('tournament') tournament: string,
   ): Promise<TournamentBracketsResponseDto> {
-    return await this.fixturesService.getTournamentBrackets(season, tournament)
+    const { competition, stage } = await this.competitions.resolveLegacy(
+      season,
+      tournament,
+    )
+    return await this.fixturesService.getTournamentBrackets(competition, stage!)
   }
 
   @Get('seasons/:season/tournaments/:tournament/availableStage')
@@ -207,6 +244,10 @@ export class FixtureController {
     @Param('season') season: string,
     @Param('tournament') tournament: string,
   ): Promise<AvailableStagesResponseDto> {
-    return await this.fixturesService.getAvailableStages(season, tournament)
+    const { competition, stage } = await this.competitions.resolveLegacy(
+      season,
+      tournament,
+    )
+    return await this.fixturesService.getAvailableStages(competition, stage!)
   }
 }

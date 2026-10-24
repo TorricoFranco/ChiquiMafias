@@ -6,9 +6,11 @@ interface MatchTimelineProps {
   events: MatchEvent[];
   homeTeam: Team;
   awayTeam: Team;
+  /** Cancha neutral (Copa Argentina): no se dice local ni visitante. */
+  neutralVenue?: boolean;
 }
 
-export const MatchTimeline: React.FC<MatchTimelineProps> = ({ events, homeTeam, awayTeam }) => {
+export const MatchTimeline: React.FC<MatchTimelineProps> = ({ events, homeTeam, awayTeam, neutralVenue = false }) => {
   if (!events || events.length === 0) {
     return (
       <div className="rounded-2xl bg-[#1c1b1b] border border-[#2b2a2a] p-8 text-center my-4">
@@ -105,10 +107,10 @@ export const MatchTimeline: React.FC<MatchTimelineProps> = ({ events, homeTeam, 
                   {isSubst ? (
                     <div className="text-xs mt-1 flex flex-col items-end gap-0.5 w-full">
                       <span className="text-emerald-400 font-semibold truncate w-full">
-                        Entra: {ev.substitutionLog?.playerIn || ev.player?.name}
+                        Entra: {ev.substitutionLog?.playerOut || ev.assist?.name}
                       </span>
                       <span className="text-red-400/80 font-medium truncate w-full">
-                        Sale: {ev.substitutionLog?.playerOut || ev.assist?.name}
+                        Sale: {ev.substitutionLog?.playerIn || ev.player?.name}
                       </span>
                     </div>
                   ) : (
@@ -163,10 +165,10 @@ export const MatchTimeline: React.FC<MatchTimelineProps> = ({ events, homeTeam, 
                   {isSubst ? (
                     <div className="text-xs mt-1 flex flex-col items-start gap-0.5 w-full">
                       <span className="text-emerald-400 font-semibold truncate w-full">
-                        Entra: {ev.substitutionLog?.playerIn || ev.player?.name}
+                        Entra: {ev.substitutionLog?.playerOut || ev.assist?.name}
                       </span>
                       <span className="text-red-400/80 font-medium truncate w-full">
-                        Sale: {ev.substitutionLog?.playerOut || ev.assist?.name}
+                        Sale: {ev.substitutionLog?.playerIn || ev.player?.name}
                       </span>
                     </div>
                   ) : (
@@ -200,12 +202,26 @@ export const MatchTimeline: React.FC<MatchTimelineProps> = ({ events, homeTeam, 
       </div>
 
       <div className="flex justify-between items-center mb-6 px-2 opacity-80">
-        <div className="w-[45%] text-right font-bold text-[#d2f000] uppercase text-[10px] md:text-xs truncate pr-4">
-          Local: {homeTeam.name}
+        <div
+          className="w-[45%] flex justify-center font-bold text-[#d2f000] uppercase text-[10px] md:text-xs truncate"
+          title={neutralVenue ? homeTeam.name : `Local: ${homeTeam.name}`}
+        >
+          {homeTeam.logo ? (
+            <img src={homeTeam.logo} alt={homeTeam.name} className="w-8 h-8 md:w-10 md:h-10 object-contain" referrerPolicy="no-referrer" />
+          ) : (
+            homeTeam.name
+          )}
         </div>
         <div className="w-[10%] text-center text-[#8e9285] text-[10px] font-mono">VS</div>
-        <div className="w-[45%] text-left font-bold text-blue-400 uppercase text-[10px] md:text-xs truncate pl-4">
-          Visita: {awayTeam.name}
+        <div
+          className="w-[45%] flex justify-center font-bold text-blue-400 uppercase text-[10px] md:text-xs truncate"
+          title={neutralVenue ? awayTeam.name : `Visita: ${awayTeam.name}`}
+        >
+          {awayTeam.logo ? (
+            <img src={awayTeam.logo} alt={awayTeam.name} className="w-8 h-8 md:w-10 md:h-10 object-contain" referrerPolicy="no-referrer" />
+          ) : (
+            awayTeam.name
+          )}
         </div>
       </div>
 

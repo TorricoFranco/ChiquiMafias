@@ -3,13 +3,15 @@ import { io, Socket } from 'socket.io-client';
 import { useUserStore } from '@/store/useUserStore';
 import { useLiveScores } from '../hooks/useFixture';
 import { formatToMapFixtureSocket } from '../utils/formatToMapFixtureSocket';
+import { LIVE_STATUSES } from '../utils/liveStatus';
 import type { LeagueLiveUpdate, LiveResult } from '../types';
 
-export const useLeagueLive = (leagueId: string) => {
+/** Marcadores en vivo de una competición: los iniciales por REST y después por socket. */
+export const useLeagueLive = (slug: string) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const { accessToken } = useUserStore(); 
 
-  const { data: initialLive, isLoading } = useLiveScores();
+  const { data: initialLive, isLoading } = useLiveScores(slug);
   const [liveResults, setLiveResults] = useState<Record<string, LiveResult>>(() =>
     initialLive ? formatToMapFixtureSocket(initialLive) : {}
   );
@@ -27,7 +29,7 @@ export const useLeagueLive = (leagueId: string) => {
   }
 
   useEffect(() => {
-    if (!leagueId) return;
+    if (!slug) return;
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -40,7 +42,12 @@ export const useLeagueLive = (leagueId: string) => {
 
     wsSocket.on("connect", () => {
       console.log(`✅ Conectado al socket de ligas`);
-      wsSocket.emit('join_league', { leagueId });
+      // El backend responde `{ status: 'ok' }` o el error (competición inexistente).
+      wsSocket.emit('join_competition', { slug }, (res?: { status?: string; code?: string; message?: string }) => {
+        if (res?.status && res.status !== 'ok') {
+          console.warn(`No se pudo seguir en vivo "${slug}": ${res.message ?? res.code ?? 'error desconocido'}`);
+        }
+      });
     });
 
     wsSocket.on("disconnect", () => {
@@ -52,11 +59,11 @@ export const useLeagueLive = (leagueId: string) => {
 
     return () => {
       if (wsSocket.connected) {
-        wsSocket.emit('leave_league', { leagueId });
+        wsSocket.emit('leave_competition', { slug });
       }
       wsSocket.disconnect();
     };
-  }, [accessToken, leagueId]);
+  }, [accessToken, slug]);
 
   const handleLeagueUpdate = useCallback((matches: Record<string, LeagueLiveUpdate>) => {
     console.log('🏆 on_league_update payload:', matches); 
@@ -73,7 +80,8 @@ export const useLeagueLive = (leagueId: string) => {
           homeTeamId: live.homeTeamId,
           awayTeamId: live.awayTeamId,
           status: live.status,
-          isLive: true,
+          // Un partido que terminó también llega por acá, una última vez, con su resultado final.
+          isLive: LIVE_STATUSES.includes(live.status),
           isPlayoff: !!live.isPlayoff,
           elapsed: live.elapsed 
         };

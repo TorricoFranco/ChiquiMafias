@@ -23,11 +23,15 @@ export type LeagueLiveUpdatePayload = Record<string, LeagueLiveScore>
 
 export interface MatchLiveUpdatePayload {
   matchId: string
-  type: 'SCORE_UPDATED' | 'MINUTE_TICK'
+  // MATCH_ENDED: el partido terminó (cierra el chat y el front recarga el detalle)
+  type: 'SCORE_UPDATED' | 'MINUTE_TICK' | 'MATCH_ENDED'
   h: number
   a: number
   status: string
-  elapsed: number
+  elapsed: number | null
+  // Ver backend/src/matches/utils/match-chat.util.ts
+  chatState: 'NOT_STARTED' | 'OPEN' | 'PAUSED' | 'CLOSED'
+  chatActive: boolean
 }
 
 export interface StatsUpdatedPayload {
@@ -40,16 +44,21 @@ export interface StatsUpdatedPayload {
   }>
 }
 
+/**
+ * `lastEvent` es el evento crudo del proveedor (`toWireEvent` en
+ * events-fetch.cron.ts): los ids de equipo y jugador son los del proveedor, no
+ * los internos. El front no lo usa para armar la cronología, solo recarga el
+ * detalle del partido.
+ */
 export interface TimelineUpdatedPayload {
   matchId: string
   lastEvent: {
-    id?: string
-    type: 'Goal' | 'Card' | 'subst' | 'Var'
-    minute?: number
-    time?: { elapsed: number }
-    team?: { id: string; name: string; logo_url?: string }
-    player?: { id: string; name: string; photo?: string | null }
-    detail?: string
+    time: { elapsed: number; extra: number | null }
+    team: { id: number; name: string; logo?: string } | null
+    player: { id: number; name: string } | null
+    assist: { id: number; name: string } | null
+    type: string
+    detail: string
   } | null
   totalEvents: number
 }
@@ -128,6 +137,11 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
+  join_competition: (
+    data: { slug: string },
+    callback?: (response: { status: 'ok' } | { status: 'error' }) => void,
+  ) => void
+  leave_competition: (data: { slug: string }) => void
   join_league: (
     data: { leagueId: string },
     callback?: (error: any) => void,

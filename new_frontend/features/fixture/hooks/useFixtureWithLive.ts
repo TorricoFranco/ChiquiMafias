@@ -1,11 +1,12 @@
 import { useFixtureMatchday } from './useFixture';
 import { useLeagueLive } from '../socket/useFixtureSocket';
+import { LIVE_STATUSES, liveFor } from '../utils/liveStatus';
 
 export const useFixtureWithLive = (
     season: string, 
     tournament: string, 
-    matchday: string, 
-    leagueId: string 
+    matchday: string,
+    slug: string
 ) => {
     const { 
         data: fixtureData, 
@@ -14,11 +15,11 @@ export const useFixtureWithLive = (
 
     const { 
         liveResults 
-    } = useLeagueLive(leagueId);
+    } = useLeagueLive(slug);
 
     const mergedMatches = fixtureData?.matches.map(match => {
-        const liveData = liveResults[match.id]; 
-        
+        const liveData = liveFor(match, liveResults[match.id]);
+
         if (liveData) {
             return {
                 ...match,
@@ -28,7 +29,7 @@ export const useFixtureWithLive = (
                 away_penalty_goals: liveData.ap,
                 status_short: liveData.status,
                 elapsed: liveData.elapsed,
-                is_live: ['1H', '2H', 'HT', 'ET', 'BT', 'P', 'LIVE'].includes(liveData.status)
+                is_live: LIVE_STATUSES.includes(liveData.status)
             };
         }
         

@@ -10,10 +10,7 @@ import {
 import { RedisService } from 'src/redis/redis.service'
 import { NotFoundException } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { ApiFootballHttp } from 'src/api-football/http/api-football.http'
-import { ApiFootballResponse } from 'src/api-football/interfaces/types'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { ApiFixture } from 'src/api-football/interfaces/fixture'
 import { SystemRole } from 'src/auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
@@ -29,7 +26,6 @@ export class TestEventsController {
   constructor(
     private readonly redisService: RedisService,
     private prisma: PrismaService,
-    private http: ApiFootballHttp,
   ) {}
 
   @ApiOperation({

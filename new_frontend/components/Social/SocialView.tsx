@@ -64,7 +64,7 @@ export const SocialView = () => {
 
         {activeTab === "Vivo" && (
           <div className="w-full max-w-2xl mx-auto">
-            <SidebarFixtureList season="2026" leagueId="1" />
+            <SidebarFixtureList />
           </div>
         )}
 

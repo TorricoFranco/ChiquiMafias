@@ -2,13 +2,20 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 
-import { PrematchServiceApi } from 'src/api-football/services/prematch.api'
+import { PrematchServiceApi } from 'src/football/services/prematch.api'
+import { FootballRefsService } from 'src/football/services/refs.service'
 import { MatchesMappers } from './matches.mappers'
+import { getMatchChatState } from './utils/match-chat.util'
 
-import { MatchDetailsResponseDto } from './dto/response/match-details-response.dto'
+import {
+  MatchDetailsResponseDto,
+  MatchWithCompetitionResponseDto,
+} from './dto/response/match-details-response.dto'
+import { CompetitionsService } from 'src/competitions/competitions.service'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
 import { StandingsService } from 'src/standings/standings.service'
+import { splitPenaltyShootout } from './utils/penalty-shootout.util'
 
 @Injectable()
 export class MatchesService {
@@ -23,14 +30,62 @@ export class MatchesService {
     private redisService: RedisService,
     private api: PrematchServiceApi,
     private standingsService: StandingsService,
+    private refs: FootballRefsService,
+    private competitions: CompetitionsService,
   ) {}
+
+  /**
+   * El partido y su competición, solo si es de la temporada actual de su
+   * competición (ERS RF-A04). Si no, 404: la API pública no expone temporadas
+   * anteriores.
+   */
+  async findCurrentSeasonMatch(matchId: string) {
+    const match = await this.prisma.matches.findUnique({
+      where: { id: matchId },
+      select: { league_id: true, season: true },
+    })
+    const competition = match
+      ? await this.competitions.findCurrentByLeagueId(match.league_id)
+      : null
+    if (!match || !competition || competition.season !== match.season) {
+      throw new NotFoundException('Partido no encontrado')
+    }
+    return { match, competition }
+  }
+
+  /**
+   * Detalle de un partido con su competición. Solo partidos de la temporada
+   * actual de su competición (ERS RF-A04): el resto da 404.
+   */
+  async getMatchDetailsById(
+    matchId: string,
+  ): Promise<MatchWithCompetitionResponseDto> {
+    const { match, competition } = await this.findCurrentSeasonMatch(matchId)
+
+    const details = await this.getMatchDetails(
+      match.league_id,
+      String(match.season),
+      matchId,
+    )
+    return {
+      ...details,
+      competition: {
+        slug: competition.slug,
+        name: competition.name,
+        shortName: competition.shortName,
+        neutralVenue: competition.neutralVenue,
+        seasonLabel: competition.seasonLabel,
+      },
+    }
+  }
 
   async getMatchDetails(
     leagueId: string,
     season: string,
     matchId: string,
   ): Promise<MatchDetailsResponseDto> {
-    const cacheKey = `match:details:v1:${matchId}`
+    // v2: suma chatState y chatActive pasó a depender del estado del partido.
+    const cacheKey = `match:details:v2:${matchId}`
     const cached = await this.redisService.redis.get(cacheKey)
     if (cached) return JSON.parse(cached)
 
@@ -54,6 +109,7 @@ export class MatchesService {
             venue: true,
             league: {
               select: {
+                id: true,
                 api_league_id: true,
               },
             },
@@ -66,7 +122,7 @@ export class MatchesService {
 
         // Recuperar data de live scores si existe
         const liveDataRaw = await this.redisService.redis.hget(
-          `live_scores:league:${match.league.api_league_id}`,
+          `live_scores:league:${match.league.api_league_id ?? match.league.id}`,
           matchId,
         )
         if (liveDataRaw) {
@@ -98,7 +154,13 @@ export class MatchesService {
 
         // USAMOS EL MAPPER CORREGIDO
 
-        const liveSummary = MatchesMappers.formatSummaryFromEvents(events)
+        // La tanda de penales va aparte: no es parte de la cronología ni de los goles.
+        const { events: matchEvents, shootout } = splitPenaltyShootout(
+          events,
+          match.home_penalty_goals !== null &&
+            match.away_penalty_goals !== null,
+        )
+        const liveSummary = MatchesMappers.formatSummaryFromEvents(matchEvents)
 
         const finalVenue = match.venue || match.home_team.venue
         const isLive = [
@@ -154,14 +216,16 @@ export class MatchesService {
             },
           },
           lineups: lineup,
-          events: events,
+          events: matchEvents,
+          shootout,
           stats: statistics.map((s) => ({
             ...s,
             teamLogo: s.teamLogo ?? '',
           })),
           isLive,
-          chatActive:
-            match.lineup_fetched && (isLive || match.status_short === 'PEN'),
+          // El chat depende solo del estado del partido (ERS RF-A14).
+          chatState: getMatchChatState(match.status_short),
+          chatActive: getMatchChatState(match.status_short) === 'OPEN',
         }
 
         const ttl = isLive ? 10 : 3600
@@ -280,7 +344,7 @@ export class MatchesService {
     const cacheKey = `pre_match:v2:${matchId}`
     const staleKey = `pre_match:v2:stale:${matchId}`
 
-    // Endpoint público: sin esta lectura, cada visita hace 3 llamadas a API-Football
+    // Endpoint público: sin esta lectura, cada visita hace 3 llamadas al proveedor
     const cached = await this.redisService.redis.get(cacheKey)
     if (cached) return JSON.parse(cached) as PreMatchResponseDto
 
@@ -302,15 +366,22 @@ export class MatchesService {
         const hId = String(match.home_team.id)
         const aId = String(match.away_team.id)
 
-        const hIdApi = String(match.home_team.api_team_id)
-        const aIdApi = String(match.away_team.api_team_id)
+        // IDs de los equipos en el proveedor activo.
+        const [hExternal, aExternal] = await Promise.all([
+          this.refs.teamExternalId(match.home_team),
+          this.refs.teamExternalId(match.away_team),
+        ])
+        const hIdApi = String(hExternal)
+        const aIdApi = String(aExternal)
+        const hasExternalIds = hExternal !== null && aExternal !== null
         const leagueId = match.league_id
         const season = match.season
 
+        // Sin vínculo con el proveedor no hay historial ni forma; la tabla sí.
         const [h2h, hForm, aForm, standings] = await Promise.all([
-          this.api.getH2H(`${hIdApi}-${aIdApi}`),
-          this.api.getLatestResults(hIdApi),
-          this.api.getLatestResults(aIdApi),
+          hasExternalIds ? this.api.getH2H(hIdApi, aIdApi) : [],
+          hasExternalIds ? this.api.getLatestResults(hIdApi) : '',
+          hasExternalIds ? this.api.getLatestResults(aIdApi) : '',
           this.standingsService.getCachedFullStandings(leagueId, season),
         ])
 
@@ -322,6 +393,9 @@ export class MatchesService {
           aIdApi,
         )
 
+        // Sin vínculo con el proveedor el resultado es parcial: no se cachea.
+        if (!hasExternalIds) return processed
+
         const serialized = JSON.stringify(processed)
         await this.redisService.redis.set(
           cacheKey,
@@ -329,7 +403,7 @@ export class MatchesService {
           'EX',
           this.CACHE_TTL,
         )
-        // Copia de respaldo con TTL largo: solo se lee si API-Football falla
+        // Copia de respaldo con TTL largo: solo se lee si el proveedor falla
         // después de que venció la key principal.
         await this.redisService.redis.set(
           staleKey,

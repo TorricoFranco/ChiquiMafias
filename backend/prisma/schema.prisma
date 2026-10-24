@@ -15,7 +15,7 @@ model Teams {
   country         String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
-  api_team_id     Int      @unique
+  api_team_id     Int?     @unique
   short_code      String?
   venue_id        String?
 
@@ -31,6 +31,9 @@ model Teams {
 
   events          MatchEvents[]
   teamSeasonStats TeamSeasonStats[]
+  bracketHome     BracketSlot[]     @relation("BracketHome")
+  bracketAway     BracketSlot[]     @relation("BracketAway")
+  bracketWins     BracketSlot[]     @relation("BracketWinner")
   venue           Venues?           @relation(fields: [venue_id], references: [id])
   nicknames       Teams_nicknames[]
 
@@ -99,7 +102,7 @@ model Matches {
   home_team_id       String
   away_team_id       String
   league_id          String
-  api_fixture_id     Int         @unique
+  api_fixture_id     Int?        @unique
   away_goals         Int?
   home_goals         Int?
   home_penalty_goals Int?
@@ -135,6 +138,8 @@ model Matches {
   league        Leagues            @relation(fields: [league_id], references: [id])
   venue         Venues?            @relation(fields: [venue_id], references: [id])
   stats         Stats_team_match[]
+  markets       Market[]
+  bracketSlot   BracketSlot?
 
   @@index([date])
   @@index([league_id, season])
@@ -147,7 +152,7 @@ model Matches {
 
 model Leagues {
   id                 String               @id @default(uuid())
-  api_league_id      Int                  @unique
+  api_league_id      Int?                 @unique
   name               String
   type               String?
   country            String?
@@ -158,11 +163,155 @@ model Leagues {
   leagueTeams        LeagueTeams[]
   matches            Matches[]
   teamSeasonStats    TeamSeasonStats[]
+
+  // Identidad estable de la competición, igual en todos los entornos y ajena al
+  // proveedor de datos ('liga-profesional', 'copa-argentina').
+  slug              String?             @unique
+  short_name        String?
+  // true en competiciones a cancha neutral (Copa Argentina): no hay local/visitante.
+  neutral_venue     Boolean             @default(false)
+  // Temporada que se muestra al usuario. Una sola por competición, por diseño.
+  current_season_id String?             @unique
+  current_season    CompetitionSeason?  @relation("CurrentSeason", fields: [current_season_id], references: [id])
+  seasons           CompetitionSeason[] @relation("LeagueSeasons")
+}
+
+enum CompetitionFormat {
+  LIGA_DIVIDIDA // Apertura / Clausura (Liga Profesional)
+  LIGA // todos contra todos
+  ELIMINACION // Copa Argentina
+  GRUPOS_Y_ELIMINACION // Libertadores, Sudamericana
+}
+
+// Una edición de una competición. Agregar un año es agregar una fila.
+model CompetitionSeason {
+  id                     String            @id @default(uuid())
+  league_id              String
+  // Año de inicio de la temporada.
+  season                 Int
+  // Lo que se muestra: '2026' o '2026/27'.
+  label                  String
+  format                 CompetitionFormat
+  sync_enabled           Boolean           @default(true)
+  // Una competición recién agregada no abre mercados hasta activarlo.
+  bets_enabled           Boolean           @default(false)
+  fixtures_sync_minutes  Int               @default(10)
+  // null = el formato no tiene tabla de posiciones.
+  standings_sync_minutes Int?
+  starts_on              DateTime?
+  ends_on                DateTime?
+  last_fixtures_sync_at  DateTime?
+  last_standings_sync_at DateTime?
+  created_at             DateTime          @default(now())
+  updated_at             DateTime          @updatedAt
+
+  league          Leagues            @relation("LeagueSeasons", fields: [league_id], references: [id])
+  currentOfLeague Leagues?           @relation("CurrentSeason")
+  bracketSlots    BracketSlot[]
+  bracketDraw     BracketDraw?
+  bracketChanges  BracketChangeLog[]
+
+  @@unique([league_id, season])
+}
+
+// Orden oficial de la primera ronda del cuadro (ERS §7.4). Se carga una vez por
+// temporada; sin sorteo, el cuadro se reconstruye desde lo jugado.
+model BracketDraw {
+  id                    String   @id @default(uuid())
+  competition_season_id String   @unique
+  /// Cruces de la primera ronda de arriba hacia abajo: [[localId, visitanteId], …].
+  pairs                 Json
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  competition_season CompetitionSeason @relation(fields: [competition_season_id], references: [id], onDelete: Cascade)
+}
+
+enum BracketChangeAction {
+  LOAD_DRAW
+  CORRECT_SLOT
+  CLEAR_CORRECTION
+}
+
+// Auditoría de la carga del sorteo y de las correcciones de llaves (RNF-S04).
+model BracketChangeLog {
+  id                    String              @id @default(uuid())
+  competition_season_id String
+  action                BracketChangeAction
+  round_order           Int?
+  position              Int?
+  before                Json?
+  after                 Json?
+  reason                String?
+  changedById           String?
+  changedBy             User?               @relation("BracketChanges", fields: [changedById], references: [id], onDelete: SetNull)
+  /// Snapshot del autor, para que el historial siga siendo legible si se borra el usuario.
+  changedByUsername     String
+  createdAt             DateTime            @default(now())
+
+  competition_season CompetitionSeason @relation(fields: [competition_season_id], references: [id], onDelete: Cascade)
+
+  @@index([competition_season_id, createdAt(sort: Desc)])
+  @@index([changedById])
+}
+
+// Una llave del cuadro de una temporada de eliminación directa (ERS §6.3).
+// El ganador de la llave `p` de la ronda `r` va a la llave ceil(p / 2) de la
+// ronda r + 1: el 1 con el 2, el 3 con el 4…
+model BracketSlot {
+  id                    String   @id @default(uuid())
+  competition_season_id String
+  // 1 = 32avos … 6 = final.
+  round_order           Int
+  // Lugar dentro de la ronda, de arriba hacia abajo, desde 1.
+  position              Int
+  // Se completa cuando el partido existe.
+  match_id              String?  @unique
+  home_team_id          String?
+  away_team_id          String?
+  winner_team_id        String?
+  // true si el presidente la corrigió a mano: la sincronización no la pisa.
+  manually_corrected    Boolean  @default(false)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  competition_season CompetitionSeason @relation(fields: [competition_season_id], references: [id], onDelete: Cascade)
+  match              Matches?          @relation(fields: [match_id], references: [id], onDelete: SetNull)
+  home_team          Teams?            @relation("BracketHome", fields: [home_team_id], references: [id], onDelete: SetNull)
+  away_team          Teams?            @relation("BracketAway", fields: [away_team_id], references: [id], onDelete: SetNull)
+  winner_team        Teams?            @relation("BracketWinner", fields: [winner_team_id], references: [id], onDelete: SetNull)
+
+  @@unique([competition_season_id, round_order, position])
+}
+
+// Mapeo de entidades internas a los IDs que les asigna cada proveedor de datos
+// deportivos (api-football, highlightly...). `entity_id` es el uuid de Teams,
+// Matches, Leagues, Players o Venues según `entity`; no hay FK a propósito
+// (una sola tabla para las cinco entidades).
+model ProviderRef {
+  id          String         @id @default(uuid())
+  entity      FootballEntity
+  entity_id   String
+  provider    String
+  external_id Int
+  created_at  DateTime       @default(now())
+
+  @@unique([entity, provider, external_id])
+  @@unique([entity, entity_id, provider])
+  @@index([entity, entity_id])
+}
+
+enum FootballEntity {
+  TEAM
+  MATCH
+  LEAGUE
+  PLAYER
+  VENUE
 }
 
 model Players {
   id          String    @id @default(uuid())
-  api_id      Int       @unique
+  api_id      Int?      @unique
   name        String
   firstname   String?
   lastname    String?
@@ -464,7 +613,8 @@ model User {
   commentReactions CommentReaction[]
   coinOrders       CoinOrder[]
   /// Cambios de precio que aplicó como presidente.
-  priceChanges     PriceChangeLog[]  @relation("PriceChanges")
+  priceChanges     PriceChangeLog[]   @relation("PriceChanges")
+  bracketChanges   BracketChangeLog[] @relation("BracketChanges")
 
   @@map("users")
 }
@@ -651,7 +801,11 @@ model Market {
   description String?
   metadata    Json?
 
+  // Dato histórico (ID de API-Football). Los mercados automáticos se vinculan
+  // y se liquidan por matchId; los manuales no se vinculan a ningún partido.
   fixtureId Int?
+  matchId   String?
+  match     Matches?     @relation(fields: [matchId], references: [id], onDelete: SetNull)
   isManual  Boolean      @default(false)
   status    MarketStatus @default(OPEN)
   createdAt DateTime     @default(now())
@@ -659,6 +813,8 @@ model Market {
   settledAt DateTime?
 
   options MarketOption[]
+
+  @@index([matchId])
 }
 
 enum MarketStatus {

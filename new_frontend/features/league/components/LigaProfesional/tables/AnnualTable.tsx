@@ -2,6 +2,7 @@ import React from 'react';
 import { StandingRow } from '@/features/league/type';
 import { TeamRowCell } from '../utils/TeamRowCell';
 import { Globe, ShieldAlert, Radio } from 'lucide-react';
+import { useLeagueSeasonLabel } from '@/features/competitions/hooks/useCompetitions';
 
 interface AnnualTableProps {
   annualStandings: StandingRow[];
@@ -10,6 +11,7 @@ interface AnnualTableProps {
 export const AnnualTable: React.FC<AnnualTableProps> = ({
   annualStandings,
 }) => {
+  const seasonLabel = useLeagueSeasonLabel();
   const hasLiveMatch = annualStandings.some((row) => row.live);
 
   return (
@@ -18,7 +20,7 @@ export const AnnualTable: React.FC<AnnualTableProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 sm:p-4 border-b border-[#353534] bg-[#222221]">
         <div className="flex items-center gap-2.5">
           <h3 className="font-black text-sm sm:text-base text-[#e5e2e1] uppercase tracking-tight">
-            Tabla Anual 2026 (Apertura + Clausura)
+            Tabla Anual {seasonLabel} (Apertura + Clausura)
           </h3>
         </div>
 

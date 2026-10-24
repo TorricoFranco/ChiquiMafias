@@ -20,9 +20,13 @@ export type MatchStatus =
   | 'AET'
   // Interrumpidos / Especiales
   | 'SUSP'
+  | 'INT'
   | 'PST'
   | 'CANC'
-  | 'ABD';
+  | 'ABD'
+  // Resueltos en escritorio
+  | 'AWD'
+  | 'WO';
 
 export interface Venue {
   name: string;
@@ -156,6 +160,24 @@ export interface MatchEvent {
   substitutionLog: SubstitutionLog | null;
 }
 
+/** Tiro de la tanda de penales. `order` es la ronda: 1.º tiro de cada equipo, 2.º… */
+export interface ShootoutKick {
+  order: number;
+  teamId: string;
+  player: string;
+  scored: boolean;
+}
+
+/** Competición del partido (`MatchCompetitionDto`). */
+export interface MatchCompetition {
+  slug: string;
+  name: string;
+  shortName: string | null;
+  /** true en cancha neutral: no se muestra local ni visitante. */
+  neutralVenue: boolean;
+  seasonLabel: string;
+}
+
 export interface MatchDetails {
   metadata: MatchMetadata;
   score: MatchScore;
@@ -165,9 +187,31 @@ export interface MatchDetails {
   };
   lineups: MatchLineup[];
   events: MatchEvent[];
+  /** Tanda de penales; vacía (o ausente en una caché vieja) si no hubo. */
+  shootout?: ShootoutKick[];
   stats: TeamStats[];
   isLive: boolean;
   chatActive: boolean;
+  chatState: MatchChatState;
+  /** Solo en `GET /matches/:id`. */
+  competition?: MatchCompetition;
+}
+
+// Lo decide el backend (backend/src/matches/utils/match-chat.util.ts) según el
+// estado del partido: aviso antes de empezar, abierto en juego, pausado si se
+// suspende y sin chat al terminar.
+export type MatchChatState = 'NOT_STARTED' | 'OPEN' | 'PAUSED' | 'CLOSED';
+
+/**
+ * Misma regla que el backend. Solo se usa como respaldo cuando una respuesta o
+ * un evento no trae `chatState` (por ejemplo, una caché vieja).
+ */
+export function chatStateFor(status: string | null | undefined): MatchChatState {
+  const s = status ?? '';
+  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(s)) return 'OPEN';
+  if (['SUSP', 'INT'].includes(s)) return 'PAUSED';
+  if (['FT', 'AET', 'PEN', 'AWD', 'WO', 'CANC', 'ABD'].includes(s)) return 'CLOSED';
+  return 'NOT_STARTED';
 }
 
 // Pre-match Models
@@ -242,14 +286,23 @@ export interface ChatMessage {
 }
 
 // WebSocket Event Payloads
+/**
+ * Aviso de estadísticas nuevas (`stats_updated`). Hoy el backend manda solo `matchId`: el front no usa
+ * `stats`, recarga el detalle del partido.
+ */
 export interface StatsUpdatedPayload {
   matchId: string;
-  stats: TeamStats[];
+  stats?: TeamStats[];
 }
 
+/**
+ * Aviso de eventos nuevos (`timeline_updated`). `lastEvent` es el evento crudo del
+ * proveedor (`EVENTS_UPDATED.lastEvent` del backend) y NO tiene la forma de `MatchEvent`:
+ * el front no lo usa para armar la cronología, solo recarga el detalle del partido.
+ */
 export interface TimelineUpdatedPayload {
   matchId: string;
-  lastEvent: MatchEvent | null;
+  lastEvent: unknown;
   totalEvents: number;
 }
 
@@ -263,18 +316,20 @@ export interface GoalScoredPayload {
 
 export interface MatchLiveUpdatePayload {
   matchId: string;
-  type: 'SCORE_UPDATED' | 'MINUTE_TICK';
+  type: 'SCORE_UPDATED' | 'MINUTE_TICK' | 'MATCH_ENDED';
   h: number;
   a: number;
   status: string;
   elapsed: number | null;
+  chatState: MatchChatState;
+  chatActive: boolean;
 }
 
 // Helper Classification Constants
 export const LIVE_STATUSES: string[] = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'];
 export const NOT_STARTED_STATUSES: string[] = ['TBD', 'NS', 'SCHEDULED'];
 export const FINISHED_STATUSES: string[] = ['FT', 'AET', 'PEN'];
-export const INTERRUPTED_STATUSES: string[] = ['SUSP', 'PST', 'CANC', 'ABD'];
+export const INTERRUPTED_STATUSES: string[] = ['SUSP', 'INT', 'PST', 'CANC', 'ABD'];
 
 export function getDerivedMatchState(status: MatchStatus) {
   return {

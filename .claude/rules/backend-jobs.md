@@ -3,7 +3,7 @@ paths:
   - "backend/src/**/*cron*.ts"
   - "backend/src/**/*.processor.ts"
   - "backend/src/**/*.listener.ts"
-  - "backend/src/api-football/**"
+  - "backend/src/football/**"
   - "backend/src/polls/task.service.ts"
   - "backend/src/stats/**"
 ---
@@ -19,13 +19,14 @@ paths:
 - Logs de cada tick en `debug`, no en `log`: si no, ensucian la consola cada pocos segundos.
 - Los crons no emiten por socket: publican en Redis (`match_updates`, `league_live_updates`) y el gateway re-emite. Para avisar a otro módulo, `eventEmitter.emit('dominio.accion', payload)`.
 
-## API-Football
+## Datos deportivos (proveedor)
 
-- Toda llamada pasa por `ApiFootballHttp` (`src/api-football/http/`). No crees otro cliente axios con la API key.
+- Los crons y servicios de `src/football/` inyectan `FootballDataProvider` y trabajan con los tipos de `football.types.ts`; nunca con el formato crudo de un proveedor ni con un cliente HTTP. Cada proveedor (`providers/api-football/`, a futuro `providers/highlightly/`) traduce su formato crudo a ese contrato, y `FootballModule` elige cuál usar con `FOOTBALL_PROVIDER`. No crees otro cliente axios con la API key.
+- Los códigos de estado (`status.short`), el vocabulario de eventos y las claves de estadísticas del contrato son los que ya guarda la DB y lee el front: un proveedor nuevo se adapta a ellos, no al revés.
 - Cada request consume cuota del plan. Antes de agregar un cron que llame a la API, bajar un intervalo o sacar el filtro `tracked: true`, avisá cuántas requests por día suma.
 - Leé primero de la DB o de Redis y llamá a la API solo para lo que cambió o está en vivo.
 - Los mapeos de la API van en `mappers/` y los upserts en `upserts/`. No mezcles el formato crudo de la API con el modelo de Prisma en el cron.
-- Liga y temporada: no sumes más `128` / `2026` hardcodeados (ya hay varios). Usá `ID_LEAGUE_ARG` del `ConfigService` o una constante compartida.
+- Competición y temporada: no sumes más `128` / `2026` hardcodeados (todavía quedan en `fixture.service` y `standings.service`). Las competiciones y temporadas salen de `CompetitionSeason` (con `sync_enabled` y su frecuencia), y lo que cambia según el formato (rondas, fases, tabla) va en una estrategia de `football/formats/`, no en el cron.
 - Al terminar un partido o cambiar un fixture, invalidá las keys de Redis afectadas (`match:details:v1:<id>`, `fixtures:...`, `live_scores:league:<id>`).
 
 ## BullMQ

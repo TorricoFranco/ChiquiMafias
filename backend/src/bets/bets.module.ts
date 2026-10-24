@@ -8,6 +8,7 @@ import { AuthModule } from 'src/auth/auth.module'
 import { BullModule } from '@nestjs/bullmq'
 import { BetsProcessor } from './bets.processor'
 import { BetsCronService } from './bets-cron'
+import { FootballModule } from 'src/football/football.module'
 
 @Module({
   controllers: [BetsController],
@@ -19,6 +20,7 @@ import { BetsCronService } from './bets-cron'
     WalletModule,
     ChatModule,
     AuthModule,
+    FootballModule,
   ],
 })
 export class BetsModule {}
