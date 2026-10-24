@@ -60,6 +60,17 @@ export class EventsFetchCron {
     private readonly refs: FootballRefsService,
   ) {}
 
+  private async markEventsFinalized(matchId: string) {
+    await this.prisma.matches.update({
+      where: { id: matchId },
+      data: {
+        events_fetched: true,
+        events_fetched_at: new Date(),
+        events_finalized: true,
+      },
+    })
+  }
+
   @Cron(CronExpression.EVERY_MINUTE)
   async fetchEvents() {
     const now = new Date()
@@ -112,8 +123,14 @@ export class EventsFetchCron {
         const redisCountKey = `match:events_count:${match.id}`
         const lastCount = await this.redisService.redis.get(redisCountKey)
 
-        // Si no hay eventos nuevos salteamos
+        const isFinished = ['FT', 'AET', 'PEN'].includes(match.status_short)
+
+        // Si no hay eventos nuevos salteamos. Un partido terminado se cierra
+        // igual: si no, quedaba sin `events_finalized` (los eventos ya estaban
+        // guardados desde que se jugaba) y se volvía a consultar cada minuto
+        // durante 3 días.
         if (lastCount === apiEvents.length.toString()) {
+          if (isFinished) await this.markEventsFinalized(match.id)
           continue
         }
         await this.redisService.redis.set(
@@ -170,18 +187,7 @@ export class EventsFetchCron {
         // Borrado detalles en Redis para forzar recálculo con los nuevos eventos en el service
         await this.redisService.redis.del(`match:details:v2:${match.id}`)
 
-        const isFinished = ['FT', 'AET', 'PEN'].includes(match.status_short)
-
-        if (isFinished) {
-          await this.prisma.matches.update({
-            where: { id: match.id },
-            data: {
-              events_fetched: true,
-              events_fetched_at: new Date(),
-              events_finalized: true,
-            },
-          })
-        }
+        if (isFinished) await this.markEventsFinalized(match.id)
 
         const lastEvent = apiEvents[apiEvents.length - 1]
 
