@@ -4,11 +4,8 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { SidebarMatchCard } from "../widgets/SidebarMatchCard";
 import { useCalendarWithLive } from "@/features/fixture/hooks/useCalendarWithLive";
 import { LiveMatchesCarousel } from "./LiveMatchesCarousel";
-
-interface SidebarFixtureListProps {
-    season?: string;
-    leagueId?: string;
-}
+import { LEAGUE_SLUG } from "@/features/competitions/constants";
+import { useCurrentSeason } from "@/features/competitions/hooks/useCompetitions";
 
 const getFormattedDateKey = (date: Date): string => {
     const year = date.getFullYear();
@@ -25,11 +22,17 @@ const formatDayLabel = (dateStr: string) => {
     return { dayName, dayNum, monthName };
 };
 
-export const SidebarFixtureList = ({
-    season = "2026",
-    leagueId = "1",
-}: SidebarFixtureListProps) => {
-    const { calendarData, isLoading } = useCalendarWithLive(season, leagueId);
+/** Calendario de la Liga con sus marcadores en vivo. */
+export const SidebarFixtureList = () => {
+    const {
+        season,
+        isLoading: isSeasonLoading,
+        isError: isSeasonError,
+        retry: retrySeason,
+    } = useCurrentSeason(LEAGUE_SLUG);
+    const { calendarData, isLoading: isCalendarLoading } = useCalendarWithLive(season, LEAGUE_SLUG);
+    // Mientras llega la temporada el calendario no se pide: también es "cargando".
+    const isLoading = isSeasonLoading || isCalendarLoading;
     const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
     const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +93,21 @@ export const SidebarFixtureList = ({
             setSelectedDayIndex((prev) => Math.min(calendarData.availableDays.length - 1, prev + 1));
         }
     };
+
+    if (isSeasonError) {
+        return (
+            <div role="alert" className="w-full max-w-4xl mx-auto flex flex-col items-center gap-3 text-center text-[#c6c9ab] text-xs py-12 bg-[#181818] rounded-xl border border-[#353534]">
+                No se pudo cargar el calendario.
+                <button
+                    type="button"
+                    onClick={retrySeason}
+                    className="bg-[#d2f000] hover:bg-[#b8d300] text-[#191e00] font-black uppercase tracking-wider px-4 py-2 rounded-lg"
+                >
+                    Reintentar
+                </button>
+            </div>
+        );
+    }
 
     if (isLoading) {
         return (

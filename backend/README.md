@@ -88,7 +88,7 @@ Cada dominio vive en `src/<dominio>/` con su module, controller y service, y seg
 | Auth y usuarios | `auth`, `users` |
 | Dinero | `wallet`, `bets`, `coin-shop`, `store`, `inventory`, `subscriptions`, `webhook` |
 | Comunidad | `chat`, `polls`, `notifications`, `support`, `streaks`, `stats` |
-| Datos deportivos | `api-football` (crons), `matches`, `fixture`, `standings`, `teams` |
+| Datos deportivos | `football` (crons y proveedor de datos), `matches`, `fixture`, `standings`, `teams` |
 | Integraciones | `mercado-pago`, `discord`, `cloudinary`, `email` |
 | Infraestructura | `prisma`, `redis`, `config`, `adapters`, `filters`, `pipes` |
 

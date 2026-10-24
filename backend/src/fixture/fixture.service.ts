@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { RedisService } from 'src/redis/redis.service'
 
@@ -17,11 +17,17 @@ import {
   BracketsRoundsDto,
 } from './dto/response/tournament-bracket.dto'
 import { AvailableStagesResponseDto } from './dto/response/available-stages.dto'
+import { CompetitionContext } from 'src/competitions/competitions.service'
+import { CompetitionMatchesResponseDto } from './dto/response/competition-matches.dto'
+
+// Partidos por página y rango máximo de fechas de `getMatches` (ERS RNF-S02).
+export const MATCHES_PAGE_SIZE = 50
+export const MATCHES_MAX_RANGE_DAYS = 31
+const DAY_MS = 24 * 60 * 60 * 1000
 
 @Injectable()
 export class FixtureService {
   private readonly logger = new Logger(FixtureService.name)
-  private readonly LEAGUE_API_ID = 128
 
   constructor(
     private prisma: PrismaService,
@@ -29,10 +35,11 @@ export class FixtureService {
   ) {}
 
   async getFixtureByMatchday(
-    season: string,
+    competition: CompetitionContext,
     tournament: string,
     matchday: number | string,
   ): Promise<GetFixtureMatchdayResponseDto> {
+    const season = String(competition.season)
     let matchdayKey = ''
     let dbSearchTerm = ''
 
@@ -45,7 +52,7 @@ export class FixtureService {
       dbSearchTerm = normalized
     }
 
-    const cacheKey = `fixtures:128:${season}:${tournament.toUpperCase()}:${matchdayKey}`
+    const cacheKey = `fixtures:${competition.cacheKey}:${season}:${tournament.toUpperCase()}:${matchdayKey}`
 
     this.logger.debug(`Extrayendo cache: ${cacheKey}`)
 
@@ -56,7 +63,8 @@ export class FixtureService {
       matches = JSON.parse(cached)
     } else {
       const whereClause: any = {
-        season: Number(season),
+        league_id: competition.leagueId,
+        season: competition.season,
         tournament: tournament.toUpperCase() as any,
         round: {
           contains: dbSearchTerm,
@@ -93,7 +101,7 @@ export class FixtureService {
     }
 
     const liveScores = await this.redisService.redis.hgetall(
-      `live_scores:league:${this.LEAGUE_API_ID}`,
+      `live_scores:league:${competition.cacheKey}`,
     )
 
     const mergedMatches = matches.map((m) => {
@@ -111,9 +119,10 @@ export class FixtureService {
   }
 
   async getYearlyCalendar(
-    season: string,
+    competition: CompetitionContext,
   ): Promise<GetYearlyCalendarResponseDto> {
-    const cacheKey = `calendar:128:${season}:full`
+    const season = String(competition.season)
+    const cacheKey = `calendar:${competition.cacheKey}:${season}:full`
 
     const cached = await this.redisService.redis.get(cacheKey)
     let allMatches
@@ -123,7 +132,8 @@ export class FixtureService {
     } else {
       allMatches = await this.prisma.matches.findMany({
         where: {
-          season: Number(season),
+          league_id: competition.leagueId,
+          season: competition.season,
         },
         include: {
           home_team: { select: { name: true, logo_url: true } },
@@ -143,7 +153,7 @@ export class FixtureService {
     }
 
     const liveScores = await this.redisService.redis.hgetall(
-      `live_scores:league:${this.LEAGUE_API_ID}`,
+      `live_scores:league:${competition.cacheKey}`,
     )
 
     const calendar = allMatches.reduce((acc, m) => {
@@ -170,12 +180,105 @@ export class FixtureService {
     }
   }
 
+  /**
+   * Partidos de la temporada actual con su marcador en vivo, de a
+   * `MATCHES_PAGE_SIZE` y en un rango de hasta `MATCHES_MAX_RANGE_DAYS` días
+   * (ERS RNF-S02). Sin fechas ni ronda: de una semana atrás a dos adelante.
+   */
+  async getMatches(
+    competition: CompetitionContext,
+    filters: { from?: string; to?: string; round?: string; page?: number },
+  ): Promise<CompetitionMatchesResponseDto> {
+    const page = filters.page ?? 1
+    const { from, to } = this.matchesRange(filters)
+
+    const where = {
+      league_id: competition.leagueId,
+      season: competition.season,
+      ...(filters.round ? { round: filters.round } : {}),
+      ...(from || to
+        ? {
+            date: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) },
+          }
+        : {}),
+    }
+
+    const [total, matches, liveScores] = await Promise.all([
+      this.prisma.matches.count({ where }),
+      this.prisma.matches.findMany({
+        where,
+        include: {
+          home_team: { select: { name: true, logo_url: true } },
+          away_team: { select: { name: true, logo_url: true } },
+        },
+        orderBy: [{ date: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * MATCHES_PAGE_SIZE,
+        take: MATCHES_PAGE_SIZE,
+      }),
+      this.redisService.redis.hgetall(
+        `live_scores:league:${competition.cacheKey}`,
+      ),
+    ])
+
+    return {
+      page,
+      pageSize: MATCHES_PAGE_SIZE,
+      total,
+      matches: matches.map((m) => {
+        const liveRaw = liveScores?.[m.id]
+        const live = liveRaw
+          ? (JSON.parse(liveRaw) as LiveMatchData)
+          : undefined
+        return formatMatch(m, live)
+      }),
+    }
+  }
+
+  /** Rango de `getMatches`: [from, to) en UTC. 400 si es inválido o muy largo. */
+  private matchesRange(filters: {
+    from?: string
+    to?: string
+    round?: string
+  }): { from?: Date; to?: Date } {
+    const day = (value: string) => new Date(`${value}T00:00:00.000Z`)
+
+    if (!filters.from && !filters.to) {
+      if (filters.round) return {}
+      const today = day(new Date().toISOString().slice(0, 10))
+      return {
+        from: new Date(today.getTime() - 7 * DAY_MS),
+        to: new Date(today.getTime() + 15 * DAY_MS),
+      }
+    }
+    if (!filters.from || !filters.to) {
+      throw new BadRequestException('Mandá "from" y "to" juntos')
+    }
+
+    const from = day(filters.from)
+    // `to` es inclusive: se busca hasta el comienzo del día siguiente.
+    const to = new Date(day(filters.to).getTime() + DAY_MS)
+    const days = (to.getTime() - from.getTime()) / DAY_MS
+    if (days <= 0) {
+      throw new BadRequestException('"to" no puede ser anterior a "from"')
+    }
+    if (days > MATCHES_MAX_RANGE_DAYS) {
+      throw new BadRequestException(
+        `El rango no puede superar ${MATCHES_MAX_RANGE_DAYS} días`,
+      )
+    }
+    return { from, to }
+  }
+
   async getActiveMatchdayInfo(
-    season: string,
+    competition: CompetitionContext,
     tournament: string,
   ): Promise<string | number> {
     const allMatches = await this.prisma.matches.findMany({
-      where: { season: Number(season), tournament: tournament as any },
+      where: {
+        league_id: competition.leagueId,
+        season: competition.season,
+        tournament,
+      },
       select: { date: true, status_short: true, round: true },
     })
 
@@ -226,9 +329,11 @@ export class FixtureService {
     return sortedMatchdays[sortedMatchdays.length - 1]?.matchday || 1
   }
 
-  async getLiveLeagueScores(): Promise<GetLiveScoresResponseDto[]> {
+  async getLiveLeagueScores(
+    competition: CompetitionContext,
+  ): Promise<GetLiveScoresResponseDto[]> {
     const liveScores = await this.redisService.redis.hgetall(
-      `live_scores:league:${this.LEAGUE_API_ID}`,
+      `live_scores:league:${competition.cacheKey}`,
     )
 
     if (!liveScores || Object.keys(liveScores).length === 0) return []
@@ -253,15 +358,13 @@ export class FixtureService {
   }
 
   async getPendingFixtures(
-    season: number,
-    tournament: 'APERTURA' | 'CLAUSURA',
+    competition: CompetitionContext,
+    tournament: string,
   ): Promise<GetPendingFixturesResponseDto[]> {
-    const leagueId = '6a2a03c5-1054-49e4-96c3-afd2bca9ebd7'
-
     const matches = await this.prisma.matches.findMany({
       where: {
-        league_id: leagueId,
-        season: season,
+        league_id: competition.leagueId,
+        season: competition.season,
         tournament: tournament,
         status_short: 'NS',
       },
@@ -348,13 +451,14 @@ export class FixtureService {
   }
 
   async getAvailableStages(
-    season: string,
+    competition: CompetitionContext,
     tournament: string,
   ): Promise<AvailableStagesResponseDto> {
     const matches = await this.prisma.matches.findMany({
       where: {
-        season: Number(season),
-        tournament: tournament.toUpperCase() as any,
+        league_id: competition.leagueId,
+        season: competition.season,
+        tournament: tournament.toUpperCase(),
       },
       select: { round: true },
       distinct: ['round'],
@@ -380,10 +484,11 @@ export class FixtureService {
   }
 
   async getTournamentBrackets(
-    season: string,
+    competition: CompetitionContext,
     tournament: string,
   ): Promise<TournamentBracketsResponseDto> {
-    const leagueId = '6a2a03c5-1054-49e4-96c3-afd2bca9ebd7'
+    const leagueId = competition.leagueId
+    const season = String(competition.season)
     const tournamentLower = tournament.toLowerCase()
 
     const octavosCacheKey = `brackets:octavos:${leagueId}:${season}:${tournamentLower}`
@@ -413,8 +518,9 @@ export class FixtureService {
     const [playoffDbMatches, liveScores] = await Promise.all([
       this.prisma.matches.findMany({
         where: {
-          season: Number(season),
-          tournament: tournament as any,
+          league_id: leagueId,
+          season: competition.season,
+          tournament,
           OR: [
             { round: { contains: 'octavos', mode: 'insensitive' } },
             { round: { contains: 'cuartos', mode: 'insensitive' } },
@@ -436,7 +542,7 @@ export class FixtureService {
         },
       }),
       this.redisService.redis.hgetall(
-        `live_scores:league:${this.LEAGUE_API_ID}`,
+        `live_scores:league:${competition.cacheKey}`,
       ),
     ])
 

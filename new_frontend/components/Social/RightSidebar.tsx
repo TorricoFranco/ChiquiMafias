@@ -60,7 +60,7 @@ export const RightSidebar = ({ currentTab }: { currentTab: string }) => {
       {/* CONTENIDO SCROLLEABLE */}
       <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col w-full">
         {activeTab === "fixture" ? (
-          <SidebarFixtureList season="2026" leagueId="1" />
+          <SidebarFixtureList />
         ) : (
           <div className="flex flex-col flex-1 w-full">
             <BetsCarousel />

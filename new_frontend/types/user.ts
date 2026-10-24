@@ -1,7 +1,7 @@
 export type Role = 'USER' | 'MODERATOR' | 'ADMIN' | 'PRESIDENT';
 export type SubscriptionTier = 'NONE' | 'TIER_1' | 'TIER_2' | 'TIER_3';
 /** Qué acción pidió el login: cambia el texto del cartel. */
-export type LoginModalReason = 'chat' | 'poll' | 'profile' | 'store';
+export type LoginModalReason = 'chat' | 'poll' | 'profile' | 'store' | 'bets';
 
 export interface UserTeam {
     id: string;

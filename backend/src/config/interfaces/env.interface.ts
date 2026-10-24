@@ -8,7 +8,9 @@ export interface EnvironmentVariables {
   DATABASE_URL: string
 
   ID_LEAGUE_ARG: number
-  API_FOOTBALL_KEY: string
+  FOOTBALL_PROVIDER: 'api-football' | 'highlightly'
+  API_FOOTBALL_KEY?: string
+  HIGHLIGHTLY_API_KEY?: string
   GOOGLE_CLIENT_ID: string
 
   JWT_ACCESS_SECRET: string

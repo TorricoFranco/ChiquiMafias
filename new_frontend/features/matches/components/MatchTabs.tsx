@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Calendar, Activity, Users, MessageSquare } from 'lucide-react';
 
 export type MatchTabKey = 'pre-partido' | 'resumen' | 'formaciones' | 'chat';
@@ -8,7 +8,8 @@ interface MatchTabsProps {
     onChangeTab: (tab: MatchTabKey) => void;
     isNotStarted: boolean;
     hasLineups: boolean;
-    isFinished: boolean;
+    /** La pestaña de chat existe hasta que el partido termina. */
+    showChatTab: boolean;
     chatCount?: number;
     eventsCount?: number;
 }
@@ -18,10 +19,22 @@ export const MatchTabs: React.FC<MatchTabsProps> = ({
     onChangeTab,
     isNotStarted,
     hasLineups,
-    isFinished,
+    showChatTab,
     chatCount = 0,
     eventsCount = 0,
 }) => {
+    const tabRefs = useRef<Partial<Record<MatchTabKey, HTMLButtonElement | null>>>({});
+    // Pestaña con foco. Si desaparece estando enfocada (el chat al terminar el
+    // partido), el navegador no dispara blur y el foco cae al body.
+    const focusedTab = useRef<MatchTabKey | null>(null);
+
+    useEffect(() => {
+        if (!showChatTab && focusedTab.current === 'chat') {
+            focusedTab.current = activeTab;
+            tabRefs.current[activeTab]?.focus();
+        }
+    }, [showChatTab, activeTab]);
+
     const tabs: { key: MatchTabKey; label: string; icon: React.ElementType }[] = [];
 
     if (isNotStarted) {
@@ -36,7 +49,7 @@ export const MatchTabs: React.FC<MatchTabsProps> = ({
         tabs.push({ key: 'resumen', label: 'Resumen', icon: Activity });
     }
 
-    if (!isFinished) {
+    if (showChatTab) {
         tabs.push({ key: 'chat', label: 'Chat en Vivo', icon: MessageSquare });
     }
 
@@ -48,6 +61,15 @@ export const MatchTabs: React.FC<MatchTabsProps> = ({
                 return (
                     <button
                         key={tab.key}
+                        ref={(el) => {
+                            tabRefs.current[tab.key] = el;
+                        }}
+                        onFocus={() => {
+                            focusedTab.current = tab.key;
+                        }}
+                        onBlur={() => {
+                            focusedTab.current = null;
+                        }}
                         role="tab"
                         aria-selected={isActive}
                         onClick={() => onChangeTab(tab.key)}

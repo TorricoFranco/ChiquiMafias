@@ -80,6 +80,14 @@ class TeamStatsDto {
   @ApiProperty({ type: StatisticsDto }) statistics: StatisticsDto
 }
 
+class ShootoutKickDto {
+  @ApiProperty({ description: 'Ronda: 1.º tiro de cada equipo, 2.º…' })
+  order: number
+  @ApiProperty() teamId: string
+  @ApiProperty() player: string
+  @ApiProperty({ description: 'true si fue gol' }) scored: boolean
+}
+
 export class MatchDetailsResponseDto {
   @ApiProperty({ type: MetadataDto })
   metadata: MetadataDto
@@ -92,14 +100,48 @@ export class MatchDetailsResponseDto {
 
   @ApiProperty() isLive: boolean
 
-  @ApiProperty() chatActive: boolean
+  @ApiProperty({
+    description: 'true solo con el partido en juego (chatState OPEN)',
+  })
+  chatActive: boolean
+
+  @ApiProperty({
+    enum: ['NOT_STARTED', 'OPEN', 'PAUSED', 'CLOSED'],
+    description:
+      'Estado del chat: aviso antes de empezar, abierto en juego, pausado si se suspende, sin chat al terminar',
+  })
+  chatState: 'NOT_STARTED' | 'OPEN' | 'PAUSED' | 'CLOSED'
 
   @ApiProperty({ type: [Object] })
   events: any[]
+
+  @ApiProperty({
+    type: [ShootoutKickDto],
+    description: 'Tanda de penales, vacía si el partido no se definió así',
+  })
+  shootout: ShootoutKickDto[]
 
   @ApiProperty({ type: [Object] })
   lineups: any[]
 
   @ApiProperty({ type: [TeamStatsDto] })
   stats: TeamStatsDto[]
+}
+
+export class MatchCompetitionDto {
+  @ApiProperty({ example: 'liga-profesional' }) slug: string
+  @ApiProperty({ example: 'Liga Profesional Argentina' }) name: string
+  @ApiProperty({ type: String, nullable: true, example: 'Liga Profesional' })
+  shortName: string | null
+  @ApiProperty({
+    example: false,
+    description: 'true en cancha neutral: no se muestra local ni visitante',
+  })
+  neutralVenue: boolean
+  @ApiProperty({ example: '2026' }) seasonLabel: string
+}
+
+export class MatchWithCompetitionResponseDto extends MatchDetailsResponseDto {
+  @ApiProperty({ type: MatchCompetitionDto })
+  competition: MatchCompetitionDto
 }

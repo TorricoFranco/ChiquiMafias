@@ -6,13 +6,14 @@ import { Header } from '@/components/layout/Header';
 import { MatchDetailView } from '@/features/matches/components/MatchDetailView';
 import { LeagueSidebar } from '@/features/league/components/LigaProfesional/LeagueSidebar';
 import { TournamentType, ZoneType } from '@/features/league/type';
+import { LEAGUE_SLUG } from '@/features/competitions/constants';
 
 export default function InterceptedMatchModal() {
   const params = useParams();
   const router = useRouter();
   const matchId = params?.id as string;
 
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>('lpf-2026');
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>(LEAGUE_SLUG);
   const [activeTournament, setActiveTournament] = useState<TournamentType>('CLAUSURA');
   const [activeZone, setActiveZone] = useState<ZoneType>('A');
   const [isBracketOpen, setIsBracketOpen] = useState(false);
@@ -73,8 +74,6 @@ export default function InterceptedMatchModal() {
             <div className="p-4 md:p-6 lg:p-8 flex-1 flex flex-col min-h-0">
               <MatchDetailView
                 matchId={matchId}
-                leagueId={selectedLeagueId === 'lpf-2026' ? "6a2a03c5-1054-49e4-96c3-afd2bca9ebd7" : selectedLeagueId}
-                season="2026"
                 onBack={handleBack}
               />
             </div>

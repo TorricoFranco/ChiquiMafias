@@ -1,5 +1,5 @@
 import React from 'react';
-import { MatchHeaderData, OptionEntry, OptionTeam } from '../utils/matchHeader';
+import { badgeSrc, MatchHeaderData, OptionEntry, OptionTeam } from '../utils/matchHeader';
 
 interface MatchHeaderProps {
   header: MatchHeaderData;
@@ -9,7 +9,7 @@ interface MatchHeaderProps {
 const VersusTeam: React.FC<{ team: OptionTeam }> = ({ team }) => (
   <div className="flex flex-col items-center gap-1.5 w-24">
     <img
-      src={`/escudos-api/${team.logoUrl}.webp`}
+      src={badgeSrc(team.logoUrl)}
       alt={team.name}
       className="w-12 h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
       loading="lazy"
@@ -29,7 +29,7 @@ const SHIELD_SIZE = {
 const OptionShield: React.FC<{ entry: OptionEntry; size: keyof typeof SHIELD_SIZE }> = ({ entry, size }) =>
   entry.team ? (
     <img
-      src={`/escudos-api/${entry.team.logoUrl}.webp`}
+      src={badgeSrc(entry.team.logoUrl)}
       alt={entry.team.name}
       className={`${SHIELD_SIZE[size]} flex-shrink-0 object-contain drop-shadow-md`}
       loading="lazy"

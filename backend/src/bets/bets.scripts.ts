@@ -35,3 +35,25 @@ export const PLACE_BET_LUA_SCRIPT = `
     new_pool = new_option_pool
   })
 `
+
+// Cierra el mercado en Redis solo si sigue abierto. Es lo que corta las
+// apuestas: PLACE_BET_LUA_SCRIPT exige status OPEN. Devuelve 1 si lo cerró.
+export const LOCK_MARKET_LUA_SCRIPT = `
+  local market_key = KEYS[1]
+  if redis.call('HGET', market_key, 'status') == 'OPEN' then
+      redis.call('HSET', market_key, 'status', 'LOCKED')
+      return 1
+  end
+  return 0
+`
+
+// Cambia la hora de cierre en Redis solo si el mercado sigue abierto.
+// ARGV[1] = closesAt en milisegundos. Devuelve 1 si lo cambió.
+export const RESCHEDULE_MARKET_LUA_SCRIPT = `
+  local market_key = KEYS[1]
+  if redis.call('HGET', market_key, 'status') == 'OPEN' then
+      redis.call('HSET', market_key, 'closesAt', ARGV[1])
+      return 1
+  end
+  return 0
+`

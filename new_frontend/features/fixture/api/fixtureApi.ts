@@ -3,7 +3,6 @@ import {
     GetFixtureMatchdayResponse,
     GetYearlyCalendarResponse,
     GetPendingFixturesResponse,
-    GetLiveScoresResponse,
     GetActiveMatchdayResponse,
     AvailableStagesResponse,
     TournamentBracketsResponse
@@ -66,21 +65,6 @@ export const fixturesApi = {
         return res.json();
     },
 
-    /**
-     * Público: Obtener marcadores en vivo
-     */
-    getLiveScores: async (): Promise<GetLiveScoresResponse[]> => {
-        const res = await apiFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/fixtures/live-scores`, 
-            {
-                method: 'GET',
-                headers: { "Content-Type": "application/json" },
-            }
-        );
-
-        if (!res.ok) throw new Error('Error al cargar los resultados en vivo');
-        return res.json();
-    },
 
     /**
      * Público: Obtener la jornada activa por defecto

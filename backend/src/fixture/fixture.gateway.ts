@@ -4,20 +4,32 @@ import {
   ConnectedSocket,
   SubscribeMessage,
   WebSocketGateway,
+  WsException,
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 
 import { RedisService } from 'src/redis/redis.service'
-import { OnApplicationBootstrap, Logger } from '@nestjs/common'
+import { OnApplicationBootstrap, Logger, UseFilters } from '@nestjs/common'
 
 import { isPlayoffRound } from './utils/match-format'
+import { competitionRoom, legacyLeagueRoom } from './utils/league-rooms'
+import { CompetitionsService } from 'src/competitions/competitions.service'
+import { AllWsExceptionFilter } from 'src/filters/ws-exception.filter'
+import {
+  LEAGUE_LIVE_UPDATES_CHANNEL,
+  LeagueLiveUpdateMessage,
+} from 'src/football/football.events'
 
+@UseFilters(AllWsExceptionFilter)
 @WebSocketGateway()
 export class FixtureLeagueGateway implements OnApplicationBootstrap {
   @WebSocketServer() server: Server
   private readonly logger = new Logger(FixtureLeagueGateway.name)
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly competitions: CompetitionsService,
+  ) {}
 
   async onApplicationBootstrap() {
     let retries = 0
@@ -33,13 +45,15 @@ export class FixtureLeagueGateway implements OnApplicationBootstrap {
       return
     }
 
-    await this.redisService.subscribe('league_live_updates', (data) => {
+    await this.redisService.subscribe(LEAGUE_LIVE_UPDATES_CHANNEL, (data) => {
       try {
         if (!data) return
-        const parsed = JSON.parse(data)
+        const parsed = JSON.parse(data) as LeagueLiveUpdateMessage
 
         const leagueIdStr = String(parsed.leagueId).trim()
-        const room = `league_${leagueIdStr}`
+        // Una sola emisión a las dos salas: el que está en ambas lo recibe una vez.
+        const rooms = [legacyLeagueRoom(leagueIdStr)]
+        if (parsed.slug) rooms.push(competitionRoom(parsed.slug))
 
         if (!this.server) {
           this.logger.error('WebSocket Server no inicializado')
@@ -68,31 +82,85 @@ export class FixtureLeagueGateway implements OnApplicationBootstrap {
         })
 
         this.logger.debug(
-          `Emitiendo actualización para la liga ${leagueIdStr} (${room})`,
+          `Emitiendo actualización para la liga ${leagueIdStr} (${rooms.join(', ')})`,
           formattedMatches,
         )
 
-        this.server.to(room).emit('on_league_update', formattedMatches)
+        this.server.to(rooms).emit('on_league_update', formattedMatches)
       } catch (error) {
         this.logger.error('Error procesando update de Redis:', error.message)
       }
     })
   }
 
-  @SubscribeMessage('join_league')
-  handleJoinLeague(
+  /**
+   * Marcadores en vivo de una competición. Solo se entra a la sala de una
+   * competición que existe y tiene temporada actual (ERS RNF-S03).
+   */
+  @SubscribeMessage('join_competition')
+  async handleJoinCompetition(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { leagueId: string },
+    @MessageBody() data: { slug?: unknown },
   ) {
-    client.join(`league_${data.leagueId}`)
-    this.logger.log(`Client ${client.id} joined league_${data.leagueId}`)
+    const slug = typeof data?.slug === 'string' ? data.slug : ''
+    try {
+      await this.competitions.resolveCurrent(slug)
+    } catch {
+      throw new WsException({
+        code: 'COMPETITION_NOT_FOUND',
+        message: 'Competición no encontrada',
+      })
+    }
+    await client.join(competitionRoom(slug))
+    this.logger.debug(`Cliente ${client.id} entró a ${competitionRoom(slug)}`)
+    return { status: 'ok' }
+  }
+
+  @SubscribeMessage('leave_competition')
+  async handleLeaveCompetition(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { slug?: unknown },
+  ) {
+    if (typeof data?.slug !== 'string') return
+    await client.leave(competitionRoom(data.slug))
+  }
+
+  /** Alias de `join_competition` por clave de Redis (`'128'`), con la misma validación. */
+  @SubscribeMessage('join_league')
+  async handleJoinLeague(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { leagueId?: unknown },
+  ) {
+    const leagueKey =
+      typeof data?.leagueId === 'string' || typeof data?.leagueId === 'number'
+        ? String(data.leagueId)
+        : ''
+    const competition = leagueKey
+      ? await this.competitions.findCurrentByCacheKey(leagueKey)
+      : null
+    if (!competition) {
+      throw new WsException({
+        code: 'COMPETITION_NOT_FOUND',
+        message: 'Competición no encontrada',
+      })
+    }
+    await client.join(legacyLeagueRoom(leagueKey))
+    this.logger.debug(
+      `Cliente ${client.id} entró a ${legacyLeagueRoom(leagueKey)}`,
+    )
+    return { status: 'ok' }
   }
 
   @SubscribeMessage('leave_league')
-  handleLeaveLeague(
+  async handleLeaveLeague(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { leagueId: string },
+    @MessageBody() data: { leagueId?: unknown },
   ) {
-    client.leave(`league_${data.leagueId}`)
+    if (
+      typeof data?.leagueId !== 'string' &&
+      typeof data?.leagueId !== 'number'
+    )
+      return
+    await client.leave(legacyLeagueRoom(data.leagueId))
   }
 }

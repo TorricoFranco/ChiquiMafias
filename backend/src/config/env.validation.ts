@@ -18,7 +18,19 @@ export const envValidationSchema = Joi.object({
 
   ID_LEAGUE_ARG: Joi.number().required(),
   DATABASE_URL: Joi.string().required(),
-  API_FOOTBALL_KEY: Joi.string().required(),
+  FOOTBALL_PROVIDER: Joi.string()
+    .valid('api-football', 'highlightly')
+    .default('api-football'),
+  API_FOOTBALL_KEY: Joi.string().empty('').when('FOOTBALL_PROVIDER', {
+    is: 'highlightly',
+    then: Joi.string().optional(),
+    otherwise: Joi.string().required(),
+  }),
+  HIGHLIGHTLY_API_KEY: Joi.string().empty('').when('FOOTBALL_PROVIDER', {
+    is: 'highlightly',
+    then: Joi.string().required(),
+    otherwise: Joi.string().optional(),
+  }),
   GOOGLE_CLIENT_ID: Joi.string().required(),
 
   JWT_ACCESS_SECRET: Joi.string().required(),

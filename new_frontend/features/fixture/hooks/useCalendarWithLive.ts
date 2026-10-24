@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { useYearlyCalendar } from './useFixture';
 import { useLeagueLive } from '../socket/useFixtureSocket';
+import { LIVE_STATUSES, liveFor } from '../utils/liveStatus';
 import type { MatchFixture } from '../types';
 
-export const useCalendarWithLive = (season: string, leagueId: string) => {
+export const useCalendarWithLive = (season: string, slug: string) => {
   const {
     data: calendarData,
     isLoading: isCalendarLoading
@@ -12,7 +13,7 @@ export const useCalendarWithLive = (season: string, leagueId: string) => {
   const {
     liveResults,
     isLoading: isLiveLoading
-  } = useLeagueLive(leagueId);
+  } = useLeagueLive(slug);
 
   const mergedCalendar = useMemo(() => {
     if (!calendarData) return null;
@@ -21,7 +22,7 @@ export const useCalendarWithLive = (season: string, leagueId: string) => {
 
     Object.entries(calendarData.calendar).forEach(([dateString, matches]) => {
       updatedCalendarRecord[dateString] = matches.map(match => {
-        const liveData = liveResults[match.id];
+        const liveData = liveFor(match, liveResults[match.id]);
 
         if (liveData) {
           return {
@@ -32,7 +33,7 @@ export const useCalendarWithLive = (season: string, leagueId: string) => {
             away_penalty_goals: liveData.ap,
             status_short: liveData.status,
             elapsed: liveData.elapsed,
-            is_live: ['1H', '2H', 'HT', 'ET', 'BT', 'P', 'LIVE'].includes(liveData.status)
+            is_live: LIVE_STATUSES.includes(liveData.status)
           };
         }
 

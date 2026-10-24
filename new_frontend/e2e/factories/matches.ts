@@ -1,3 +1,4 @@
+import { chatStateFor } from "@/features/matches/types";
 import type { MatchDetails, MatchMetadata, MatchScore, PreMatchResponse } from "@/features/matches/types";
 import { LOCAL_IMAGE, nextId } from "./ids";
 
@@ -11,6 +12,7 @@ type MatchOverrides = Omit<Partial<MatchDetails>, "metadata" | "score"> & {
 
 export function buildMatchDetails(overrides: MatchOverrides = {}): MatchDetails {
   const { metadata, score, ...rest } = overrides;
+  const chatState = chatStateFor(metadata?.status ?? "NS");
   return {
     metadata: {
       id: nextId("match"),
@@ -41,7 +43,8 @@ export function buildMatchDetails(overrides: MatchOverrides = {}): MatchDetails 
     events: [],
     stats: [],
     isLive: false,
-    chatActive: false,
+    chatActive: chatState === "OPEN",
+    chatState,
     ...rest,
   };
 }

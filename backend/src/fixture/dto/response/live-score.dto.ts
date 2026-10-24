@@ -42,6 +42,14 @@ export class GetLiveScoresResponseDto {
   awayTeamId: string
 
   @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 67,
+    description: 'Minuto del partido',
+  })
+  elapsed: number | null
+
+  @ApiProperty({
     example: '1H',
     description:
       'Estado en tiempo real: 1H (Primer Tiempo), 2H (Segundo Tiempo), HT (Entretiempo)',
