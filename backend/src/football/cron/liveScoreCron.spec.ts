@@ -147,6 +147,108 @@ describe('LiveScoreCron', () => {
     expect(redis.del).not.toHaveBeenCalledWith('match:details:v2:m1')
   })
 
+  describe('aviso de la competición con el resultado final', () => {
+    const leagueUpdates = () =>
+      (redisService.publish.mock.calls as unknown[][])
+        .filter((c) => c[0] === 'league_live_updates')
+        .map(
+          (c) =>
+            c[1] as {
+              leagueId: number
+              slug: string
+              matches: Record<string, string>
+            },
+        )
+
+    it('Debe publicar el final de un partido que terminó, sin guardarlo en el hash del vivo', async () => {
+      provider.getLiveFixtures.mockResolvedValue([
+        baseFixture({
+          status: { short: 'FT', long: 'Finished', elapsed: 90 },
+          goals: { home: 1, away: 2 },
+        }),
+      ])
+
+      await cron.handleLiveScores()
+
+      const updates = leagueUpdates()
+      expect(updates).toHaveLength(1)
+      expect(updates[0]).toMatchObject({
+        leagueId: 128,
+        slug: 'liga-profesional',
+      })
+      expect(JSON.parse(updates[0].matches.m1)).toMatchObject({
+        status_short: 'FT',
+        home_goals: 1,
+        away_goals: 2,
+      })
+      expect(redis.hset).not.toHaveBeenCalled()
+    })
+
+    it('Debe publicar en un solo aviso los partidos en juego y los que terminaron', async () => {
+      prisma.matches.findMany.mockResolvedValue([
+        activeMatch,
+        { ...activeMatch, id: 'm2', api_fixture_id: 1002 },
+      ])
+      provider.getLiveFixtures.mockResolvedValue([
+        baseFixture(),
+        baseFixture({
+          externalId: 1002,
+          status: { short: 'FT', long: 'Finished', elapsed: 90 },
+        }),
+      ])
+
+      await cron.handleLiveScores()
+
+      const updates = leagueUpdates()
+      expect(updates).toHaveLength(1)
+      expect(Object.keys(updates[0].matches).sort()).toEqual(['m1', 'm2'])
+      expect(JSON.parse(updates[0].matches.m1)).toMatchObject({
+        status_short: '2H',
+      })
+      expect(JSON.parse(updates[0].matches.m2)).toMatchObject({
+        status_short: 'FT',
+      })
+      // El hash de partidos en vivo solo guarda el que sigue en juego.
+      expect(redis.hset).toHaveBeenCalledWith('live_scores:league:128', {
+        m1: expect.any(String) as unknown,
+      })
+    })
+
+    it('Debe publicar el final cuando el partido salió del feed y se cerró por id', async () => {
+      provider.getLiveFixtures.mockResolvedValue([])
+      prisma.matches.findMany.mockResolvedValue([
+        { ...activeMatch, status_short: '2H' },
+      ])
+      provider.getFixture.mockResolvedValue(
+        baseFixture({ status: { short: 'FT', long: 'Finished', elapsed: 90 } }),
+      )
+
+      await cron.handleLiveScores()
+
+      const updates = leagueUpdates()
+      expect(updates).toHaveLength(1)
+      expect(updates[0]).toMatchObject({
+        leagueId: 128,
+        slug: 'liga-profesional',
+      })
+      expect(JSON.parse(updates[0].matches.m1)).toMatchObject({
+        status_short: 'FT',
+        home_goals: 1,
+      })
+    })
+
+    it('No debe publicar nada si ningún partido está en juego ni terminó', async () => {
+      provider.getLiveFixtures.mockResolvedValue([])
+      prisma.matches.findMany.mockResolvedValue([
+        { ...activeMatch, status_short: 'NS' },
+      ])
+
+      await cron.handleLiveScores()
+
+      expect(leagueUpdates()).toHaveLength(0)
+    })
+  })
+
   describe('[VIVO]', () => {
     let log: jest.SpyInstance
     const vivo = () =>

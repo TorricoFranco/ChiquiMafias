@@ -177,6 +177,9 @@ export class LiveScoreCron {
     }
 
     const liveScoresHash: Record<string, string> = {}
+    // Partidos que terminaron en este tick: viajan en el aviso de la competición
+    // (con su resultado final) pero no se guardan en el hash de partidos en vivo.
+    const finishedScores: Record<string, string> = {}
     // Partidos cuyo detalle cacheado quedó viejo en este tick.
     const changedMatchIds: string[] = []
 
@@ -204,6 +207,9 @@ export class LiveScoreCron {
         })
 
         this.logLive(matchDb, apiMatch, 'terminó')
+        finishedScores[matchDb.id] = JSON.stringify(
+          this.toLiveData(matchDb, apiMatch),
+        )
         await this.handleMatchCleanup(matchDb.id, leagueId)
 
         // Avisa al front que terminó: cierra el chat y recarga el partido.
@@ -212,18 +218,9 @@ export class LiveScoreCron {
         continue
       }
 
-      const liveData: LiveMatchData = {
-        home_goals: apiMatch.goals.home ?? 0,
-        away_goals: apiMatch.goals.away ?? 0,
-        home_penalty_goals: apiMatch.penalty.home,
-        away_penalty_goals: apiMatch.penalty.away,
-        status_short: apiMatch.status.short,
-        elapsed: apiMatch.status.elapsed,
-        home_team_id: matchDb.home_team_id,
-        away_team_id: matchDb.away_team_id,
-        round: matchDb.round,
-      }
-      liveScoresHash[matchDb.id] = JSON.stringify(liveData)
+      liveScoresHash[matchDb.id] = JSON.stringify(
+        this.toLiveData(matchDb, apiMatch),
+      )
 
       const hasPenaltiesChanged = apiMatch.penalty.home !== null
 
@@ -298,13 +295,39 @@ export class LiveScoreCron {
           ...changedMatchIds.map((id) => `match:details:v2:${id}`),
         )
       }
+    }
 
-      const update: LeagueLiveUpdateMessage = {
-        leagueId,
-        slug: league.slug,
-        matches: liveScoresHash,
-      }
-      await this.redisService.publish(LEAGUE_LIVE_UPDATES_CHANNEL, update)
+    // Los que terminaron viajan con su resultado final: el feed ya no los trae
+    // y, sin este aviso, el front se quedaba con el último marcador "en vivo".
+    const published = { ...liveScoresHash, ...finishedScores }
+    if (Object.keys(published).length > 0) {
+      await this.publishLeagueUpdate(leagueId, league.slug, published)
+    }
+  }
+
+  private async publishLeagueUpdate(
+    leagueId: number | string,
+    slug: string | null,
+    matches: Record<string, string>,
+  ) {
+    const update: LeagueLiveUpdateMessage = { leagueId, slug, matches }
+    await this.redisService.publish(LEAGUE_LIVE_UPDATES_CHANNEL, update)
+  }
+
+  private toLiveData(
+    matchDb: ActiveMatch,
+    apiMatch: FootballFixture,
+  ): LiveMatchData {
+    return {
+      home_goals: apiMatch.goals.home ?? 0,
+      away_goals: apiMatch.goals.away ?? 0,
+      home_penalty_goals: apiMatch.penalty.home,
+      away_penalty_goals: apiMatch.penalty.away,
+      status_short: apiMatch.status.short,
+      elapsed: apiMatch.status.elapsed,
+      home_team_id: matchDb.home_team_id,
+      away_team_id: matchDb.away_team_id,
+      round: matchDb.round,
     }
   }
 
@@ -465,6 +488,11 @@ export class LiveScoreCron {
 
       // Igual que un final visto en el feed: fecha del fixture y tabla.
       if (isFinished) await this.notifyFinished(matchDb, leagueId)
+
+      // La lista de la competición se entera del estado nuevo (final, suspensión).
+      await this.publishLeagueUpdate(leagueId, matchDb.league.slug, {
+        [matchDb.id]: JSON.stringify(this.toLiveData(matchDb, apiMatch)),
+      })
 
       // Solo lo que cambió: un partido que el feed en vivo no trae se consulta
       // en cada tick y no tiene que llenar la consola.
