@@ -6,6 +6,16 @@ import {
 } from '../types';
 import { MapPin, User, Shield } from 'lucide-react';
 
+const MAX_VISIBLE_RED_CARDS = 3;
+
+const RedCards: React.FC<{ count: number; label: string }> = ({ count, label }) => (
+    <div className="flex items-center gap-1 min-h-4" role={count > 0 ? 'img' : undefined} aria-label={count > 0 ? `${count} tarjeta(s) roja(s) de ${label}` : undefined}>
+        {Array.from({ length: Math.min(count, MAX_VISIBLE_RED_CARDS) }).map((_, i) => (
+            <div key={i} className="w-2.5 h-3.5 bg-red-500 rounded-[2px] shadow-sm border border-red-600/50" />
+        ))}
+    </div>
+);
+
 interface MatchHeaderProps {
     details: MatchDetails;
 }
@@ -60,6 +70,8 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
     const homeReds = score.summary?.redCards?.filter((rc) => rc.team === teams.home.id).length || 0;
     const awayReds = score.summary?.redCards?.filter((rc) => rc.team === teams.away.id).length || 0;
 
+    const hasPenaltyScore = score.home_penalties !== null && score.away_penalties !== null;
+
     // Filtramos los goles por equipo
     const homeGoals = score.summary?.goals?.filter((g) => g.team === teams.home.id) || [];
     const awayGoals = score.summary?.goals?.filter((g) => g.team === teams.away.id) || [];
@@ -98,9 +110,9 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
             </div>
 
             {/* Scoreboard Arena */}
-            <div className="relative z-10 grid grid-cols-[1fr_auto_1fr] md:grid-cols-7 items-center gap-2 md:gap-4 my-2">
+            <div className="relative z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-2 md:gap-4 my-2">
                 {/* Local Team */}
-                <div className="md:col-span-3 flex flex-col md:flex-row items-center justify-start md:justify-end gap-2 md:gap-4 order-1 min-w-0">
+                <div className="flex flex-col md:flex-row items-center justify-start md:justify-end gap-2 md:gap-4 order-1 min-w-0">
                     <div className="text-center md:text-right order-2 md:order-1 min-w-0">
                         <h2 className="text-sm md:text-2xl font-black text-[#e5e2e1] tracking-tight break-words">
                             {teams.home.name}
@@ -121,7 +133,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                 </div>
 
                 {/* Center: Score & Red Cards */}
-                <div className="md:col-span-1 flex flex-col items-center justify-center order-2 py-2">
+                <div className="flex flex-col items-center justify-center order-2 py-2">
                     {isNotStarted ? (
                         <div className="flex flex-col items-center gap-1">
                             <span className="text-2xl md:text-3xl font-black text-[#8e9285] tracking-widest font-mono">
@@ -130,44 +142,33 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-1.5">
-                            <div className="flex items-center gap-3">
-                                {/* Tarjetas rojas Local */}
-                                {homeReds > 0 && (
-                                    <div className="flex items-center gap-1">
-                                        {Array.from({ length: homeReds }).map((_, i) => (
-                                            <div key={i} className="w-3 h-4 bg-red-500 rounded-[2px] shadow-sm border border-red-600/50" />
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Marcador */}
-                                <div
-                                    role="group"
-                                    aria-label={`Marcador: ${teams.home.name} ${score.home}, ${teams.away.name} ${score.away}`}
-                                    className="flex items-center gap-2 md:gap-3 bg-[#131313] px-3 md:px-5 py-2 rounded-2xl border border-[#2b2a2a] shadow-inner"
-                                >
-                                    <span className="text-3xl md:text-4xl font-black text-[#e5e2e1] font-mono">
-                                        {score.home}
-                                    </span>
-                                    <span className="text-xl text-[#8e9285] font-light">-</span>
-                                    <span className="text-3xl md:text-4xl font-black text-[#e5e2e1] font-mono">
-                                        {score.away}
-                                    </span>
-                                </div>
-
-                                {/* Tarjetas rojas Visitante */}
-                                {awayReds > 0 && (
-                                    <div className="flex items-center gap-1">
-                                        {Array.from({ length: awayReds }).map((_, i) => (
-                                            <div key={i} className="w-3 h-4 bg-red-500 rounded-[2px] shadow-sm border border-red-600/50" />
-                                        ))}
-                                    </div>
-                                )}
+                            {/* Marcador */}
+                            <div
+                                role="group"
+                                aria-label={`Marcador: ${teams.home.name} ${score.home}, ${teams.away.name} ${score.away}`}
+                                className="flex items-center gap-2 md:gap-3 bg-[#131313] px-3 md:px-5 py-2 rounded-2xl border border-[#2b2a2a] shadow-inner"
+                            >
+                                <span className="text-3xl md:text-4xl font-black text-[#e5e2e1] font-mono">
+                                    {score.home}
+                                </span>
+                                <span className="text-xl text-[#8e9285] font-light">-</span>
+                                <span className="text-3xl md:text-4xl font-black text-[#e5e2e1] font-mono">
+                                    {score.away}
+                                </span>
                             </div>
 
-                            {metadata.status === 'PEN' && (
-                                <div className="mt-1 px-3 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs font-mono font-bold border border-purple-500/30">
-                                    Penales: ({score.home_penalties ?? '-'}) - ({score.away_penalties ?? '-'})
+                            {/* Tarjetas rojas: debajo del marcador, cada una en el borde de su equipo (hasta 3 por lado) */}
+                            {(homeReds > 0 || awayReds > 0) && (
+                                <div className="self-stretch flex items-center justify-between gap-2 px-1">
+                                    <RedCards count={homeReds} label={teams.home.name} />
+                                    <RedCards count={awayReds} label={teams.away.name} />
+                                </div>
+                            )}
+
+                            {hasPenaltyScore && (
+                                <div className="px-3 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs font-mono font-bold border border-purple-500/30 whitespace-nowrap">
+                                    <span className="hidden md:inline">Penales:</span>
+                                    <span className="md:hidden">Pen.</span> ({score.home_penalties}) - ({score.away_penalties})
                                 </div>
                             )}
 
@@ -182,7 +183,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                 </div>
 
                 {/* Away Team */}
-                <div className="md:col-span-3 flex flex-col md:flex-row items-center justify-start gap-2 md:gap-4 order-3 min-w-0">
+                <div className="flex flex-col md:flex-row items-center justify-start gap-2 md:gap-4 order-3 min-w-0">
                     <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl bg-[#2b2a2a] p-2 flex items-center justify-center border border-[#3e3d3c] shrink-0">
                         {teams.away.logo ? (
                             <img

@@ -160,6 +160,14 @@ export interface MatchEvent {
   substitutionLog: SubstitutionLog | null;
 }
 
+/** Tiro de la tanda de penales. `order` es la ronda: 1.º tiro de cada equipo, 2.º… */
+export interface ShootoutKick {
+  order: number;
+  teamId: string;
+  player: string;
+  scored: boolean;
+}
+
 /** Competición del partido (`MatchCompetitionDto`). */
 export interface MatchCompetition {
   slug: string;
@@ -179,6 +187,8 @@ export interface MatchDetails {
   };
   lineups: MatchLineup[];
   events: MatchEvent[];
+  /** Tanda de penales; vacía (o ausente en una caché vieja) si no hubo. */
+  shootout?: ShootoutKick[];
   stats: TeamStats[];
   isLive: boolean;
   chatActive: boolean;

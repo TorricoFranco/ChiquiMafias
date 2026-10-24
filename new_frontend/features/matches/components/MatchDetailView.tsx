@@ -5,6 +5,7 @@ import { MatchStatusBanner } from './MatchStatusBanner';
 import { MatchTabs, MatchTabKey } from './MatchTabs';
 import { PreMatchSection } from './pre-match/PreMatchSection';
 import { MatchTimeline } from './MatchTimeline';
+import { MatchPenaltyShootout } from './MatchPenaltyShootout';
 import { MatchStats } from './MatchStats';
 import { MatchLineups } from './MatchLineups';
 import { MatchChat } from './MatchChat';
@@ -132,6 +133,15 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
 
                     {activeTab === 'resumen' && (
                         <div className="flex flex-col gap-6">
+                            {matchDetails.shootout && matchDetails.shootout.length > 0 && (
+                                <MatchPenaltyShootout
+                                    kicks={matchDetails.shootout}
+                                    homeTeam={matchDetails.teams.home}
+                                    awayTeam={matchDetails.teams.away}
+                                    homePenalties={matchDetails.score.home_penalties}
+                                    awayPenalties={matchDetails.score.away_penalties}
+                                />
+                            )}
                             <MatchTimeline
                                 events={matchDetails.events}
                                 homeTeam={matchDetails.teams.home}

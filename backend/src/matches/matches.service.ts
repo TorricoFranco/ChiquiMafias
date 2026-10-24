@@ -15,6 +15,7 @@ import { CompetitionsService } from 'src/competitions/competitions.service'
 import { PreMatchResponseDto } from './dto/response/prematch-response.dto'
 import { MatchEventResponseDto } from './dto/response/match-events-response.dto'
 import { StandingsService } from 'src/standings/standings.service'
+import { splitPenaltyShootout } from './utils/penalty-shootout.util'
 
 @Injectable()
 export class MatchesService {
@@ -153,7 +154,13 @@ export class MatchesService {
 
         // USAMOS EL MAPPER CORREGIDO
 
-        const liveSummary = MatchesMappers.formatSummaryFromEvents(events)
+        // La tanda de penales va aparte: no es parte de la cronología ni de los goles.
+        const { events: matchEvents, shootout } = splitPenaltyShootout(
+          events,
+          match.home_penalty_goals !== null &&
+            match.away_penalty_goals !== null,
+        )
+        const liveSummary = MatchesMappers.formatSummaryFromEvents(matchEvents)
 
         const finalVenue = match.venue || match.home_team.venue
         const isLive = [
@@ -209,7 +216,8 @@ export class MatchesService {
             },
           },
           lineups: lineup,
-          events: events,
+          events: matchEvents,
+          shootout,
           stats: statistics.map((s) => ({
             ...s,
             teamLogo: s.teamLogo ?? '',
