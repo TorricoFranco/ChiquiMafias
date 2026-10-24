@@ -319,6 +319,8 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
 
   return {
     isLoading: isSeasonLoading || isFixtureLoading || isStandingsLoading,
+    /** El fixture de la fecha todavía no llegó (incluye esperar a la temporada, de la que sale su clave). */
+    isFixtureLoading: isSeasonLoading || isFixtureLoading,
     /** Etiqueta de la temporada actual (`2026`); vacía mientras carga. */
     seasonLabel,
     isSeasonError,

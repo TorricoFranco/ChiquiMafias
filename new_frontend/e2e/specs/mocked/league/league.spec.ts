@@ -79,6 +79,78 @@ test.describe("Ligas: Liga Profesional", () => {
     expect(api.lastRequest("GET", "/competitions/:slug/live")?.path).toMatch(/\/competitions\/liga-profesional\/live$/);
   });
 
+  test("mientras llega el fixture de la fecha dice que está cargando y no que no hay partidos", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const loaded = buildMatchday("5", [buildMatchFixture({ id: "m-carga" })]);
+    api.on("GET", "/fixtures/seasons/:season/tournaments/:tournament/matchday/:matchday", async () => {
+      await gate;
+      return loaded;
+    });
+
+    await app.open("/?tab=ligas");
+
+    await expect(page.getByRole("status").filter({ hasText: "Cargando partidos..." })).toBeVisible();
+    await expect(page.getByText("No hay partidos programados para esta fecha.")).toHaveCount(0);
+
+    release();
+
+    await expect(page.getByRole("link", { name: "Boca Juniors vs River Plate" })).toBeVisible();
+    await expect(page.getByText("Cargando partidos...")).toHaveCount(0);
+  });
+
+  test("un partido que termina deja de figurar en vivo y muestra su resultado final", { tag: "@p0" }, async ({ app, page, api, session, socket }) => {
+    session.loginAs("USER");
+    const match = buildMatchFixture({ id: "m-vivo", status_short: "2H", elapsed: 80, home_goals: 1, away_goals: 1, is_live: true });
+    mockLeague(api, { matchdays: { "5": buildMatchday("5", [match]) } });
+
+    await app.open("/?tab=ligas");
+    const row = page.getByRole("link", { name: "Boca Juniors vs River Plate" });
+    await expect(row).toContainText("ST80");
+    await socket.waitForEmit("join_competition");
+
+    // El backend manda el resultado final una última vez: el feed en vivo ya no lo trae.
+    await socket.emit("on_league_update", {
+      "m-vivo": { h: 2, a: 1, hp: 0, ap: 0, homeTeamId: "team-boca", awayTeamId: "team-river", status: "FT", elapsed: 90 },
+    });
+
+    await expect(row).toContainText("Finalizado");
+    await expect(row).toContainText("2-1");
+    await expect(row).not.toContainText("ST80");
+  });
+
+  test("un dato en vivo viejo no pisa un partido que el backend ya da por terminado", async ({ app, page, api, session, socket }) => {
+    session.loginAs("USER");
+    const terminado = buildMatchFixture({ id: "m-fin", status_short: "FT", elapsed: 90, home_goals: 2, away_goals: 1 });
+    const enJuego = buildMatchFixture({
+      id: "m-otro",
+      home_team: { name: "Racing Club", logo_url: terminado.home_team.logo_url },
+      away_team: { name: "Independiente", logo_url: terminado.home_team.logo_url },
+    });
+    mockLeague(api, { matchdays: { "5": buildMatchday("5", [terminado, enJuego]) } });
+
+    await app.open("/?tab=ligas");
+    const row = page.getByRole("link", { name: "Boca Juniors vs River Plate" });
+    const otherRow = page.getByRole("link", { name: "Racing Club vs Independiente" });
+    await expect(row).toContainText("Finalizado");
+    await socket.waitForEmit("join_competition");
+
+    // Los dos van en el mismo aviso: cuando el segundo se ve en vivo, el primero ya se procesó.
+    await socket.emit("on_league_update", {
+      "m-fin": { h: 1, a: 1, hp: 0, ap: 0, homeTeamId: "team-boca", awayTeamId: "team-river", status: "2H", elapsed: 85 },
+      "m-otro": { h: 0, a: 0, hp: 0, ap: 0, homeTeamId: "team-racing", awayTeamId: "team-independiente", status: "2H", elapsed: 85 },
+    });
+    await expect(otherRow).toContainText("ST85");
+
+    await expect(row).toContainText("Finalizado");
+    await expect(row).toContainText("2-1");
+    await expect(row).not.toContainText("ST85");
+  });
+
   test("una competición nueva de la API aparece en el menú como en preparación", async ({ app, page, api, session }) => {
     session.loginAs("USER");
     // Sin cuadro todavía: se queda en Ligas como "en preparación".
