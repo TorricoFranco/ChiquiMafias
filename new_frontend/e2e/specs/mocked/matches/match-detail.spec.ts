@@ -84,6 +84,50 @@ test.describe("Detalle de partido", () => {
     await expect(page.getByText("1T 23'")).toBeVisible();
   });
 
+  test("un gol avisado por socket aparece en la cronología y entre los goleadores del marcador", { tag: "@p0" }, async ({ page, api, socket }) => {
+    const live = buildMatchDetails({ metadata: { status: "1H" }, score: { home: 0, away: 0, elapsed: 20 } });
+    let current = live;
+    api.on("GET", "/matches/:matchId", () => current);
+    api.on("GET", "/matches/pre-match/:matchId", buildPreMatch());
+
+    await page.goto(`/match/${live.metadata.id}`);
+    await expect(page.getByText("Sin incidencias registradas")).toBeVisible();
+    await socket.waitForEmit("join_match");
+
+    // El backend ya tiene el gol guardado cuando avisa por socket.
+    current = {
+      ...live,
+      score: {
+        ...live.score,
+        home: 1,
+        summary: { goals: [{ min: 23, player: "Miguel Merentiel", team: "team-boca" }], redCards: [], lastUpdate: null },
+      },
+      events: [
+        {
+          id: "ev-gol-1",
+          minute: 23,
+          extraMinute: null,
+          type: "Goal",
+          detail: "Normal Goal",
+          team: { id: "team-boca", name: "Boca Juniors", logo_url: null },
+          player: { id: "player-merentiel", name: "Miguel Merentiel", photo: null },
+          assist: null,
+          substitutionLog: null,
+        },
+      ],
+    };
+    // `lastEvent` viaja con la forma cruda del proveedor, no con la de MatchEvent.
+    await socket.emit("timeline_updated", {
+      matchId: live.metadata.id,
+      lastEvent: { time: { elapsed: 23, extra: null }, team: { id: 4429, name: "Boca Juniors" }, player: { id: 77, name: "Miguel Merentiel" }, type: "Goal", detail: "Normal Goal" },
+      totalEvents: 1,
+    });
+
+    await expect(page.getByText("Cronología del Partido (1)")).toBeVisible();
+    // Una vez en la cronología y otra entre los goleadores del marcador.
+    await expect(page.getByText("Miguel Merentiel")).toHaveCount(2);
+  });
+
   test("si el backend corta el socket por token vencido, renueva la sesión y vuelve a la sala del partido", { tag: "@p0" }, async ({ page, api, session, socket }) => {
     session.loginAs("USER");
     const match = buildMatchDetails({ metadata: { status: "1H" }, score: { home: 0, away: 0, elapsed: 10 } });
