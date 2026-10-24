@@ -4,6 +4,8 @@ const SHOW_NEAR_TOP = 24;
 const MIN_DELTA = 6;
 // El plegado reflowea el contenedor y puede disparar un scroll falso: se ignora mientras dura la transición.
 const SETTLE_MS = 350;
+// El header solo se pliega en celular (`max-md`); desde md es fijo y no se oculta nunca.
+const MOBILE_QUERY = '(max-width: 767px)';
 
 /**
  * Devuelve true cuando el usuario baja el scroll y false cuando lo sube.
@@ -24,7 +26,14 @@ export function useHideOnScroll(resetKey?: string) {
   useEffect(() => {
     const lastTop = new WeakMap<EventTarget, number>();
 
+    const mobile = window.matchMedia(MOBILE_QUERY);
+    // Al pasar a escritorio con el header plegado se vuelve a mostrar (y a poder clickear).
+    const onMediaChange = () => {
+      if (!mobile.matches) setHidden(false);
+    };
+
     const onScroll = (e: Event) => {
+      if (!mobile.matches) return;
       const el = e.target;
       if (!(el instanceof HTMLElement)) return;
       if (el.clientHeight < window.innerHeight * 0.5) return;
@@ -55,7 +64,11 @@ export function useHideOnScroll(resetKey?: string) {
     };
 
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-    return () => document.removeEventListener('scroll', onScroll, { capture: true });
+    mobile.addEventListener('change', onMediaChange);
+    return () => {
+      document.removeEventListener('scroll', onScroll, { capture: true });
+      mobile.removeEventListener('change', onMediaChange);
+    };
   }, []);
 
   return hidden;

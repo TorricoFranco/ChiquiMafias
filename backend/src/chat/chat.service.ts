@@ -7,6 +7,9 @@ import { RateLimitState } from './interfaces/RateLimitState'
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter'
 import { Interval } from '@nestjs/schedule'
 import { CHAT_RATE_LIMITS, DEFAULT_RATE_LIMIT } from './constants/chat-rules'
+import { ROLE_HIERARCHY, SystemRole } from 'src/auth/enums/roles.enum'
+
+export type DeleteMessageResult = 'deleted' | 'not_found' | 'forbidden'
 
 @Injectable()
 export class ChatService {
@@ -141,47 +144,57 @@ export class ChatService {
     return { allowed: true }
   }
 
-  async deleteGlobalMessage(messageId: string): Promise<boolean> {
-    const globalKey = 'chat:global:history'
-    const history = await this.redisService.redis.lrange(globalKey, 0, -1)
+  /**
+   * Borra un mensaje del historial. Lo puede borrar su autor o un moderador
+   * (o superior).
+   */
+  private async deleteFromHistory(
+    key: string,
+    messageId: string,
+    actor: { id: string; role: SystemRole },
+  ): Promise<DeleteMessageResult> {
+    const history = await this.redisService.redis.lrange(key, 0, -1)
 
-    const messageToRemove = history.find((msgStr) => {
+    let found: { raw: string; authorId?: string } | null = null
+    for (const raw of history) {
       try {
-        const parsed = JSON.parse(msgStr)
-        return parsed.messageId === messageId
+        const parsed = JSON.parse(raw)
+        if (parsed.messageId === messageId) {
+          found = { raw, authorId: parsed.userId }
+          break
+        }
       } catch {
-        return false
+        continue
       }
-    })
-
-    if (messageToRemove) {
-      await this.redisService.redis.lrem(globalKey, 1, messageToRemove)
-      return true
     }
-    return false
+    if (!found) return 'not_found'
+
+    const isModerator =
+      ROLE_HIERARCHY.indexOf(actor.role) >=
+      ROLE_HIERARCHY.indexOf(SystemRole.MODERATOR)
+    if (!isModerator && found.authorId !== actor.id) return 'forbidden'
+
+    await this.redisService.redis.lrem(key, 1, found.raw)
+    return 'deleted'
+  }
+
+  async deleteGlobalMessage(
+    messageId: string,
+    actor: { id: string; role: SystemRole },
+  ): Promise<DeleteMessageResult> {
+    return this.deleteFromHistory('chat:global:history', messageId, actor)
   }
 
   async deleteMatchMessage(
     matchId: string,
     messageId: string,
-  ): Promise<boolean> {
-    const matchKey = `chat:match:${matchId}:history`
-    const history = await this.redisService.redis.lrange(matchKey, 0, -1)
-
-    const messageToRemove = history.find((msgStr) => {
-      try {
-        const parsed = JSON.parse(msgStr)
-        return parsed.messageId === messageId
-      } catch {
-        return false
-      }
-    })
-
-    if (messageToRemove) {
-      await this.redisService.redis.lrem(matchKey, 1, messageToRemove)
-      return true
-    }
-    return false
+    actor: { id: string; role: SystemRole },
+  ): Promise<DeleteMessageResult> {
+    return this.deleteFromHistory(
+      `chat:match:${matchId}:history`,
+      messageId,
+      actor,
+    )
   }
 
   async processMessageAssets(

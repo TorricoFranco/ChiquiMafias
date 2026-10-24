@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errorMessage';
 import { MatchHeader } from './MatchHeader';
 import { getMatchHeader } from '../utils/matchHeader';
+import { useUserStore } from '@/store/useUserStore';
 
 interface MarketCardProps {
   market: Market;
@@ -46,6 +47,11 @@ export const MarketCard: React.FC<MarketCardProps> = ({
     onInteract?.();
 
     if (isDirectBet) {
+      // Sin sesión no hay apuesta: se pide el login en vez de dejar elegir y fallar al confirmar.
+      if (!useUserStore.getState().id) {
+        useUserStore.getState().setLoginModalOpen(true, 'bets');
+        return;
+      }
       if (localSelectedOption?.id === option.id) {
         setLocalSelectedOption(null);
       } else {
@@ -72,6 +78,10 @@ export const MarketCard: React.FC<MarketCardProps> = ({
 
   const handleDirectBetSubmit = async () => {
     if (!localSelectedOption || !betAmount || isNaN(Number(betAmount))) return;
+    if (!useUserStore.getState().id) {
+      useUserStore.getState().setLoginModalOpen(true, 'bets');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
