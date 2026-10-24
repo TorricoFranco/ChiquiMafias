@@ -286,9 +286,13 @@ export interface ChatMessage {
 }
 
 // WebSocket Event Payloads
+/**
+ * Aviso de estadísticas nuevas (`stats_updated`). Hoy el backend manda solo `matchId`: el front no usa
+ * `stats`, recarga el detalle del partido.
+ */
 export interface StatsUpdatedPayload {
   matchId: string;
-  stats: TeamStats[];
+  stats?: TeamStats[];
 }
 
 /**

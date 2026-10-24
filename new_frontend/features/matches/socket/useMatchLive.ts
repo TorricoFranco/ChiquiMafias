@@ -60,13 +60,12 @@ export const useMatchLive = (matchId: string) => {
       queryClient.invalidateQueries({ queryKey });
     };
 
+    // El aviso del backend no trae las estadísticas (llega `stats` sin definir) y los ids de equipo
+    // que manda son los del proveedor: pisar la caché con eso borraba el bloque de estadísticas del
+    // partido. Se recarga el detalle, que ya las trae con los ids propios.
     const handleStatsUpdate = (payload: StatsUpdatedPayload) => {
       if (!isThisMatch(payload)) return;
-      console.log('📈 stats_updated payload:', payload);
-      updateCache((prev) => {
-        if (!prev) return prev;
-        return { ...prev, stats: payload.stats };
-      });
+      queryClient.invalidateQueries({ queryKey });
     };
 
     const handleForceUpdate = () => {
