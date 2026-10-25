@@ -1,5 +1,5 @@
 import { expect, test } from "../../../fixtures/test";
-import { buildComment, buildPoll, paginatedComments } from "../../../factories/polls";
+import { buildComment, buildCommentUser, buildPoll, paginatedComments } from "../../../factories/polls";
 import { buildInventoryItem } from "../../../factories/store";
 
 test.describe("Encuestas de la tribuna", () => {
@@ -83,7 +83,7 @@ test.describe("Encuestas de la tribuna", () => {
     api.on("GET", "/polls/active", [poll]);
     api.on("GET", "/polls/:id/comments", () => paginatedComments(comments));
     api.handle("POST", "/polls/:id/comments", (req) => {
-      const comment = buildComment({ pollId: poll.id, text: (req.body as { text: string }).text, user: { id: "me", username: "hincha_e2e" } });
+      const comment = buildComment({ pollId: poll.id, text: (req.body as { text: string }).text, user: buildCommentUser({ id: "me", username: "hincha_e2e" }) });
       comments.push(comment);
       return { status: 201, body: comment };
     });
@@ -99,6 +99,34 @@ test.describe("Encuestas de la tribuna", () => {
 
     await expect(card.getByText("Gana el que tenga más hambre")).toBeVisible();
     await expect(card.getByRole("textbox", { name: "Tu comentario" })).toHaveValue("");
+  });
+
+  test("cada comentario muestra el escudo y el plan de su autor, como en el chat", async ({ app, page, api }) => {
+    const poll = buildPoll({ stats: { comments: 3, reactions: 0 } });
+    const escudo = "https://res.cloudinary.com/demo/escudo-boca.png";
+    api.on("GET", "/polls/active", [poll]);
+    api.on("GET", "/polls/:id/comments", paginatedComments([
+      buildComment({ text: "Desde el palco se ve todo", isPremium: true, user: buildCommentUser({ id: "u-vip", username: "palquista", tier: "TIER_3", badgeUrl: escudo, nameColor: "color_boca" }) }),
+      buildComment({ text: "Platea opina", user: buildCommentUser({ id: "u-platea", username: "plateista", tier: "TIER_2" }) }),
+      buildComment({ text: "Popular opina", user: buildCommentUser({ id: "u-popu", username: "popular", tier: "TIER_1" }) }),
+      buildComment({ text: "Sin plan", user: buildCommentUser({ id: "u-comun", username: "hincha" }) }),
+    ]));
+    await page.route("https://res.cloudinary.com/**", (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: "<svg xmlns='http://www.w3.org/2000/svg'/>" }));
+
+    await app.open();
+    await app.goToSection("Comunidad");
+    const card = page.getByRole("article", { name: poll.title });
+    await card.getByRole("button", { name: "3 Comentarios" }).click();
+
+    const vip = card.getByRole("article", { name: "Comentario de @palquista (PALCO VIP)" });
+    await expect(vip).toContainText("Desde el palco se ve todo");
+    await expect(vip.getByRole("img", { name: "Escudo de @palquista" })).toHaveAttribute("src", escudo);
+    await expect(card.getByRole("article", { name: "Comentario de @plateista (PLATEÍSTA)" })).toContainText("PLATEÍSTA");
+    await expect(card.getByRole("article", { name: "Comentario de @popular (POPULAR)" })).toContainText("POPULAR");
+    // Sin plan: sin etiqueta, y sin escudo se muestra la inicial.
+    const comun = card.getByRole("article", { name: "Comentario de @hincha", exact: true });
+    await expect(comun).toContainText("Sin plan");
+    await expect(comun.getByRole("img")).toHaveCount(0);
   });
 
   test("reclamar las recompensas suma las monedas al saldo", { tag: "@p0" }, async ({ app, page, api, session }) => {

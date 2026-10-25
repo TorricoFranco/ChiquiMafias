@@ -31,7 +31,10 @@ describe('PollsService', () => {
       deleteMany: jest.fn(),
       upsert: jest.fn(),
     },
-    storeItem: { findFirst: jest.fn() },
+    storeItem: { findFirst: jest.fn(), findMany: jest.fn() },
+    comment: { findMany: jest.fn(), count: jest.fn(), create: jest.fn() },
+    commentReaction: { groupBy: jest.fn() },
+    user: { findUnique: jest.fn() },
   }
 
   const mockEventEmitter = { emit: jest.fn() }
@@ -88,6 +91,156 @@ describe('PollsService', () => {
         ...data,
       }),
     )
+  })
+
+  describe('comentarios', () => {
+    const vipAuthor = {
+      id: 'user-vip',
+      username: 'palquista',
+      activeSubscriptionTier: 'TIER_3',
+      activeNameColorId: 'item-color-boca',
+      team: { badgeUrl: 'https://res.cloudinary.com/escudo-boca.png' },
+    }
+    const plainAuthor = {
+      id: 'user-comun',
+      username: 'hincha',
+      activeSubscriptionTier: null,
+      activeNameColorId: null,
+      team: null,
+    }
+
+    beforeEach(() => {
+      mockPrisma.poll.findUnique.mockResolvedValue({
+        id: 'poll-1',
+        commentsEnabled: true,
+      })
+      mockPrisma.commentReaction.groupBy.mockResolvedValue([])
+      mockPrisma.storeItem.findMany.mockResolvedValue([
+        { id: 'item-color-boca', assetId: 'color_boca' },
+      ])
+    })
+
+    it('Debe mandar el autor con escudo, plan y color de nombre, sin nombre ni correo', async () => {
+      mockPrisma.comment.findMany.mockResolvedValue([
+        {
+          id: 'c-1',
+          text: 'Vamos',
+          createdAt: new Date('2026-10-24T12:00:00Z'),
+          isPremium: true,
+          user: vipAuthor,
+          reactions: [],
+        },
+        {
+          id: 'c-2',
+          text: 'Dale',
+          createdAt: new Date('2026-10-24T11:00:00Z'),
+          isPremium: false,
+          user: plainAuthor,
+          reactions: [],
+        },
+      ])
+      mockPrisma.comment.count.mockResolvedValue(2)
+
+      const result = await service.getPollComments('poll-1', 1, 20)
+
+      expect(result.data[0].user).toEqual({
+        id: 'user-vip',
+        username: 'palquista',
+        badgeUrl: 'https://res.cloudinary.com/escudo-boca.png',
+        tier: 'TIER_3',
+        nameColor: 'color_boca',
+      })
+      expect(result.data[1].user).toEqual({
+        id: 'user-comun',
+        username: 'hincha',
+        badgeUrl: null,
+        tier: null,
+        nameColor: null,
+      })
+      // El recorte del autor nunca pide el nombre ni el correo.
+      const { select } = (
+        mockPrisma.comment.findMany.mock.calls[0] as [
+          { select: { user: { select: Record<string, unknown> } } },
+        ]
+      )[0]
+      expect(select.user.select).not.toHaveProperty('name')
+      expect(select.user.select).not.toHaveProperty('email')
+      // Por el plan actual (PALCO VIP primero, sin plan al final) y después por fecha.
+      expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [
+            {
+              user: {
+                activeSubscriptionTier: { sort: 'desc', nulls: 'last' },
+              },
+            },
+            { createdAt: 'desc' },
+          ],
+        }),
+      )
+      // Un solo pedido a la tienda para traducir los colores de la página.
+      expect(mockPrisma.storeItem.findMany).toHaveBeenCalledTimes(1)
+      expect(mockPrisma.storeItem.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['item-color-boca'] } },
+        select: { id: true, assetId: true },
+      })
+    })
+
+    it('No debe consultar la tienda si nadie tiene un color equipado', async () => {
+      mockPrisma.comment.findMany.mockResolvedValue([
+        {
+          id: 'c-2',
+          text: 'Dale',
+          createdAt: new Date(),
+          isPremium: false,
+          user: plainAuthor,
+          reactions: [],
+        },
+      ])
+      mockPrisma.comment.count.mockResolvedValue(1)
+
+      await service.getPollComments('poll-1', 1, 20)
+
+      expect(mockPrisma.storeItem.findMany).not.toHaveBeenCalled()
+    })
+
+    it('Debe devolver el comentario nuevo con la misma forma que el listado', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        activeSubscriptionTier: 'TIER_3',
+      })
+      mockPrisma.comment.create.mockResolvedValue({
+        id: 'c-nuevo',
+        text: 'Hola',
+        pollId: 'poll-1',
+        userId: 'user-vip',
+        isPremium: true,
+        isDeleted: false,
+        createdAt: new Date(),
+        user: vipAuthor,
+      })
+
+      const result = await service.addComment('poll-1', 'user-vip', {
+        text: 'Hola',
+      })
+
+      expect(mockPrisma.comment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ isPremium: true }) as unknown,
+        }),
+      )
+      expect(result.user).toEqual({
+        id: 'user-vip',
+        username: 'palquista',
+        badgeUrl: 'https://res.cloudinary.com/escudo-boca.png',
+        tier: 'TIER_3',
+        nameColor: 'color_boca',
+      })
+      expect(result).toMatchObject({
+        likesCount: 0,
+        dislikesCount: 0,
+        userReaction: null,
+      })
+    })
   })
 
   describe('proposePoll', () => {

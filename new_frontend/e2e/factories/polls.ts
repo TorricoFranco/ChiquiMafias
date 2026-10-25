@@ -1,6 +1,7 @@
 import type {
   AdminPollItem,
   Comment,
+  CommentUser,
   PaginatedComments,
   Poll,
   PollAuthor,
@@ -57,6 +58,11 @@ export function buildAdminPoll(overrides: Partial<AdminPollItem> = {}): AdminPol
   return { ...buildPoll(), status: "PENDING", ...overrides };
 }
 
+/** Autor de un comentario sin suscripción, sin escudo y sin color equipado. */
+export function buildCommentUser(overrides: Partial<CommentUser> = {}): CommentUser {
+  return { id: "user-comentario", username: "opinologo", badgeUrl: null, tier: null, nameColor: null, ...overrides };
+}
+
 export function buildComment(overrides: Partial<Comment> = {}): Comment {
   return {
     id: nextId("comment"),
@@ -64,7 +70,7 @@ export function buildComment(overrides: Partial<Comment> = {}): Comment {
     userId: "user-comentario",
     text: "Gana Boca, no hay discusión",
     createdAt: "2026-05-10T19:00:00.000Z",
-    user: { id: "user-comentario", username: "opinologo" },
+    user: buildCommentUser(),
     likesCount: 0,
     dislikesCount: 0,
     userReaction: null,
@@ -74,5 +80,5 @@ export function buildComment(overrides: Partial<Comment> = {}): Comment {
 }
 
 export function paginatedComments(data: Comment[]): PaginatedComments {
-  return { data, meta: { total: data.length, page: 1, limit: 20, lastPage: 1 } };
+  return { data, meta: { total: data.length, page: 1, limit: 20, totalPages: 1 } };
 }
