@@ -228,6 +228,32 @@ aparece en `GET /competitions` y en el menú de Ligas. Pasos, con `FOOTBALL_PROV
 6. **Apuestas**: recién cuando se decida, `bets_enabled = true` en la misma temporada. El mercado es 1X2
    sobre los 90 minutos y un partido definido por penales es empate.
 
+## Partidos congelados (sin resultado después de jugarse)
+
+El sync del fixture de la Liga solo mira una ventana de 10 días hacia atrás y 7 hacia adelante
+(`liga-dividida.strategy.ts`). Si el servidor estuvo apagado, o en medio de un cambio de proveedor,
+los partidos que se jugaron fuera de esa ventana quedan en `SCHEDULED` con estado `NS` para siempre:
+el fixture muestra solo los horarios, sin resultado, y ningún cron los vuelve a mirar. Se arregla
+**una sola vez** con `scripts/resync-stale-fixtures.ts`:
+
+```bash
+# primero en seco: lista qué partidos cambiarían (producción: tool …, desarrollo: docker exec …)
+tool scripts/resync-stale-fixtures.ts --slug liga-profesional
+tool scripts/resync-stale-fixtures.ts --slug liga-profesional --apply
+```
+
+- Solo toca los partidos de esa competición y temporada que ya pasaron su hora y siguen en
+  `SCHEDULED` o `LIVE`. Actualiza estado, goles, penales, minuto y fecha con los mismos campos que el sync.
+  No crea partidos, no toca rondas ni estadios y no emite `match.finished`.
+- Pide el rango de los partidos congelados al proveedor (unos pocos pedidos) y borra los caches del
+  fixture al aplicar.
+- **Dinero:** si alguno de esos partidos tiene mercado de apuestas, al quedar `FINISHED` el cron de
+  apuestas lo liquida. El dry-run lo avisa antes de escribir.
+- Después completá eventos y estadísticas con el relleno, limitado a las fechas afectadas para no
+  gastar cuota en partidos viejos: `scripts/backfill-match-details.ts --slug liga-profesional --since
+  2026-10-09 --apply` (primero sin `--apply`). Si hubo errores, repetí el comando: solo reintenta lo
+  pendiente.
+
 ## Cuota de pedidos (Highlightly: 7.500 por día)
 
 Calculadora: `node scripts/dev/football-quota.mjs`. Hace cero pedidos; los intervalos salen de los
