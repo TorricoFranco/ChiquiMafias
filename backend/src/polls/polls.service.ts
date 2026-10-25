@@ -30,6 +30,11 @@ import {
   pollAuthorSelect,
   resolvePollAuthor,
 } from './utils/poll-author.util'
+import {
+  commentAuthorSelect,
+  nameColorAssets,
+  toCommentAuthor,
+} from './utils/comment-author.util'
 
 @Injectable()
 export class PollsService {
@@ -748,17 +753,27 @@ export class PollsService {
 
     const isPremium = user?.activeSubscriptionTier === 'TIER_3'
 
-    return this.prisma.comment.create({
+    const { user: author, ...comment } = await this.prisma.comment.create({
       data: {
         text: dto.text,
         pollId,
         isPremium,
         userId,
       },
-      include: {
-        user: { select: { username: true, activeChatBubbleId: true } },
-      },
+      include: { user: { select: commentAuthorSelect } },
     })
+
+    // Misma forma que un comentario del listado.
+    return {
+      ...comment,
+      user: toCommentAuthor(
+        author,
+        await nameColorAssets(this.prisma, [author]),
+      ),
+      likesCount: 0,
+      dislikesCount: 0,
+      userReaction: null,
+    }
   }
 
   async reactToPoll(pollId: string, userId: string, type: ReactionType) {
@@ -810,20 +825,18 @@ export class PollsService {
         },
         skip,
         take: limit,
-        orderBy: [{ isPremium: 'desc' }, { createdAt: 'desc' }],
+        // Por el plan actual del autor, como el destaque: PALCO VIP, PLATEÍSTA,
+        // POPULAR (el enum ordena TIER_1 < TIER_2 < TIER_3) y después los comunes.
+        orderBy: [
+          { user: { activeSubscriptionTier: { sort: 'desc', nulls: 'last' } } },
+          { createdAt: 'desc' },
+        ],
         select: {
           id: true,
           text: true,
           createdAt: true,
           isPremium: true,
-          user: {
-            select: {
-              id: true,
-              username: true,
-              activeNameColorId: true,
-              activeChatBubbleId: true,
-            },
-          },
+          user: { select: commentAuthorSelect },
           reactions: currentUserId
             ? {
                 where: { userId: currentUserId },
@@ -839,14 +852,20 @@ export class PollsService {
 
     const commentIds = comments.map((c) => c.id)
 
-    const reactionCounts = await this.prisma.commentReaction.groupBy({
-      by: ['commentId', 'type'],
-      where: { commentId: { in: commentIds } },
-      _count: { type: true },
-    })
+    const [reactionCounts, nameColors] = await Promise.all([
+      this.prisma.commentReaction.groupBy({
+        by: ['commentId', 'type'],
+        where: { commentId: { in: commentIds } },
+        _count: { type: true },
+      }),
+      nameColorAssets(
+        this.prisma,
+        comments.map((c) => c.user),
+      ),
+    ])
 
     const formattedComments = comments.map((comment) => {
-      const { reactions, ...commentData } = comment
+      const { reactions, user, ...commentData } = comment
 
       const likes =
         reactionCounts.find(
@@ -859,6 +878,7 @@ export class PollsService {
 
       return {
         ...commentData,
+        user: toCommentAuthor(user, nameColors),
         likesCount: likes,
         dislikesCount: dislikes,
         userReaction:

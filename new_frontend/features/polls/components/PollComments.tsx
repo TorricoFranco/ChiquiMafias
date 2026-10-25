@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Send, ThumbsUp, ThumbsDown, Crown } from "lucide-react"; 
+import { Send } from "lucide-react";
 import { usePollComments, useAddComment, useReactToComment } from "@/features/polls/hooks/usePolls";
-import { formatTimeAgo } from "../utils/timeUtils";
+import { PollCommentItem } from "./PollCommentItem";
 
 export const PollComments = ({ pollId }: { pollId: string }) => {
     const [commentInput, setCommentInput] = useState("");
@@ -40,47 +40,7 @@ export const PollComments = ({ pollId }: { pollId: string }) => {
                     <p className="text-xs text-[#909378] italic text-center py-4">Sé el primero en opinar...</p>
                 ) : (
                     commentsData?.data?.map((c) => (
-                        <div
-                            key={c.id}
-                            className={`p-3 rounded-lg text-xs flex flex-col gap-1.5 transition-all ${c.isPremium
-                                    ? 'bg-[#d2f000]/5 border border-[#d2f000]/20'
-                                    : 'bg-[#1c1b1b]/50 border border-transparent hover:bg-[#1c1b1b]'
-                                }`}
-                        >
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                    <span className={`font-bold ${c.isPremium ? 'text-[#d2f000]' : 'text-[#e5e2e1]'}`}>
-                                        @{c.user.username || "anónimo"}
-                                    </span>
-                                    {c.isPremium && (
-                                        <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded font-black tracking-wider bg-[#d2f000] text-[#191e00]">
-                                            <Crown className="w-2.5 h-2.5" />
-                                            PALCO VIP
-                                        </span>
-                                    )}
-                                </div>
-                                <span className="text-[10px] text-[#767861] font-medium">{formatTimeAgo(c.createdAt)}</span>
-                            </div>
-
-                            <p className="text-[#c6c9ab] leading-relaxed mt-0.5">{c.text}</p>
-
-                            <div className="flex justify-end gap-4 mt-1">
-                                <button
-                                    onClick={() => handleCommentReaction(c.id, "LIKE")}
-                                    className={`flex items-center gap-1.5 transition-colors ${c.userReaction === 'LIKE' ? 'text-[#d2f000]' : 'text-[#767861] hover:text-[#d2f000]'}`}
-                                >
-                                    <ThumbsUp className="w-3.5 h-3.5" />
-                                    <span className="text-[11px] font-semibold">{c.likesCount || 0}</span>
-                                </button>
-                                <button
-                                    onClick={() => handleCommentReaction(c.id, "DISLIKE")}
-                                    className={`flex items-center gap-1.5 transition-colors ${c.userReaction === 'DISLIKE' ? 'text-red-400' : 'text-[#767861] hover:text-red-400'}`}
-                                >
-                                    <ThumbsDown className="w-3.5 h-3.5" />
-                                    <span className="text-[11px] font-semibold">{c.dislikesCount || 0}</span>
-                                </button>
-                            </div>
-                        </div>
+                        <PollCommentItem key={c.id} comment={c} onReact={handleCommentReaction} />
                     ))
                 )}
             </div>
