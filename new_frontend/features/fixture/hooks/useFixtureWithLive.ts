@@ -45,6 +45,8 @@ export const useFixtureWithLive = (
         tournament: fixtureData?.tournament,
         current_matchday: fixtureData?.current_matchday,
         matches: mergedMatches,
+        /** Lo que llegó por socket, por id de partido (incluye el momento del final). */
+        liveResults,
         isLoading: isFixtureLoading
     };
 };

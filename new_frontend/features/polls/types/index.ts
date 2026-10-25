@@ -103,11 +103,22 @@ export interface Poll {
     reactions: number;
   };
 }
+/** Plan de suscripción del autor de un comentario. */
+export type CommentTier = Exclude<SubscriptionTier, "NONE">;
+
+/**
+ * Autor de un comentario (`toCommentAuthor` del backend). Vista común: solo el @username,
+ * nunca el nombre ni el correo.
+ */
 export interface CommentUser {
   id: string;
   username: string | null;
-  activeNameColorId?: string | null;
-  activeChatBubbleId?: string | null;
+  /** Escudo del equipo del usuario: su "foto", como en el chat. */
+  badgeUrl: string | null;
+  /** Plan vigente; `null` sin suscripción. */
+  tier: CommentTier | null;
+  /** `assetId` del color de nombre equipado (clave de `NAME_COLORS`). */
+  nameColor: string | null;
 }
 
 export interface Comment {
@@ -136,7 +147,7 @@ export interface PaginatedComments {
     total: number;
     page: number;
     limit: number;
-    lastPage: number;
+    totalPages: number;
   };
 }
 

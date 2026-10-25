@@ -101,6 +101,11 @@ export interface LiveResult {
     isLive: boolean;
     isPlayoff: boolean;
     elapsed?: number | null;
+    /**
+     * Cuándo llegó por socket el resultado final (ms). Mientras la tabla del backend no se
+     * actualiza, el front la sigue sumando para que los puntos no desaparezcan con el pitazo.
+     */
+    finishedAt?: number;
 }
 
 // Payload de on_league_update: h, a y los goles de penales llegan sueltos y el código los convierte con Number().
