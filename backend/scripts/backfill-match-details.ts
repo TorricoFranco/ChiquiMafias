@@ -10,8 +10,10 @@
  * pedidos gastaría. Con --apply consulta y guarda; se puede repetir, no duplica.
  *
  *   npx ts-node -r tsconfig-paths/register scripts/backfill-match-details.ts \
- *     --slug copa-argentina [--season 2026] [--lineups] [--limit 100] [--apply]
+ *     --slug copa-argentina [--season 2026] [--since 2026-10-01] [--lineups] [--limit 100] [--apply]
  *
+ * - --since AAAA-MM-DD limita a los partidos desde esa fecha (por ejemplo, para
+ *   completar una sola fecha de la Liga sin gastar pedidos en las anteriores).
  * - Necesita HIGHLIGHTLY_API_KEY y que los partidos estén vinculados en
  *   `ProviderRef` (script link-provider-ids).
  * - Cuesta 2 pedidos por partido (eventos y estadísticas), o 3 con --lineups.
@@ -46,9 +48,14 @@ async function main() {
   const apply = flag('apply')
   const withLineups = flag('lineups')
   const limit = Number(arg('limit') ?? 100)
+  const sinceArg = arg('since')
+  const since = sinceArg ? new Date(`${sinceArg}T00:00:00.000Z`) : undefined
   if (!slug) throw new Error('Falta --slug <competición> (ej. copa-argentina)')
   if (!Number.isInteger(limit) || limit < 1) {
     throw new Error('--limit tiene que ser un entero positivo')
+  }
+  if (since && Number.isNaN(since.getTime())) {
+    throw new Error('--since tiene que ser una fecha AAAA-MM-DD')
   }
 
   const key = process.env.HIGHLIGHTLY_API_KEY
@@ -72,6 +79,7 @@ async function main() {
       where: {
         league_id: league.id,
         season,
+        ...(since ? { date: { gte: since } } : {}),
         status_short: { in: FINISHED },
         OR: [
           { events_finalized: false },
