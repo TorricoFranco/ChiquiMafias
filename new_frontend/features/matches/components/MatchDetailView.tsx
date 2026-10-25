@@ -42,11 +42,15 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
         isNotStarted && !hasLineups ? 'pre-partido' : 'resumen'
     );
 
-    // Pre-partido deja de existir al arrancar el partido y el chat al terminar: en ese caso se muestra resumen. Derivado, sin efecto.
+    // Pre-partido deja de existir al arrancar el partido y el chat al terminar: en ese caso se muestra resumen.
+    // Y al revés: "Resumen" no existe antes de arrancar (pasa si el detalle ya venía con alineaciones al
+    // abrir la pantalla), así que se muestra el historial. Derivado, sin efecto.
     const activeTab: MatchTabKey =
-        (!isNotStarted && selectedTab === 'pre-partido') || (!showChatTab && selectedTab === 'chat')
-            ? 'resumen'
-            : selectedTab;
+        isNotStarted && selectedTab === 'resumen'
+            ? 'pre-partido'
+            : (!isNotStarted && selectedTab === 'pre-partido') || (!showChatTab && selectedTab === 'chat')
+                ? 'resumen'
+                : selectedTab;
 
     return (
         <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-12 px-2 md:px-0">

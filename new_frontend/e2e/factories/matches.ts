@@ -1,5 +1,5 @@
 import { chatStateFor } from "@/features/matches/types";
-import type { MatchDetails, MatchMetadata, MatchScore, PreMatchResponse } from "@/features/matches/types";
+import type { MatchDetails, MatchLineup, MatchMetadata, MatchScore, PreMatchResponse } from "@/features/matches/types";
 import { LOCAL_IMAGE, nextId } from "./ids";
 
 /** leagueId que las páginas de partido mandan fijo al backend. */
@@ -46,6 +46,19 @@ export function buildMatchDetails(overrides: MatchOverrides = {}): MatchDetails 
     chatActive: chatState === "OPEN",
     chatState,
     ...rest,
+  };
+}
+
+export function buildMatchLineup(overrides: Partial<MatchLineup> = {}): MatchLineup {
+  return {
+    teamId: "team-boca",
+    teamName: "Boca Juniors",
+    formation: "4-3-3",
+    coach: "Claudio Úbeda",
+    kitColors: null,
+    startXI: [{ id: nextId("player"), name: "Agustín Marchesín", number: 1, pos: "G", grid: "1:1" }],
+    substitutes: [],
+    ...overrides,
   };
 }
 
