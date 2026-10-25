@@ -147,6 +147,8 @@ export interface SimulatedResult {
   homeTeamId: string;
   awayTeamId: string;
   isSimulated: boolean;
+  /** Torneo del partido: suma solo en sus zonas (los mismos equipos están en las del Apertura y el Clausura). */
+  tournament: TournamentType;
 }
 
 export interface AvailableStages {

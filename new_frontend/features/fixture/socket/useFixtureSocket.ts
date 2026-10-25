@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { useUserStore } from '@/store/useUserStore';
 import { useLiveScores } from '../hooks/useFixture';
 import { formatToMapFixtureSocket } from '../utils/formatToMapFixtureSocket';
-import { LIVE_STATUSES } from '../utils/liveStatus';
+import { FINAL_STATUSES, LIVE_STATUSES } from '../utils/liveStatus';
 import type { LeagueLiveUpdate, LiveResult } from '../types';
 
 /** Marcadores en vivo de una competición: los iniciales por REST y después por socket. */
@@ -83,7 +83,9 @@ export const useLeagueLive = (slug: string) => {
           // Un partido que terminó también llega por acá, una última vez, con su resultado final.
           isLive: LIVE_STATUSES.includes(live.status),
           isPlayoff: !!live.isPlayoff,
-          elapsed: live.elapsed 
+          elapsed: live.elapsed,
+          // El primer aviso con el final marca el momento; los siguientes no lo corren.
+          finishedAt: FINAL_STATUSES.includes(live.status) ? (prev[id]?.finishedAt ?? Date.now()) : undefined,
         };
       });
 

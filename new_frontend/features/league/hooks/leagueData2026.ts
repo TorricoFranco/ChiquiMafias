@@ -649,43 +649,36 @@ export function processStandingsWithSimulations(
     const clA: StandingRow[] = baseStandings.clausura.groups.A.map((r) => ({ ...r }));
     const clB: StandingRow[] = baseStandings.clausura.groups.B.map((r) => ({ ...r }));
 
+    const addResult = (row: StandingRow, goalsFor: number, goalsAgainst: number) => {
+        row.played += 1;
+        row.goalsFor += goalsFor;
+        row.goalsAgainst += goalsAgainst;
+        row.goalDiff = row.goalsFor - row.goalsAgainst;
+        if (goalsFor > goalsAgainst) {
+            row.won += 1;
+            row.points += 3;
+        } else if (goalsFor < goalsAgainst) {
+            row.lost += 1;
+        } else {
+            row.draw += 1;
+            row.points += 1;
+        }
+    };
+
     // Apply simulated scores
     for (const sim of simList) {
-        const { h, a, homeTeamId, awayTeamId } = sim;
+        const { h, a, homeTeamId, awayTeamId, tournament } = sim;
         // Un resultado simulado a medio cargar todavía no cuenta como partido jugado.
         if (h === null || a === null) continue;
-        const allGroups = [apA, apB, clA, clB];
 
-        for (const group of allGroups) {
-            const home = group.find((t) => t.teamId === homeTeamId);
-            const away = group.find((t) => t.teamId === awayTeamId);
-
-            if (home && away) {
-                home.played += 1;
-                away.played += 1;
-                home.goalsFor += h;
-                home.goalsAgainst += a;
-                away.goalsFor += a;
-                away.goalsAgainst += h;
-                home.goalDiff = home.goalsFor - home.goalsAgainst;
-                away.goalDiff = away.goalsFor - away.goalsAgainst;
-
-                if (h > a) {
-                    home.won += 1;
-                    home.points += 3;
-                    away.lost += 1;
-                } else if (h < a) {
-                    away.won += 1;
-                    away.points += 3;
-                    home.lost += 1;
-                } else {
-                    home.draw += 1;
-                    home.points += 1;
-                    away.draw += 1;
-                    away.points += 1;
-                }
-            }
-        }
+        // Solo las zonas del torneo del partido: los mismos equipos están en las del Apertura y
+        // del Clausura, y sumarlo en las dos contaba el partido dos veces en la anual y en los promedios.
+        const rows = tournament === 'APERTURA' ? [...apA, ...apB] : [...clA, ...clB];
+        // Cada equipo suma en su zona: en un interzonal no están en el mismo grupo.
+        const home = rows.find((t) => t.teamId === homeTeamId);
+        const away = rows.find((t) => t.teamId === awayTeamId);
+        if (home) addResult(home, h, a);
+        if (away) addResult(away, a, h);
     }
 
     // Re-sort and re-number zones

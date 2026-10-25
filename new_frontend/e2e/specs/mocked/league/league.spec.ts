@@ -1,7 +1,8 @@
 import { expect, test } from "../../../fixtures/test";
 import { buildCompetition, buildCopaArgentina } from "../../../factories/competitions";
 import { buildMatchFixture } from "../../../factories/fixtures";
-import { buildMatchday } from "../../../factories/league";
+import type { FullStandingsResponse } from "@/features/standings/types";
+import { buildMatchday, buildStandingRow } from "../../../factories/league";
 import { buildMatchDetails, buildPreMatch } from "../../../factories/matches";
 import { BASE_URL } from "../../../support/env";
 import { mockLeague } from "../../../support/league";
@@ -203,5 +204,181 @@ test.describe("Ligas: Liga Profesional", () => {
 
       await expect(alert).toHaveCount(0);
     });
+  });
+});
+
+// Tabla de la temporada con un Apertura terminado y un Clausura en juego. Boca y River están en la
+// Zona A de los dos torneos, como en la Liga real; Racing e Independiente, en la Zona B.
+// `withBocaRiver` / `withRacingIndependiente`: la tabla del backend ya incluye ese partido (1-0 y 0-0).
+function seasonStandings({ withBocaRiver = false, withRacingIndependiente = false } = {}): FullStandingsResponse {
+  const row = buildStandingRow;
+  const apertura = {
+    A: [
+      row("Boca Juniors", { played: 16, won: 9, draw: 3, lost: 4, points: 30, goalsFor: 25, goalsAgainst: 15, goalDiff: 10 }),
+      row("River Plate", { position: 2, played: 16, won: 8, draw: 4, lost: 4, points: 28, goalsFor: 20, goalsAgainst: 14, goalDiff: 6 }),
+    ],
+    B: [
+      row("Racing Club", { played: 16, won: 6, draw: 5, lost: 5, points: 23, goalsFor: 18, goalsAgainst: 17, goalDiff: 1 }),
+      row("Independiente", { position: 2, played: 16, won: 5, draw: 5, lost: 6, points: 20, goalsFor: 15, goalsAgainst: 18, goalDiff: -3 }),
+    ],
+  };
+  const clausura = {
+    A: [
+      withBocaRiver
+        ? row("Boca Juniors", { played: 11, won: 8, draw: 0, lost: 3, points: 24, goalsFor: 16, goalsAgainst: 9, goalDiff: 7 })
+        : row("Boca Juniors", { played: 10, won: 7, draw: 0, lost: 3, points: 21, goalsFor: 15, goalsAgainst: 9, goalDiff: 6 }),
+      withBocaRiver
+        ? row("River Plate", { position: 2, played: 11, won: 5, draw: 4, lost: 2, points: 19, goalsFor: 12, goalsAgainst: 8, goalDiff: 4 })
+        : row("River Plate", { position: 2, played: 10, won: 5, draw: 4, lost: 1, points: 19, goalsFor: 12, goalsAgainst: 7, goalDiff: 5 }),
+    ],
+    B: [
+      row("Racing Club", { played: withRacingIndependiente ? 11 : 10, won: 3, draw: withRacingIndependiente ? 4 : 3, lost: 4, points: withRacingIndependiente ? 13 : 12, goalsFor: 9, goalsAgainst: 11, goalDiff: -2 }),
+      row("Independiente", { position: 2, played: withRacingIndependiente ? 11 : 10, won: 2, draw: withRacingIndependiente ? 5 : 4, lost: 4, points: withRacingIndependiente ? 11 : 10, goalsFor: 8, goalsAgainst: 12, goalDiff: -4 }),
+    ],
+  };
+  return {
+    apertura: { tournament: "APERTURA", groups: apertura },
+    clausura: { tournament: "CLAUSURA", groups: clausura },
+    annual: [],
+    averages: [],
+    updated_at: "2026-10-24T12:00:00.000Z",
+  };
+}
+
+const BOCA_RIVER = { home_team_id: "team-boca-juniors", away_team_id: "team-river-plate" };
+const finalScore = (h: number, a: number, homeTeamId: string, awayTeamId: string) => ({ h, a, hp: 0, ap: 0, homeTeamId, awayTeamId, status: "FT", elapsed: 90 });
+
+test.describe("Ligas: la tabla con partidos en vivo", () => {
+  const zoneTable = (page: import("@playwright/test").Page) =>
+    page.getByRole("table").filter({ has: page.getByRole("columnheader", { name: "Pos" }) });
+  const annualTable = (page: import("@playwright/test").Page) =>
+    page.getByRole("table").filter({ has: page.getByRole("columnheader", { name: "Estado" }) });
+  const standingsRequests = (api: import("../../../support/api-mock").ApiMock) => api.requests("GET", "/standings/seasons/:season").length;
+
+  test("un partido en vivo del Clausura se cuenta una sola vez en la tabla anual", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    const live = buildMatchFixture({ id: "m-vivo", ...BOCA_RIVER, status_short: "2H", elapsed: 60, home_goals: 1, away_goals: 0, is_live: true });
+    mockLeague(api, { standings: seasonStandings(), matchdays: { "5": buildMatchday("5", [live]) } });
+
+    await app.open("/?tab=ligas");
+
+    // Clausura: 21 + 3. Anual: Apertura 30 + Clausura 21 + 3 = 54, con 16 + 10 + 1 = 27 jugados.
+    await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toContainText("24");
+    const annualBoca = annualTable(page).getByRole("row", { name: /Boca Juniors/ });
+    await expect(annualBoca).toContainText("54");
+    await expect(annualBoca).toContainText("27");
+    await expect(annualBoca).not.toContainText("57");
+  });
+
+  test("en un interzonal en vivo cada equipo suma en su propia zona", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    const live = buildMatchFixture({
+      id: "m-interzonal",
+      home_team_id: "team-boca-juniors",
+      away_team_id: "team-racing-club",
+      away_team: { name: "Racing Club", logo_url: buildMatchFixture().away_team.logo_url },
+      status_short: "2H",
+      elapsed: 70,
+      home_goals: 1,
+      away_goals: 0,
+      is_live: true,
+    });
+    mockLeague(api, { standings: seasonStandings(), matchdays: { "5": buildMatchday("5", [live]) } });
+
+    await app.open("/?tab=ligas");
+
+    await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toContainText("24");
+    // Racing (Zona B) suma el partido perdido: 16 + 10 + 1 = 27 jugados en la anual.
+    await expect(annualTable(page).getByRole("row", { name: /Racing Club/ })).toContainText("27");
+  });
+
+  test("un partido de playoff en vivo no suma a la tabla", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    const live = buildMatchFixture({ id: "m-playoff", ...BOCA_RIVER, is_playoff: true, status_short: "2H", elapsed: 60, home_goals: 1, away_goals: 0, is_live: true });
+    mockLeague(api, { standings: seasonStandings(), matchdays: { "5": buildMatchday("5", [live]) } });
+
+    await app.open("/?tab=ligas");
+
+    await expect(page.getByRole("link", { name: "Boca Juniors vs River Plate" })).toContainText("ST60");
+    await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toContainText("21");
+    await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).not.toContainText("24");
+  });
+
+  test("al terminar el partido los puntos siguen en la tabla hasta que el backend la actualiza", { tag: "@p0" }, async ({ app, page, api, session, socket }) => {
+    session.loginAs("USER");
+    await page.clock.install();
+    const live = buildMatchFixture({ id: "m-final", ...BOCA_RIVER, status_short: "2H", elapsed: 88, home_goals: 1, away_goals: 0, is_live: true });
+    let standings = seasonStandings();
+    mockLeague(api, { matchdays: { "5": buildMatchday("5", [live]) } });
+    api.on("GET", "/standings/seasons/:season", () => standings);
+
+    await app.open("/?tab=ligas");
+    const bocaRow = zoneTable(page).getByRole("row", { name: /Boca Juniors/ });
+    await expect(bocaRow).toContainText("24");
+    await socket.waitForEmit("join_competition");
+
+    await socket.emit("on_league_update", { "m-final": finalScore(1, 0, "team-boca-juniors", "team-river-plate") });
+    await expect(page.getByRole("link", { name: "Boca Juniors vs River Plate" })).toContainText("Finalizado");
+    await expect(bocaRow).toContainText("24");
+
+    // A los 2 minutos pide la tabla, pero el proveedor todavía no la actualizó: sigue sumando.
+    let before = standingsRequests(api);
+    await page.clock.fastForward("02:30");
+    await expect.poll(() => standingsRequests(api)).toBeGreaterThan(before);
+    await expect(bocaRow).toContainText("24");
+
+    // A los 4 minutos la tabla ya tiene el partido: deja de sumarlo y no queda contado dos veces.
+    standings = seasonStandings({ withBocaRiver: true });
+    before = standingsRequests(api);
+    await page.clock.fastForward("02:00");
+    await expect.poll(() => standingsRequests(api)).toBeGreaterThan(before);
+    await expect(bocaRow).toContainText("24");
+    await expect(bocaRow).not.toContainText("27");
+  });
+
+  test("un segundo final de la fecha no vuelve a sumar un partido que la tabla ya incluye", async ({ app, page, api, session, socket }) => {
+    session.loginAs("USER");
+    await page.clock.install();
+    const bocaRiver = buildMatchFixture({ id: "m-a", ...BOCA_RIVER, status_short: "2H", elapsed: 88, home_goals: 1, away_goals: 0, is_live: true });
+    const racingIndependiente = buildMatchFixture({
+      id: "m-b",
+      home_team_id: "team-racing-club",
+      away_team_id: "team-independiente",
+      home_team: { name: "Racing Club", logo_url: bocaRiver.home_team.logo_url },
+      away_team: { name: "Independiente", logo_url: bocaRiver.home_team.logo_url },
+      status_short: "2H",
+      elapsed: 70,
+      home_goals: 0,
+      away_goals: 0,
+      is_live: true,
+    });
+    let standings = seasonStandings();
+    mockLeague(api, { matchdays: { "5": buildMatchday("5", [bocaRiver, racingIndependiente]) } });
+    api.on("GET", "/standings/seasons/:season", () => standings);
+
+    await app.open("/?tab=ligas");
+    const bocaRow = zoneTable(page).getByRole("row", { name: /Boca Juniors/ });
+    await expect(bocaRow).toContainText("24");
+    await socket.waitForEmit("join_competition");
+
+    // Termina Boca-River y la tabla nueva ya lo incluye.
+    await socket.emit("on_league_update", { "m-a": finalScore(1, 0, "team-boca-juniors", "team-river-plate") });
+    standings = seasonStandings({ withBocaRiver: true });
+    let before = standingsRequests(api);
+    await page.clock.fastForward("02:30");
+    await expect.poll(() => standingsRequests(api)).toBeGreaterThan(before);
+    await expect(bocaRow).toContainText("24");
+
+    // Más tarde termina Racing-Independiente: Boca-River no se vuelve a sumar.
+    await socket.emit("on_league_update", { "m-b": finalScore(0, 0, "team-racing-club", "team-independiente") });
+    await expect(page.getByRole("link", { name: "Racing Club vs Independiente" })).toContainText("Finalizado");
+    await expect(bocaRow).toContainText("24");
+    await expect(bocaRow).not.toContainText("27");
+
+    standings = seasonStandings({ withBocaRiver: true, withRacingIndependiente: true });
+    before = standingsRequests(api);
+    await page.clock.fastForward("02:30");
+    await expect.poll(() => standingsRequests(api)).toBeGreaterThan(before);
+    await expect(bocaRow).toContainText("24");
   });
 });
