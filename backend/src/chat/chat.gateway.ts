@@ -148,6 +148,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /** El socket sobrevive a la navegación: el chat que se vuelve a montar pide el historial de nuevo. */
+  @SubscribeMessage('request_global_history')
+  async handleRequestGlobalHistory(@ConnectedSocket() socket: Socket) {
+    await this.sendGlobalHistory(socket)
+  }
+
   handleDisconnect(socket: Socket) {
     this.chatService.onClientDisconnected(socket.id)
     this.server.emit(

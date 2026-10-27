@@ -171,6 +171,9 @@ export function useChatSocket() {
     socket.on("poll_show", handlePollShow);
     socket.on("subscription_gift_received", handleSubscriptionGift);
 
+    // El socket global ya estaba conectado: el historial del connect no se repite al volver a montar el chat.
+    if (socket.connected) socket.emit("request_global_history");
+
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
