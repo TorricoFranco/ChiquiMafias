@@ -3,7 +3,7 @@ import { expect, test } from "../../../fixtures/test";
 import { buildMarket, buildMatchMarket } from "../../../factories/bets";
 import { buildChatMessage, buildMatchChatMessage } from "../../../factories/chat";
 import { buildCalendar, buildMatchFixture } from "../../../factories/fixtures";
-import { buildMatchDetails, buildPreMatch } from "../../../factories/matches";
+import { buildMatchDetails, buildMatchLineup, buildPreMatch } from "../../../factories/matches";
 import type { ApiMock } from "../../../support/api-mock";
 import { BASE_URL } from "../../../support/env";
 import { ChatPanel } from "../../../pages/chat-panel";
@@ -54,6 +54,18 @@ test.describe("Detalle de partido", () => {
 
     await expect(page.getByRole("tab", { name: "Historial" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tab", { name: "Chat en Vivo" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Resumen" })).toBeHidden();
+    await expect(page.getByText("Partidos recientes:").first()).toBeVisible();
+  });
+
+  test("un partido sin empezar que ya tiene alineaciones muestra la pestaña Formaciones y abre en el historial", async ({ page, api }) => {
+    const match = buildMatchDetails({ metadata: { status: "NS" }, lineups: [buildMatchLineup()] });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+
+    await expect(page.getByRole("tab", { name: "Formaciones" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Historial" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tab", { name: "Resumen" })).toBeHidden();
     await expect(page.getByText("Partidos recientes:").first()).toBeVisible();
   });
