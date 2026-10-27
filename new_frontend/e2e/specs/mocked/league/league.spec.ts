@@ -2,7 +2,7 @@ import { expect, test } from "../../../fixtures/test";
 import { buildCompetition, buildCopaArgentina } from "../../../factories/competitions";
 import { buildMatchFixture } from "../../../factories/fixtures";
 import type { FullStandingsResponse } from "@/features/standings/types";
-import { buildMatchday, buildStandingRow } from "../../../factories/league";
+import { buildBracketTeam, buildMatchday, buildPlayoffBrackets, buildStandingRow } from "../../../factories/league";
 import { buildMatchDetails, buildPreMatch } from "../../../factories/matches";
 import { BASE_URL } from "../../../support/env";
 import { mockLeague } from "../../../support/league";
@@ -55,6 +55,32 @@ test.describe("Ligas: Liga Profesional", () => {
     // Con `next dev`, la primera visita a la ruta interceptada la compila (varios segundos).
     await expect(page).toHaveURL(`${BASE_URL}/match/${match.metadata.id}`, { timeout: 30_000 });
     await expect(page.getByRole("heading", { name: "Boca Juniors" })).toBeVisible();
+  });
+
+  test("en el celular el cuadro de playoffs muestra los dos lados enteros y la final en su lugar", { tag: "@mobile-only" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, {
+      brackets: buildPlayoffBrackets({
+        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan") },
+        "octavos:right:0": { home_team: buildBracketTeam("Rosario Central"), away_team: buildBracketTeam("Independiente") },
+        "semifinal:left:0": { home_team: buildBracketTeam("Talleres"), away_team: buildBracketTeam("Lanus") },
+        "final:center:0": { home_team: buildBracketTeam("Boca Juniors"), away_team: buildBracketTeam("River Plate") },
+      }),
+    });
+
+    await app.open("/?tab=ligas");
+    await page.getByRole("button", { name: "Ver llaves playoffs" }).click();
+
+    // Antes el árbol de escritorio desbordaba: los octavos de la izquierda quedaban fuera de la pantalla.
+    const octavos = page.getByRole("region", { name: "Octavos de final" });
+    await expect(octavos.getByText("Instituto")).toBeInViewport({ ratio: 1 });
+    await expect(octavos.getByText("Rosario Central")).toBeInViewport({ ratio: 1 });
+
+    // 'semifinal' también contiene 'final': la primera semi no puede ocupar el lugar de la final.
+    const final = page.getByRole("region", { name: "Final", exact: true });
+    await expect(final.getByText("Boca Juniors")).toBeVisible();
+    await expect(final.getByText("Talleres")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Semifinales" }).getByText("Talleres")).toBeVisible();
   });
 
   test("pide los datos de la temporada actual que informa el backend", async ({ app, page, api, session }) => {

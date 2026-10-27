@@ -53,8 +53,10 @@ export const MatchTabs: React.FC<MatchTabsProps> = ({
         tabs.push({ key: 'chat', label: 'Chat en Vivo', icon: MessageSquare });
     }
 
+    // En celular las pestañas se reparten el ancho con el icono arriba del texto: con tres
+    // (en vivo con formaciones) no entran en fila y la barra se deslizaba de costado.
     return (
-        <div role="tablist" className="flex gap-2 overflow-x-auto pb-2 border-b border-[#2b2a2a] scrollbar-hide">
+        <div role="tablist" className="flex gap-1 sm:gap-2 pb-2 border-b border-[#2b2a2a]">
             {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.key;
@@ -73,7 +75,7 @@ export const MatchTabs: React.FC<MatchTabsProps> = ({
                         role="tab"
                         aria-selected={isActive}
                         onClick={() => onChangeTab(tab.key)}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-t-xl transition-all font-bold text-sm whitespace-nowrap cursor-pointer ${isActive
+                        className={`flex-1 sm:flex-initial min-w-0 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 rounded-t-xl transition-all font-bold text-xs sm:text-sm whitespace-nowrap cursor-pointer ${isActive
                                 ? 'bg-[#2b2a2a] text-[#d2f000] border-b-2 border-[#d2f000]'
                                 : 'text-[#8e9285] hover:text-[#c6c9ab] hover:bg-[#1c1b1b]'
                             }`}
