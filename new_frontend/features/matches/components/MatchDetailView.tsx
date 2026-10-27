@@ -68,7 +68,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
             {isLoading ? (
                 <div className="flex flex-col gap-6 animate-pulse">
                     <div className="h-64 rounded-2xl bg-[#1c1b1b] border border-[#2b2a2a]" />
-                    <div className="h-12 w-96 rounded-xl bg-[#1c1b1b] border border-[#2b2a2a]" />
+                    <div className="h-12 w-full max-w-96 rounded-xl bg-[#1c1b1b] border border-[#2b2a2a]" />
                     <div className="h-96 rounded-2xl bg-[#1c1b1b] border border-[#2b2a2a]" />
                 </div>
             ) : error ? (
