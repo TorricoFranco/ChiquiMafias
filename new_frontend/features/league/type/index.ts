@@ -118,20 +118,23 @@ export interface LeagueMatch {
   minute?: string;
 }
 
+// Cruce de `GET /fixtures/seasons/:season/tournaments/:tournament/brackets` (BracketMatchDto).
+// El backend no manda el id de los equipos ni `winnerTeamId`: solo los traen los datos de ejemplo.
 export interface BracketMatch {
   id: string;
-  round: PlayoffStageKey;
+  /** `octavos` en los cruces armados con la tabla; el nombre de la fecha (`Regular Season - octavos`) en los que ya están en la DB. */
+  round: string;
   position: number;
   side: 'left' | 'right' | 'center';
   home_team: {
-    id: string;
+    id?: string;
     name: string;
-    logo_url: string;
+    logo_url: string | null;
   };
   away_team: {
-    id: string;
+    id?: string;
     name: string;
-    logo_url: string;
+    logo_url: string | null;
   };
   home_goals: number | null;
   away_goals: number | null;

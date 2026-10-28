@@ -28,7 +28,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeSection, onSelect })
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-16 bg-[#131313] border-t border-[#454932] lg:hidden"
+      // z-40, debajo de los overlays (z-50 en adelante): con el mismo z la barra iba después en el DOM
+      // y tapaba los botones de abajo de cada modal. El contenido ya le deja su lugar con pb-16.
+      className="fixed bottom-0 left-0 w-full z-40 flex justify-around items-center h-16 bg-[#131313] border-t border-[#454932] lg:hidden"
     >
       {TABS.map((tab) => {
         const isActive = activeSection === tab.section;

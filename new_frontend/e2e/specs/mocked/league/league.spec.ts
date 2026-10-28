@@ -2,7 +2,7 @@ import { expect, test } from "../../../fixtures/test";
 import { buildCompetition, buildCopaArgentina } from "../../../factories/competitions";
 import { buildMatchFixture } from "../../../factories/fixtures";
 import type { FullStandingsResponse } from "@/features/standings/types";
-import { buildMatchday, buildStandingRow } from "../../../factories/league";
+import { buildBracketTeam, buildMatchday, buildPlayoffBrackets, buildStandingRow } from "../../../factories/league";
 import { buildMatchDetails, buildPreMatch } from "../../../factories/matches";
 import { BASE_URL } from "../../../support/env";
 import { mockLeague } from "../../../support/league";
@@ -55,6 +55,32 @@ test.describe("Ligas: Liga Profesional", () => {
     // Con `next dev`, la primera visita a la ruta interceptada la compila (varios segundos).
     await expect(page).toHaveURL(`${BASE_URL}/match/${match.metadata.id}`, { timeout: 30_000 });
     await expect(page.getByRole("heading", { name: "Boca Juniors" })).toBeVisible();
+  });
+
+  test("en el celular el cuadro de playoffs muestra los dos lados enteros y la final en su lugar", { tag: "@mobile-only" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, {
+      brackets: buildPlayoffBrackets({
+        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan") },
+        "octavos:right:0": { home_team: buildBracketTeam("Rosario Central"), away_team: buildBracketTeam("Independiente") },
+        "semifinal:left:0": { home_team: buildBracketTeam("Talleres"), away_team: buildBracketTeam("Lanus") },
+        "final:center:0": { home_team: buildBracketTeam("Boca Juniors"), away_team: buildBracketTeam("River Plate") },
+      }),
+    });
+
+    await app.open("/?tab=ligas");
+    await page.getByRole("button", { name: "Ver llaves playoffs" }).click();
+
+    // Antes el árbol de escritorio desbordaba: los octavos de la izquierda quedaban fuera de la pantalla.
+    const octavos = page.getByRole("region", { name: "Octavos de final" });
+    await expect(octavos.getByText("Instituto")).toBeInViewport({ ratio: 1 });
+    await expect(octavos.getByText("Rosario Central")).toBeInViewport({ ratio: 1 });
+
+    // 'semifinal' también contiene 'final': la primera semi no puede ocupar el lugar de la final.
+    const final = page.getByRole("region", { name: "Final", exact: true });
+    await expect(final.getByText("Boca Juniors")).toBeVisible();
+    await expect(final.getByText("Talleres")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Semifinales" }).getByText("Talleres")).toBeVisible();
   });
 
   test("pide los datos de la temporada actual que informa el backend", async ({ app, page, api, session }) => {
@@ -164,6 +190,40 @@ test.describe("Ligas: Liga Profesional", () => {
     await expect(page.getByText("Competición en Preparación")).toBeVisible();
     // Las que todavía no están en la API siguen como próximas.
     await expect(page.getByRole("button", { name: "Libertadores" })).toBeVisible();
+  });
+
+  test("en el cuadro de playoffs solo queda resaltado el ganador de cada cruce terminado", { tag: "@mobile" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    // Como lo manda el backend: los equipos sin id y sin `winnerTeamId`, el ganador sale del resultado.
+    mockLeague(api, {
+      brackets: buildPlayoffBrackets({
+        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan"), home_goals: 2, away_goals: 1, status_short: "FT" },
+        "octavos:left:1": {
+          home_team: buildBracketTeam("Rosario Central"),
+          away_team: buildBracketTeam("Independiente"),
+          home_goals: 1,
+          away_goals: 1,
+          home_penalty_goals: 3,
+          away_penalty_goals: 4,
+          status_short: "PEN",
+        },
+        // Terminado sin los penales cargados: no hay de dónde sacar al ganador.
+        "octavos:left:2": { home_team: buildBracketTeam("Belgrano"), away_team: buildBracketTeam("Tigre"), home_goals: 0, away_goals: 0, status_short: "PEN" },
+        "octavos:right:0": { home_team: buildBracketTeam("Talleres"), away_team: buildBracketTeam("Lanus") },
+      }),
+    });
+
+    await app.open("/?tab=ligas");
+    await page.getByRole("button", { name: "VER LLAVES PLAYOFFS", exact: true }).click();
+
+    // Solo los visibles: el cuadro puede tener un armado para el celular y otro para escritorio.
+    const winner = (team: string) => page.getByText(`${team} (ganador)`).filter({ visible: true });
+    await expect(winner("Instituto")).toBeVisible();
+    await expect(winner("Independiente")).toBeVisible();
+    await expect(winner("Huracan")).toHaveCount(0);
+    await expect(winner("Rosario Central")).toHaveCount(0);
+    // Ni el cruce por penales sin cargar ni el que todavía no se jugó tienen ganador.
+    await expect(page.getByText("(ganador)").filter({ visible: true })).toHaveCount(2);
   });
 
   test.describe("si no se puede cargar la temporada", () => {

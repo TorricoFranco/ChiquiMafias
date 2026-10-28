@@ -36,9 +36,10 @@ export const BracketModal: React.FC<BracketModalProps> = ({
     const semiLeft = brackets.filter((b) => b.round.includes('semifinal') && b.side === 'left');
     const semiRight = brackets.filter((b) => b.round.includes('semifinal') && b.side === 'right');
 
-    const finalMatch = brackets.find((b) => b.round.includes('final'));
+    // 'semifinal' también contiene 'final': sin excluirla, la primera semi ocupa el lugar de la final.
+    const finalMatch = brackets.find((b) => b.round.includes('final') && !b.round.includes('semifinal'));
 
-    const renderMatchCard = (m: BracketMatch, roundName: string, isCenter = false) => {
+    const renderMatchCard = (m: BracketMatch, roundName: string, isCenter = false, fluid = false) => {
         const isLive = m.status_short === 'LIVE' || m.status_short === '1H' || m.status_short === '2H';
         const isFinished = m.status_short === 'FT' || m.status_short === 'PEN' || m.status_short === 'AET';
 
@@ -50,8 +51,8 @@ export const BracketModal: React.FC<BracketModalProps> = ({
             m.away_team.name.includes('CONFIRMAR') ||
             m.away_team.id === 'tbd';
 
-        let calculatedWinnerId = m.winnerTeamId;
-        if (isFinished && !calculatedWinnerId) {
+        let calculatedWinnerId: string | undefined;
+        if (isFinished && !m.winnerTeamId) {
             if (m.status_short === 'PEN') {
                 if ((m.home_penalty_goals ?? 0) > (m.away_penalty_goals ?? 0)) {
                     calculatedWinnerId = m.home_team.name;
@@ -67,28 +68,25 @@ export const BracketModal: React.FC<BracketModalProps> = ({
             }
         }
 
-        const isHomeWinner = isFinished && (
-            m.winnerTeamId === m.home_team.id ||
-            calculatedWinnerId === m.home_team.id ||
-            calculatedWinnerId === m.home_team.name
-        );
+        // El backend no manda el id de los equipos ni `winnerTeamId`: sin ganador, comparar ids daría
+        // undefined === undefined y marcaría a los dos equipos.
+        const winner = m.winnerTeamId ?? calculatedWinnerId;
+        const isWinner = (team: BracketMatch['home_team']) =>
+            isFinished && !!winner && (winner === team.id || winner === team.name);
 
-        const isAwayWinner = isFinished && (
-            m.winnerTeamId === m.away_team.id ||
-            calculatedWinnerId === m.away_team.id ||
-            calculatedWinnerId === m.away_team.name
-        );
+        const isHomeWinner = isWinner(m.home_team);
+        const isAwayWinner = isWinner(m.away_team);
 
         return (
             <div
                 key={m.id}
-                className={`flex flex-col rounded-xl p-2 transition-all shadow-md shrink-0 ${isCenter
-                    ? 'w-44 sm:w-52 bg-gradient-to-b from-[#2a2a2a] to-[#1c1b1b] border-2 border-[#d2f000] shadow-[0_0_20px_rgba(210,240,0,0.25)]'
+                className={`flex flex-col rounded-xl p-2 transition-all shadow-md shrink-0 ${fluid ? 'w-full min-w-0' : isCenter ? 'w-44 sm:w-52' : 'w-36 sm:w-40'} ${isCenter
+                    ? 'bg-gradient-to-b from-[#2a2a2a] to-[#1c1b1b] border-2 border-[#d2f000] shadow-[0_0_20px_rgba(210,240,0,0.25)]'
                     : isTBD
-                        ? 'w-36 sm:w-40 bg-[#161616]/60 border border-[#2a2a2a] opacity-50'
+                        ? 'bg-[#161616]/60 border border-[#2a2a2a] opacity-50'
                         : isLive
-                            ? 'w-36 sm:w-40 bg-[#221a1a] border border-red-500/60 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
-                            : 'w-36 sm:w-40 bg-[#202020] border border-[#353534] hover:border-[#454932]'
+                            ? 'bg-[#221a1a] border border-red-500/60 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
+                            : 'bg-[#202020] border border-[#353534] hover:border-[#454932]'
                     }`}
             >
                 <div className="flex items-center justify-between pb-1 mb-1 border-b border-[#353534]/50 text-[9px] sm:text-[10px]">
@@ -125,6 +123,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                         </div>
                         <span className={`text-[10px] sm:text-xs uppercase font-bold truncate ${isHomeWinner ? 'text-[#d2f000]' : isFinished ? 'text-[#888]' : 'text-[#e5e2e1]'}`}>
                             {m.home_team?.name || 'A confirmar'}
+                            {isHomeWinner && <span className="sr-only"> (ganador)</span>}
                         </span>
                     </div>
                     {!isTBD && (
@@ -158,6 +157,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                         </div>
                         <span className={`text-[10px] sm:text-xs uppercase font-bold truncate ${isAwayWinner ? 'text-[#d2f000]' : isFinished ? 'text-[#888]' : 'text-[#e5e2e1]'}`}>
                             {m.away_team?.name || 'A confirmar'}
+                            {isAwayWinner && <span className="sr-only"> (ganador)</span>}
                         </span>
                     </div>
                     {!isTBD && (
@@ -177,42 +177,94 @@ export const BracketModal: React.FC<BracketModalProps> = ({
         );
     };
 
-    return (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-[1300px] h-[95vh] bg-[#161616] border border-[#353534] rounded-3xl flex flex-col overflow-hidden shadow-2xl">
+    const finalCard = finalMatch ? renderMatchCard(finalMatch, 'Final', true) : (
+        <div className="w-44 h-20 rounded-xl border border-dashed border-[#353534] flex items-center justify-center text-[10px] text-[#555]">
+            Final a confirmar
+        </div>
+    );
 
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[#353534] bg-[#1c1b1b] flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#d2f000]/10 border border-[#d2f000]/30 flex items-center justify-center text-[#d2f000]">
+    // Celular y tablet: cada ronda en dos columnas (lado izquierdo y derecho del cuadro), de
+    // octavos a la final. Los cruces se agrupan de a pares: cada par define un cruce de la ronda siguiente.
+    const mobileRounds = [
+        { title: 'Octavos de final', label: 'Octavos', left: octavosLeft, right: octavosRight },
+        { title: 'Cuartos de final', label: 'Cuartos', left: cuartosLeft, right: cuartosRight },
+        { title: 'Semifinales', label: 'Semifinal', left: semiLeft, right: semiRight },
+    ];
+
+    const renderMobileSide = (matches: BracketMatch[], roundName: string) => {
+        const pairs: BracketMatch[][] = [];
+        for (let i = 0; i < matches.length; i += 2) pairs.push(matches.slice(i, i + 2));
+        return (
+            <div className="flex flex-col gap-4 min-w-0">
+                {pairs.map((pair) => (
+                    <div key={pair[0].id} className="flex flex-col gap-2">
+                        {pair.map((m) => renderMatchCard(m, roundName, false, true))}
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    const renderRoundTitle = (title: string) => (
+        <h3 className="flex items-center gap-2 mb-2 text-[10px] font-black uppercase tracking-wider text-[#8e9285]">
+            <span>{title}</span>
+            <span className="flex-1 h-px bg-[#353534]" />
+        </h3>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+            <div className="relative w-full max-w-[1300px] h-full sm:h-[95vh] bg-[#161616] border border-[#353534] rounded-2xl sm:rounded-3xl flex flex-col overflow-hidden shadow-2xl">
+
+                <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 border-b border-[#353534] bg-[#1c1b1b] flex-shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-[#d2f000]/10 border border-[#d2f000]/30 flex items-center justify-center text-[#d2f000]">
                             <GitBranch className="w-5 h-5" />
                         </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-lg font-black text-[#e5e2e1] uppercase tracking-tight">
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <h2 className="text-sm sm:text-lg leading-tight font-black text-[#e5e2e1] uppercase tracking-tight">
                                     Cuadro de Eliminación Directa
                                 </h2>
-                                <span className="px-2 py-0.5 rounded-full bg-[#d2f000]/15 text-[#d2f000] text-[10px] font-black border border-[#d2f000]/30">
+                                <span className="hidden sm:inline px-2 py-0.5 rounded-full bg-[#d2f000]/15 text-[#d2f000] text-[10px] font-black border border-[#d2f000]/30">
                                     PLAYOFFS
                                 </span>
                             </div>
-                            <p className="text-xs text-[#8e9285]">
+                            <p className="text-xs text-[#8e9285] truncate">
                                 {tournamentName} • Partido único
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-9 h-9 rounded-xl bg-[#2a2a2a] hover:bg-[#353534] text-[#c6c9ab] hover:text-[#e5e2e1] flex items-center justify-center transition-colors"
+                        className="w-9 h-9 shrink-0 rounded-xl bg-[#2a2a2a] hover:bg-[#353534] text-[#c6c9ab] hover:text-[#e5e2e1] flex items-center justify-center transition-colors"
                         title="Cerrar (Esc)"
+                        aria-label="Cerrar cuadro"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-x-auto overflow-y-auto p-4 flex items-center justify-start lg:justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1b1b] to-[#161616]">
+                <div className="lg:hidden flex-1 overflow-y-auto p-3 sm:p-4 flex flex-col gap-5 bg-[#161616]">
+                    {mobileRounds.map((round) => (
+                        <section key={round.title} aria-label={round.title}>
+                            {renderRoundTitle(round.title)}
+                            <div className="grid grid-cols-2 gap-2">
+                                {renderMobileSide(round.left, round.label)}
+                                {renderMobileSide(round.right, round.label)}
+                            </div>
+                        </section>
+                    ))}
+                    <section aria-label="Final">
+                        {renderRoundTitle('Final')}
+                        <div className="flex justify-center">{finalCard}</div>
+                    </section>
+                </div>
+
+                <div className="hidden lg:flex flex-1 overflow-auto p-4 items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1b1b] to-[#161616]">
 
                     {/* Ancho mínimo optimizado */}
-                    <div className="flex items-center justify-center gap-2 sm:gap-3 min-w-[780px] h-full max-h-[600px] my-auto">
+                    <div className="flex items-center justify-center gap-3 min-w-[780px] h-full max-h-[600px] my-auto">
 
                         {/* LADO IZQUIERDO: Octavos */}
                         <div className="flex flex-col justify-between h-full py-1">
@@ -231,11 +283,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
 
                         {/* CENTRO: FINAL (Centrada perfectamente entre las dos semis) */}
                         <div className="flex flex-col items-center justify-center h-full px-1">
-                            {finalMatch ? renderMatchCard(finalMatch, 'Final', true) : (
-                                <div className="w-44 h-20 rounded-xl border border-dashed border-[#353534] flex items-center justify-center text-[10px] text-[#555]">
-                                    Final a confirmar
-                                </div>
-                            )}
+                            {finalCard}
                         </div>
 
                         {/* LADO DERECHO: Semifinal (Acercada al centro) */}
@@ -255,7 +303,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                     </div>
                 </div>
 
-                <div className="px-6 py-3 border-t border-[#353534] bg-[#181818] flex items-center justify-between text-xs text-[#8e9285] flex-shrink-0">
+                <div className="px-4 sm:px-6 py-3 border-t border-[#353534] bg-[#181818] flex items-center justify-between text-xs text-[#8e9285] flex-shrink-0">
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1.5 text-red-400">
                             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
@@ -266,7 +314,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                             Ganador avanza
                         </span>
                     </div>
-                    <span>Presione Esc para cerrar</span>
+                    <span className="hidden lg:inline">Presione Esc para cerrar</span>
                 </div>
             </div>
         </div>

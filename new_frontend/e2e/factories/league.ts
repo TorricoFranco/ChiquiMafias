@@ -1,4 +1,5 @@
-import type { GetFixtureMatchdayResponse, MatchFixture } from "@/features/fixture/types";
+import type { GetFixtureMatchdayResponse, MatchFixture, TournamentBracketsResponse } from "@/features/fixture/types";
+import type { BracketMatch, PlayoffStageKey } from "@/features/league/type";
 import type { FullStandingsResponse, StandingRow } from "@/features/standings/types";
 import { LOCAL_IMAGE } from "./ids";
 import { buildMatchFixture } from "./fixtures";
@@ -35,4 +36,56 @@ export function buildStandings(zoneA: StandingRow[], zoneB: StandingRow[] = []):
 
 export function buildMatchday(matchday: string, matches: MatchFixture[] = [buildMatchFixture()]): GetFixtureMatchdayResponse {
   return { tournament: "CLAUSURA", season: "2026", current_matchday: matchday, matches };
+}
+
+type BracketTeam = BracketMatch["home_team"];
+
+/** Equipo de un cruce: el backend manda solo el nombre y el escudo, sin id. */
+export function buildBracketTeam(name: string): BracketTeam {
+  return { name, logo_url: LOCAL_IMAGE };
+}
+
+/** Cruce del cuadro de playoffs de la LPF. Sin equipos queda "A confirmar", como lo manda el backend. */
+export function buildBracketMatch(
+  round: PlayoffStageKey,
+  side: BracketMatch["side"],
+  position: number,
+  overrides: Partial<BracketMatch> = {},
+): BracketMatch {
+  const tbd: BracketTeam = { name: "A confirmar", logo_url: null };
+  return {
+    id: `bracket-${round}-${side}-${position}`,
+    round,
+    position,
+    side,
+    home_team: tbd,
+    away_team: tbd,
+    home_goals: null,
+    away_goals: null,
+    status_short: "NS",
+    ...overrides,
+  };
+}
+
+/**
+ * Respuesta de `GET /fixtures/seasons/:season/tournaments/:tournament/brackets`, con las rondas en el
+ * orden del backend (octavos, cuartos, semifinal y final). `filled` completa cruces por
+ * `"<ronda>:<lado>:<posición>"`, por ejemplo `"final:center:0"`.
+ */
+export function buildPlayoffBrackets(filled: Record<string, Partial<BracketMatch>> = {}): TournamentBracketsResponse {
+  const slot = (round: PlayoffStageKey, side: BracketMatch["side"], position: number) =>
+    buildBracketMatch(round, side, position, filled[`${round}:${side}:${position}`]);
+  const sides = (round: PlayoffStageKey, perSide: number) =>
+    (["left", "right"] as const).flatMap((side) => Array.from({ length: perSide }, (_, p) => slot(round, side, p)));
+
+  return {
+    tournament: "CLAUSURA",
+    season: "2026",
+    brackets: {
+      octavos: sides("octavos", 4),
+      cuartos: sides("cuartos", 2),
+      semifinal: sides("semifinal", 1),
+      final: [slot("final", "center", 0)],
+    },
+  };
 }
