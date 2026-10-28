@@ -192,6 +192,40 @@ test.describe("Ligas: Liga Profesional", () => {
     await expect(page.getByRole("button", { name: "Libertadores" })).toBeVisible();
   });
 
+  test("en el cuadro de playoffs solo queda resaltado el ganador de cada cruce terminado", { tag: "@mobile" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    // Como lo manda el backend: los equipos sin id y sin `winnerTeamId`, el ganador sale del resultado.
+    mockLeague(api, {
+      brackets: buildPlayoffBrackets({
+        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan"), home_goals: 2, away_goals: 1, status_short: "FT" },
+        "octavos:left:1": {
+          home_team: buildBracketTeam("Rosario Central"),
+          away_team: buildBracketTeam("Independiente"),
+          home_goals: 1,
+          away_goals: 1,
+          home_penalty_goals: 3,
+          away_penalty_goals: 4,
+          status_short: "PEN",
+        },
+        // Terminado sin los penales cargados: no hay de dónde sacar al ganador.
+        "octavos:left:2": { home_team: buildBracketTeam("Belgrano"), away_team: buildBracketTeam("Tigre"), home_goals: 0, away_goals: 0, status_short: "PEN" },
+        "octavos:right:0": { home_team: buildBracketTeam("Talleres"), away_team: buildBracketTeam("Lanus") },
+      }),
+    });
+
+    await app.open("/?tab=ligas");
+    await page.getByRole("button", { name: "VER LLAVES PLAYOFFS", exact: true }).click();
+
+    // Solo los visibles: el cuadro puede tener un armado para el celular y otro para escritorio.
+    const winner = (team: string) => page.getByText(`${team} (ganador)`).filter({ visible: true });
+    await expect(winner("Instituto")).toBeVisible();
+    await expect(winner("Independiente")).toBeVisible();
+    await expect(winner("Huracan")).toHaveCount(0);
+    await expect(winner("Rosario Central")).toHaveCount(0);
+    // Ni el cruce por penales sin cargar ni el que todavía no se jugó tienen ganador.
+    await expect(page.getByText("(ganador)").filter({ visible: true })).toHaveCount(2);
+  });
+
   test.describe("si no se puede cargar la temporada", () => {
     // TanStack reintenta 3 veces antes de dar error (unos 7 s).
     const ERROR_TIMEOUT = 20_000;
