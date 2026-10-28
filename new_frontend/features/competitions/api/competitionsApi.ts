@@ -28,6 +28,10 @@ export const competitionsApi = {
   bracket: (slug: string): Promise<BracketResponse> =>
     get(`${competitionUrl(slug)}/bracket`, 'Error al cargar el cuadro'),
 
+  /** Partidos cercanos de la temporada actual: de una semana atrás a dos adelante. */
+  upcomingMatches: (slug: string): Promise<CompetitionMatchesResponse> =>
+    get(`${competitionUrl(slug)}/matches`, 'Error al cargar los partidos'),
+
   /** Partidos de una ronda de la temporada actual. */
   matchesOfRound: (slug: string, round: string): Promise<CompetitionMatchesResponse> =>
     get(

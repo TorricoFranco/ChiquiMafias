@@ -319,6 +319,9 @@ export interface MatchLiveUpdatePayload {
   type: 'SCORE_UPDATED' | 'MINUTE_TICK' | 'MATCH_ENDED';
   h: number;
   a: number;
+  /** Marcador de la tanda de penales; null si el partido no fue a penales. */
+  hp?: number | null;
+  ap?: number | null;
   status: string;
   elapsed: number | null;
   chatState: MatchChatState;
@@ -330,6 +333,11 @@ export const LIVE_STATUSES: string[] = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE
 export const NOT_STARTED_STATUSES: string[] = ['TBD', 'NS', 'SCHEDULED'];
 export const FINISHED_STATUSES: string[] = ['FT', 'AET', 'PEN'];
 export const INTERRUPTED_STATUSES: string[] = ['SUSP', 'INT', 'PST', 'CANC', 'ABD'];
+
+/** true si el proveedor ya mandó el marcador de la tanda de penales. */
+export function hasPenaltyScore(score: Pick<MatchScore, 'home_penalties' | 'away_penalties'>) {
+  return score.home_penalties !== null && score.away_penalties !== null;
+}
 
 export function getDerivedMatchState(status: MatchStatus) {
   return {

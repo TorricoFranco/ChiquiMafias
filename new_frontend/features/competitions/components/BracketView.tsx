@@ -53,8 +53,9 @@ const SlotCard: React.FC<{ slot: BracketSlot }> = ({ slot }) => {
   const teams =
     slot.home && slot.away ? `${slot.home.name} vs ${slot.away.name}` : 'Llave por definir';
   const winner = [slot.home, slot.away].find((t) => t && t.id === slot.winnerTeamId);
+  const inShootout = slot.isLive && slot.status === 'P';
   const details = [
-    slot.isLive ? 'en vivo' : null,
+    inShootout ? 'penales en vivo' : slot.isLive ? 'en vivo' : null,
     slot.homeGoals !== null && slot.awayGoals !== null
       ? `${slot.homeGoals} a ${slot.awayGoals}`
       : null,
@@ -93,7 +94,7 @@ const SlotCard: React.FC<{ slot: BracketSlot }> = ({ slot }) => {
           {slot.isLive ? (
             <span className="text-[#ffb4ab] flex items-center gap-1">
               <span aria-hidden="true" className="w-1.5 h-1.5 bg-[#d30017] rounded-full live-pulse" />
-              En vivo
+              {inShootout ? 'Penales en vivo' : 'En vivo'}
             </span>
           ) : (
             <span className="text-[#909378]">{formatKickoff(slot.date!)}</span>

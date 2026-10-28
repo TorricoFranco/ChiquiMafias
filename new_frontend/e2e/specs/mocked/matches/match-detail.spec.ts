@@ -3,7 +3,7 @@ import { expect, test } from "../../../fixtures/test";
 import { buildMarket, buildMatchMarket } from "../../../factories/bets";
 import { buildChatMessage, buildMatchChatMessage } from "../../../factories/chat";
 import { buildCalendar, buildMatchFixture } from "../../../factories/fixtures";
-import { buildMatchDetails, buildMatchLineup, buildPreMatch } from "../../../factories/matches";
+import { buildMatchDetails, buildMatchLineup, buildPreMatch, buildShootoutKick } from "../../../factories/matches";
 import type { ApiMock } from "../../../support/api-mock";
 import { BASE_URL } from "../../../support/env";
 import { ChatPanel } from "../../../pages/chat-panel";
@@ -526,5 +526,129 @@ test.describe("Chat del partido según su estado", () => {
     await chat.send("Último mensaje");
 
     await expect(page.getByText("El partido no está activo, la tribuna está cerrada")).toBeVisible();
+  });
+});
+
+test.describe("Tanda de penales en el detalle", () => {
+  const shootout = (page: import("@playwright/test").Page) => page.getByRole("region", { name: "Tanda de penales" });
+
+  test("en curso muestra los tiros y el marcador, sin ganador todavía", { tag: "@mobile" }, async ({ page, api }) => {
+    const match = buildMatchDetails({
+      metadata: { status: "P", status_long: "Penalties" },
+      score: { home: 1, away: 1, home_penalties: 2, away_penalties: 1, elapsed: 120 },
+      shootout: [
+        buildShootoutKick({ order: 1, teamId: "team-river", player: "Miguel Borja", scored: false }),
+        buildShootoutKick({ order: 1, teamId: "team-boca", player: "Edinson Cavani" }),
+        buildShootoutKick({ order: 2, teamId: "team-river", player: "Franco Mastantuono" }),
+        buildShootoutKick({ order: 2, teamId: "team-boca", player: "Kevin Zenón" }),
+      ],
+    });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+
+    await expect(page.getByText("PENALES EN VIVO")).toBeVisible();
+    // En la tanda el reloj no corre: no se muestra el 120.
+    await expect(page.getByText("120'")).toBeHidden();
+    await expect(shootout(page)).toContainText("En curso");
+    await expect(shootout(page)).toContainText("2 - 1");
+    await expect(shootout(page).getByRole("listitem", { name: "Errado: Miguel Borja" })).toBeVisible();
+    await expect(shootout(page).getByRole("listitem", { name: "Gol: Kevin Zenón" })).toBeVisible();
+    // Los tiros no son goles del partido: no aparecen entre los goleadores.
+    await expect(page.getByText("Kevin Zenón")).toHaveCount(1);
+  });
+
+  test("un tiro avisado por socket actualiza el marcador de la tanda", { tag: "@p0" }, async ({ page, api, socket }) => {
+    const match = buildMatchDetails({
+      metadata: { status: "P" },
+      score: { home: 1, away: 1, home_penalties: 1, away_penalties: 1, elapsed: 120 },
+    });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await expect(shootout(page)).toContainText("1 - 1");
+    await socket.waitForEmit("join_match");
+
+    await socket.emit("match_live_update", {
+      matchId: match.metadata.id,
+      type: "SCORE_UPDATED",
+      h: 1,
+      a: 1,
+      hp: 2,
+      ap: 1,
+      status: "P",
+      elapsed: 120,
+      chatState: "OPEN",
+      chatActive: true,
+    });
+
+    await expect(shootout(page)).toContainText("2 - 1");
+    await expect(page.getByText("(2) - (1)")).toBeVisible();
+  });
+
+  test("al empezar la tanda aparece aunque todavía no haya tiros ni marcador", async ({ page, api, socket }) => {
+    const match = buildMatchDetails({ metadata: { status: "2H" }, score: { home: 1, away: 1, elapsed: 90 } });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+    await expect(scoreboard(page)).toBeVisible();
+    await expect(shootout(page)).toBeHidden();
+    await socket.waitForEmit("join_match");
+
+    await socket.emit("match_live_update", {
+      matchId: match.metadata.id,
+      type: "MINUTE_TICK",
+      h: 1,
+      a: 1,
+      hp: null,
+      ap: null,
+      status: "P",
+      elapsed: 120,
+      chatState: "OPEN",
+      chatActive: true,
+    });
+
+    await expect(shootout(page)).toContainText("Los tiros aparecen a medida que se patean.");
+    await expect(shootout(page)).toContainText("0 - 0");
+    await expect(page.getByText("PENALES EN VIVO")).toBeVisible();
+  });
+
+  test("terminada sin el detalle de los tiros muestra igual el resultado de la tanda", async ({ page, api }) => {
+    const match = buildMatchDetails({
+      metadata: { status: "PEN" },
+      score: { home: 1, away: 1, home_penalties: 4, away_penalties: 3 },
+      shootout: [],
+    });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+
+    await expect(page.getByText("FINAL POR PENALES")).toBeVisible();
+    await expect(shootout(page)).toContainText("4 - 3");
+    await expect(shootout(page)).toContainText("Sin el detalle de los tiros.");
+    await expect(shootout(page)).not.toContainText("En curso");
+  });
+
+  test("terminada sin marcador ni tiros no inventa un 0 a 0", async ({ page, api }) => {
+    const match = buildMatchDetails({ metadata: { status: "PEN" }, score: { home: 1, away: 1 }, shootout: [] });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+
+    await expect(page.getByText("FINAL POR PENALES")).toBeVisible();
+    await expect(shootout(page)).toBeHidden();
+  });
+
+  test("interrumpida no queda como en curso", async ({ page, api }) => {
+    const match = buildMatchDetails({
+      metadata: { status: "INT", status_long: "Interrupted" },
+      score: { home: 1, away: 1, home_penalties: 3, away_penalties: 2 },
+    });
+    mockMatch(api, match);
+
+    await page.goto(`/match/${match.metadata.id}`);
+
+    await expect(shootout(page)).toContainText("3 - 2");
+    await expect(shootout(page)).not.toContainText("En curso");
   });
 });

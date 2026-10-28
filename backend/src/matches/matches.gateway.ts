@@ -32,6 +32,12 @@ import {
   MATCH_STATUS_CACHE_TTL_SECONDS,
   matchStatusCacheKey,
 } from './utils/match-chat.util'
+import {
+  BotWireEvent,
+  botReactionTo,
+  goalMessage,
+  shootoutMissMessage,
+} from './utils/match-bot.util'
 
 @UseFilters(AllWsExceptionFilter)
 @WebSocketGateway()
@@ -71,75 +77,77 @@ export class MatchesGateway
   async onApplicationBootstrap() {
     try {
       await this.redisService.subscribe('match_updates', (message) => {
-        const update = JSON.parse(message)
-        const room = `match_${update.matchId}`
-
-        this.server.to(room).emit('match_data_update', update)
-
-        switch (update.type) {
-          case 'STATS_UPDATED':
-            const { stats } = update.payload
-            this.server.to(room).emit('stats_updated', {
-              matchId: update.matchId,
-              stats,
-            })
-            break
-
-          case 'EVENTS_UPDATED':
-            const { lastEvent, count } = update.payload
-            this.server.to(room).emit('timeline_updated', {
-              matchId: update.matchId,
-              lastEvent,
-              totalEvents: count,
-            })
-
-            if (lastEvent?.type === 'Goal') {
-              this.server.to(room).emit('goal_scored', {
-                matchId: update.matchId,
-                teamId: lastEvent.team?.id,
-                player: lastEvent.player?.name,
-                minute: lastEvent.time?.elapsed,
-              })
-
-              const teamName = lastEvent.team?.name || 'el equipo'
-              const playerName = lastEvent.player?.name || 'un jugadorazo'
-
-              this.sendBotGoalMessage(
-                update.matchId,
-                teamName,
-                playerName,
-              ).catch((err) => {
-                this.logger.error(
-                  `Error enviando mensaje de bot para el gol: ${err.message}`,
-                )
-              })
-            }
-            break
-
-          case 'LINEUPS_READY':
-            this.server.to(room).emit('lineups_updated', update.payload)
-            break
-
-          case 'MINUTE_TICK':
-          case 'SCORE_UPDATED':
-          case 'MATCH_ENDED': {
-            const chatState = getMatchChatState(String(update.payload.status))
-            this.server.to(room).emit('match_live_update', {
-              matchId: update.matchId,
-              type: update.type,
-              h: update.payload.home_goals,
-              a: update.payload.away_goals,
-              status: update.payload.status,
-              elapsed: update.payload.elapsed,
-              chatState,
-              chatActive: chatState === 'OPEN',
-            })
-            break
-          }
+        // Acá no hay filtro de Nest: un error no tiene que salir del callback.
+        try {
+          this.handleMatchUpdate(message)
+        } catch (error) {
+          this.logger.error(
+            `Error procesando match_updates: ${error instanceof Error ? error.message : String(error)}`,
+          )
         }
       })
     } catch (error) {
       this.logger.error('Error al suscribirse a Redis en el Gateway', error)
+    }
+  }
+
+  private handleMatchUpdate(message: string) {
+    const update = JSON.parse(message)
+    const room = `match_${update.matchId}`
+
+    this.server.to(room).emit('match_data_update', update)
+
+    switch (update.type) {
+      case 'STATS_UPDATED': {
+        const { stats } = update.payload
+        this.server.to(room).emit('stats_updated', {
+          matchId: update.matchId,
+          stats,
+        })
+        break
+      }
+
+      case 'EVENTS_UPDATED': {
+        const { lastEvent, count } = update.payload
+        this.server.to(room).emit('timeline_updated', {
+          matchId: update.matchId,
+          lastEvent,
+          totalEvents: count,
+        })
+
+        // `newEvents` trae todos los eventos nuevos del tick (en la tanda
+        // caen dos tiros por minuto). Un aviso sin ese campo solo trae el último.
+        const newEvents: BotWireEvent[] =
+          update.payload.newEvents ?? (lastEvent ? [lastEvent] : [])
+        for (const event of newEvents) {
+          this.reactToEvent(update.matchId, event)
+        }
+        break
+      }
+
+      case 'LINEUPS_READY':
+        this.server.to(room).emit('lineups_updated', update.payload)
+        break
+
+      case 'MINUTE_TICK':
+      case 'SCORE_UPDATED':
+      case 'MATCH_ENDED': {
+        const chatState = getMatchChatState(String(update.payload.status))
+        this.server.to(room).emit('match_live_update', {
+          matchId: update.matchId,
+          type: update.type,
+          h: update.payload.home_goals,
+          a: update.payload.away_goals,
+          // Marcador de la tanda; null si el partido no fue a penales.
+          hp: update.payload.home_penalty_goals ?? null,
+          ap: update.payload.away_penalty_goals ?? null,
+          status: update.payload.status,
+          elapsed: update.payload.elapsed,
+          chatState,
+          chatActive: chatState === 'OPEN',
+        })
+        break
+      }
     }
   }
 
@@ -331,24 +339,31 @@ export class MatchesGateway
     return match.status_short
   }
 
-  private async sendBotGoalMessage(
-    matchId: string,
-    teamName: string,
-    playerName: string,
-  ) {
-    // Array de frases random con la jerga que pediste
-    const templates = [
-      `¡GOOOLASOOO de ${playerName}! ⚽🔥`,
-      `¡GOL de ${teamName}! 💥`,
-      `¡Apareció ${playerName} para gritar el gol! Agarrate Agarrate 😱`,
-      `¡GOL de la ${teamName.toLowerCase()}neta! 🚙💨`,
-      `¡Grito sagrado de ${playerName}! Explotó la tribuna 🏟️🔊`,
-      `Definió como los dioses... ¡Gooool de ${teamName}! 🏆`,
-    ]
+  /** Gol del partido: aviso de gol y mensaje del bot. Tiro errado en la tanda: cargada. */
+  private reactToEvent(matchId: string, event: BotWireEvent) {
+    const reaction = botReactionTo(event)
+    if (!reaction) return
 
-    const randomIndex = Math.floor(Math.random() * templates.length)
-    const botText = templates[randomIndex]
+    const playerName = event.player?.name || 'un jugadorazo'
+    let botText: string
+    if (reaction === 'GOAL') {
+      this.server.to(`match_${matchId}`).emit('goal_scored', {
+        matchId,
+        teamId: event.team?.id,
+        player: event.player?.name,
+        minute: event.time?.elapsed,
+      })
+      botText = goalMessage(event.team?.name || 'el equipo', playerName)
+    } else {
+      botText = shootoutMissMessage(event.player?.name || 'el pateador')
+    }
 
+    this.sendBotMessage(matchId, botText).catch((err) => {
+      this.logger.error(`Error enviando mensaje del bot: ${err.message}`)
+    })
+  }
+
+  private async sendBotMessage(matchId: string, botText: string) {
     const messagePayload = {
       messageId: randomUUID(),
       matchId,

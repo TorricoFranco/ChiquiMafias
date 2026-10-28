@@ -27,6 +27,9 @@ export interface MatchLiveUpdatePayload {
   type: 'SCORE_UPDATED' | 'MINUTE_TICK' | 'MATCH_ENDED'
   h: number
   a: number
+  // Marcador de la tanda de penales; null si el partido no fue a penales.
+  hp: number | null
+  ap: number | null
   status: string
   elapsed: number | null
   // Ver backend/src/matches/utils/match-chat.util.ts
