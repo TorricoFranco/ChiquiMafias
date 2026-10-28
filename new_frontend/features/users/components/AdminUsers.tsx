@@ -143,7 +143,7 @@ export const AdminUsers: React.FC = () => {
     <div className="flex flex-col gap-6">
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#d2f000] text-[#191e00] font-black text-xs px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 border border-black/20 animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-20 lg:bottom-6 right-6 z-50 bg-[#d2f000] text-[#191e00] font-black text-xs px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 border border-black/20 animate-in slide-in-from-bottom-5">
           <CheckCircle2 className="w-5 h-5" />
           <span>{toastMessage}</span>
         </div>

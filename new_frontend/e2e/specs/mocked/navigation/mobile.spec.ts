@@ -1,6 +1,8 @@
 import { expect, test } from "../../../fixtures/test";
 import { buildMarket } from "../../../factories/bets";
 import { buildCalendar, buildMatchFixture } from "../../../factories/fixtures";
+import { buildPoll } from "../../../factories/polls";
+import { buildInventoryItem } from "../../../factories/store";
 import { BetsPage } from "../../../pages/bets-page";
 import { ChatPanel } from "../../../pages/chat-panel";
 import { BASE_URL } from "../../../support/env";
@@ -31,6 +33,32 @@ test.describe("Navegación en móvil", { tag: "@mobile-only" }, () => {
 
     await app.mobileTab("Perfil").click();
     await expect(page.getByRole("main").getByRole("heading", { name: "elmasgrande" })).toBeVisible();
+  });
+
+  test("con un modal abierto la barra inferior queda debajo y el botón del modal se puede apretar", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    api.on("GET", "/inventory", [buildInventoryItem({ item: { name: "Ticket Encuesta", type: "CUSTOM_POLL", assetId: "custom-poll" } })]);
+    api.on("POST", "/polls/propose", buildPoll({ status: "PENDING" }));
+
+    await app.open();
+    await app.mobileTab("Comunidad").click();
+    await page.getByRole("button", { name: "Crear encuesta" }).click();
+    const modal = page.getByRole("dialog", { name: "Desafiar a la Tribuna" });
+    await expect(modal).toBeVisible();
+
+    // Un toque donde está la barra tiene que caer en el fondo del modal. Con la barra arriba de los
+    // modales (mismo z-index y después en el DOM), cambiaba de sección y tapaba sus botones de abajo.
+    const apuestas = await app.mobileTab("Apuestas").boundingBox();
+    expect(apuestas).not.toBeNull();
+    await page.mouse.click(apuestas!.x + apuestas!.width / 2, apuestas!.y + apuestas!.height / 2);
+    await expect(app.mobileTab("Comunidad")).toHaveAttribute("aria-current", "page");
+    await expect(modal).toBeVisible();
+
+    await modal.getByLabel("Pregunta principal *").fill("¿Vuelve Riquelme a jugar?");
+    await modal.getByRole("textbox", { name: "Opción 1" }).fill("Sí");
+    await modal.getByRole("textbox", { name: "Opción 2" }).fill("No");
+    await modal.getByRole("button", { name: "Enviar Propuesta" }).click();
+    await expect(page.getByText("¡Encuesta enviada a moderación!")).toBeVisible();
   });
 
   test("el menú lleva a las secciones de la barra lateral", { tag: "@p0" }, async ({ app, page, session }) => {
