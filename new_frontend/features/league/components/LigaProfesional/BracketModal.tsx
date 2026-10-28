@@ -51,8 +51,8 @@ export const BracketModal: React.FC<BracketModalProps> = ({
             m.away_team.name.includes('CONFIRMAR') ||
             m.away_team.id === 'tbd';
 
-        let calculatedWinnerId = m.winnerTeamId;
-        if (isFinished && !calculatedWinnerId) {
+        let calculatedWinnerId: string | undefined;
+        if (isFinished && !m.winnerTeamId) {
             if (m.status_short === 'PEN') {
                 if ((m.home_penalty_goals ?? 0) > (m.away_penalty_goals ?? 0)) {
                     calculatedWinnerId = m.home_team.name;
@@ -68,17 +68,14 @@ export const BracketModal: React.FC<BracketModalProps> = ({
             }
         }
 
-        const isHomeWinner = isFinished && (
-            m.winnerTeamId === m.home_team.id ||
-            calculatedWinnerId === m.home_team.id ||
-            calculatedWinnerId === m.home_team.name
-        );
+        // El backend no manda el id de los equipos ni `winnerTeamId`: sin ganador, comparar ids daría
+        // undefined === undefined y marcaría a los dos equipos.
+        const winner = m.winnerTeamId ?? calculatedWinnerId;
+        const isWinner = (team: BracketMatch['home_team']) =>
+            isFinished && !!winner && (winner === team.id || winner === team.name);
 
-        const isAwayWinner = isFinished && (
-            m.winnerTeamId === m.away_team.id ||
-            calculatedWinnerId === m.away_team.id ||
-            calculatedWinnerId === m.away_team.name
-        );
+        const isHomeWinner = isWinner(m.home_team);
+        const isAwayWinner = isWinner(m.away_team);
 
         return (
             <div
@@ -126,6 +123,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                         </div>
                         <span className={`text-[10px] sm:text-xs uppercase font-bold truncate ${isHomeWinner ? 'text-[#d2f000]' : isFinished ? 'text-[#888]' : 'text-[#e5e2e1]'}`}>
                             {m.home_team?.name || 'A confirmar'}
+                            {isHomeWinner && <span className="sr-only"> (ganador)</span>}
                         </span>
                     </div>
                     {!isTBD && (
@@ -159,6 +157,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                         </div>
                         <span className={`text-[10px] sm:text-xs uppercase font-bold truncate ${isAwayWinner ? 'text-[#d2f000]' : isFinished ? 'text-[#888]' : 'text-[#e5e2e1]'}`}>
                             {m.away_team?.name || 'A confirmar'}
+                            {isAwayWinner && <span className="sr-only"> (ganador)</span>}
                         </span>
                     </div>
                     {!isTBD && (

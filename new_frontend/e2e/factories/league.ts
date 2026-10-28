@@ -40,8 +40,9 @@ export function buildMatchday(matchday: string, matches: MatchFixture[] = [build
 
 type BracketTeam = BracketMatch["home_team"];
 
+/** Equipo de un cruce: el backend manda solo el nombre y el escudo, sin id. */
 export function buildBracketTeam(name: string): BracketTeam {
-  return { id: `team-${name.toLowerCase().replace(/\s+/g, "-")}`, name, logo_url: LOCAL_IMAGE };
+  return { name, logo_url: LOCAL_IMAGE };
 }
 
 /** Cruce del cuadro de playoffs de la LPF. Sin equipos queda "A confirmar", como lo manda el backend. */
@@ -51,7 +52,7 @@ export function buildBracketMatch(
   position: number,
   overrides: Partial<BracketMatch> = {},
 ): BracketMatch {
-  const tbd: BracketTeam = { id: "tbd", name: "A confirmar", logo_url: "" };
+  const tbd: BracketTeam = { name: "A confirmar", logo_url: null };
   return {
     id: `bracket-${round}-${side}-${position}`,
     round,
