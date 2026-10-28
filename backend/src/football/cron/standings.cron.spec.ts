@@ -16,6 +16,9 @@ const ligaSeason = (over: Record<string, unknown> = {}) => ({
   ...over,
 })
 
+/** Respuesta de `aggregate` con la suma de partidos jugados de la tabla guardada. */
+const played = (total: number) => ({ _sum: { matches_played: total } })
+
 const row = {
   group: 'Clausura, Group B',
   team: { externalId: 451, name: 'Boca' },
@@ -29,7 +32,7 @@ describe('StandingCron', () => {
       updateMany: jest.fn(),
       update: jest.fn(),
     },
-    teamSeasonStats: { upsert: jest.fn() },
+    teamSeasonStats: { upsert: jest.fn(), aggregate: jest.fn() },
   }
   const redis = { redis: { set: jest.fn() } }
   const provider = { getStandings: jest.fn() }
@@ -46,6 +49,9 @@ describe('StandingCron', () => {
     jest.useFakeTimers({ now: NOW })
     prisma.competitionSeason.findMany.mockResolvedValue([ligaSeason()])
     prisma.competitionSeason.updateMany.mockResolvedValue({ count: 1 })
+    // Por defecto la tabla guardada nunca cambia: el proveedor "no actualizó".
+    prisma.teamSeasonStats.aggregate.mockReset()
+    prisma.teamSeasonStats.aggregate.mockResolvedValue(played(100))
     refs.leagueExternalId.mockImplementation(
       (league: { api_league_id: number | null }) =>
         Promise.resolve(league.api_league_id ?? 999),
@@ -234,6 +240,80 @@ describe('StandingCron', () => {
       expect(provider.getStandings).toHaveBeenCalledTimes(2)
       expect(provider.getStandings).toHaveBeenCalledWith(128, 2026)
       expect(provider.getStandings).toHaveBeenCalledWith(999, 2026)
+    })
+
+    it('Debe reintentar a los 5, 15 y 30 minutos mientras el proveedor no sume el partido', async () => {
+      cron.handleMatchFinished(finished)
+
+      await jest.advanceTimersByTimeAsync(60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(1)
+
+      await jest.advanceTimersByTimeAsync(4 * 60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(2)
+
+      await jest.advanceTimersByTimeAsync(10 * 60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(3)
+
+      await jest.advanceTimersByTimeAsync(15 * 60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(4)
+
+      // Después del último intento no se pide más: sigue la sincronización periódica.
+      await jest.advanceTimersByTimeAsync(60 * 60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(4)
+    })
+
+    it('Debe dejar de reintentar apenas la tabla suma partidos jugados', async () => {
+      // Al terminar el partido (100), antes del intento (100) y después de sincronizar (102).
+      prisma.teamSeasonStats.aggregate
+        .mockResolvedValueOnce(played(100))
+        .mockResolvedValueOnce(played(100))
+        .mockResolvedValue(played(102))
+
+      cron.handleMatchFinished(finished)
+      await jest.advanceTimersByTimeAsync(60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(1)
+
+      await jest.advanceTimersByTimeAsync(30 * 60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(1)
+    })
+
+    it('No debe pedir la tabla si la sincronización periódica ya la actualizó', async () => {
+      prisma.teamSeasonStats.aggregate
+        .mockResolvedValueOnce(played(100))
+        .mockResolvedValue(played(102))
+
+      cron.handleMatchFinished(finished)
+      await jest.advanceTimersByTimeAsync(30 * 60_000)
+
+      expect(provider.getStandings).not.toHaveBeenCalled()
+    })
+
+    it('Debe pedir la tabla una sola vez si no puede leer la guardada para comparar', async () => {
+      prisma.teamSeasonStats.aggregate.mockRejectedValue(new Error('DB caída'))
+
+      cron.handleMatchFinished(finished)
+      await jest.advanceTimersByTimeAsync(60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(1)
+
+      await jest.advanceTimersByTimeAsync(30 * 60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(1)
+    })
+
+    it('Un final nuevo debe cancelar los reintentos viejos y volver a empezar', async () => {
+      cron.handleMatchFinished(finished)
+      await jest.advanceTimersByTimeAsync(60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(1)
+
+      cron.handleMatchFinished(finished)
+      await jest.advanceTimersByTimeAsync(59_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(1)
+
+      await jest.advanceTimersByTimeAsync(1_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(2)
+
+      // Los reintentos de la primera tanda (5 min) ya no existen: solo corre el de la segunda.
+      await jest.advanceTimersByTimeAsync(4 * 60_000)
+      expect(provider.getStandings).toHaveBeenCalledTimes(3)
     })
 
     it('No debe pedir la tabla de una competición sin tabla', async () => {
