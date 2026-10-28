@@ -233,8 +233,19 @@ aparece en `GET /competitions` y en el menú de Ligas. Pasos, con `FOOTBALL_PROV
 El sync del fixture de la Liga solo mira una ventana de 10 días hacia atrás y 7 hacia adelante
 (`liga-dividida.strategy.ts`). Si el servidor estuvo apagado, o en medio de un cambio de proveedor,
 los partidos que se jugaron fuera de esa ventana quedan en `SCHEDULED` con estado `NS` para siempre:
-el fixture muestra solo los horarios, sin resultado, y ningún cron los vuelve a mirar. Se arregla
-**una sola vez** con `scripts/resync-stale-fixtures.ts`:
+el fixture muestra solo los horarios, sin resultado, y ningún cron los vuelve a mirar.
+
+**Se corrige solo.** `StaleMatchesCron` corre cada 10 minutos: busca partidos `SCHEDULED`, `LIVE` o
+`SUSPENDED` con más de 3 horas desde el inicio (de los últimos 30 días, en competiciones con
+`sync_enabled`), le pide al proveedor solo el rango que los cubre y actualiza estado y resultado. Mira
+una competición como mucho cada 30 minutos (clave `stale-matches:<liga>:<temporada>` en Redis, se libera si
+falla el proveedor), no pisa un estado que el cron en vivo haya cambiado, y al terminar un partido avisa
+(`match.finished`) para recalcular la tabla y el cuadro. En los logs aparece como `[CONGELADO]`:
+`Corregido: …` cuando arregla uno, y un `WARN` (una vez por partido) cuando no puede, por ejemplo si el
+proveedor sigue sin darlo por terminado. **No corrige un partido que el proveedor da por terminado sin
+marcador**: guardaría 0-0 y las apuestas se liquidarían como empate.
+
+Para fechas de más de 30 días, o para ver antes qué cambiaría, está el script, que se corre a mano:
 
 ```bash
 # primero en seco: lista qué partidos cambiarían (producción: tool …, desarrollo: docker exec …)

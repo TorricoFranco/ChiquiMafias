@@ -25,7 +25,10 @@ import Redis from 'ioredis'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { HighlightlyHttp } from '../src/football/providers/highlightly/highlightly.http'
 import { HighlightlyProvider } from '../src/football/providers/highlightly/highlightly.provider'
-import { mapStatus } from '../src/football/mappers/mapStatus'
+import {
+  isFinishedWithoutScore,
+  toMatchResultUpdate,
+} from '../src/football/mappers/fixture-update'
 import { FootballRefsService } from '../src/football/services/refs.service'
 
 const GRACE_HOURS = 3
@@ -65,7 +68,7 @@ async function main() {
       where: {
         league_id: league.id,
         season,
-        status: { in: ['SCHEDULED', 'LIVE'] },
+        status: { in: ['SCHEDULED', 'LIVE', 'SUSPENDED'] },
         date: { lt: cutoff },
       },
       select: {
@@ -119,6 +122,7 @@ async function main() {
     }[] = []
     let unlinked = 0
     let unchanged = 0
+    let noScore = 0
     const seen = new Set<string>()
 
     for (const f of fixtures) {
@@ -131,18 +135,17 @@ async function main() {
       if (!m) continue
       seen.add(id)
 
-      const data = {
-        date: new Date(f.date),
-        timestamp: f.timestamp,
-        status: mapStatus(f.status.short),
-        status_short: f.status.short,
-        status_long: f.status.long,
-        elapsed: f.status.elapsed,
-        home_goals: f.goals.home ?? 0,
-        away_goals: f.goals.away ?? 0,
-        home_penalty_goals: f.penalty.home ?? null,
-        away_penalty_goals: f.penalty.away ?? null,
+      // Terminado sin marcador: se guardaría 0-0 y las apuestas se liquidarían
+      // como empate. No se toca hasta que el proveedor informe el resultado.
+      if (isFinishedWithoutScore(f)) {
+        noScore++
+        console.log(
+          `  SIN MARCADOR ${m.round}: ${m.home_team.name} vs ${m.away_team.name} (${m.date.toISOString().slice(0, 10)}): el proveedor lo da por terminado sin goles; no se corrige`,
+        )
+        continue
       }
+
+      const data = toMatchResultUpdate(f)
       if (data.status_short === m.status_short && data.status === m.status) {
         unchanged++
         continue
@@ -164,7 +167,7 @@ async function main() {
       )
     }
     console.log(
-      `Resumen: cambian ${changes.length} | sin cambios en el proveedor ${unchanged} | no aparecen en el rango ${missing.length} | del proveedor sin vincular ${unlinked}.`,
+      `Resumen: cambian ${changes.length} | sin cambios en el proveedor ${unchanged} | terminados sin marcador ${noScore} | no aparecen en el rango ${missing.length} | del proveedor sin vincular ${unlinked}.`,
     )
 
     if (!apply) {

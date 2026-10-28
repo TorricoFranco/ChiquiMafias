@@ -23,6 +23,7 @@ import { EventsFetchCron } from './cron/events-fetch.cron'
 import { StatsSyncCron } from './cron/stats-sync.cron'
 import { LiveScoreCron } from './cron/liveScoreCron'
 import { StandingCron } from './cron/standings.cron'
+import { StaleMatchesCron } from './cron/stale-matches.cron'
 
 /**
  * Elige el proveedor de datos según `FOOTBALL_PROVIDER`. Es el único lugar que
@@ -43,7 +44,7 @@ export function createFootballProvider(
       return new HighlightlyProvider(highlightlyHttp)
     default:
       throw new Error(
-        `FOOTBALL_PROVIDER="${name}" no es un proveedor conocido. Usá "api-football" o "highlightly".`,
+        `FOOTBALL_PROVIDER="${String(name)}" no es un proveedor conocido. Usá "api-football" o "highlightly".`,
       )
   }
 }
@@ -71,6 +72,7 @@ export function createFootballProvider(
     StatsSyncCron,
     LiveScoreCron,
     StandingCron,
+    StaleMatchesCron,
   ],
   exports: [
     FootballDataProvider,
