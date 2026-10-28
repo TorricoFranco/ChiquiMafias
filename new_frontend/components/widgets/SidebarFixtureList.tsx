@@ -5,7 +5,7 @@ import { SidebarMatchCard } from "../widgets/SidebarMatchCard";
 import { useCalendarWithLive } from "@/features/fixture/hooks/useCalendarWithLive";
 import { LiveMatchesCarousel } from "./LiveMatchesCarousel";
 import { LEAGUE_SLUG } from "@/features/competitions/constants";
-import { useCurrentSeason } from "@/features/competitions/hooks/useCompetitions";
+import { useCompetitions, useCurrentSeason } from "@/features/competitions/hooks/useCompetitions";
 
 const getFormattedDateKey = (date: Date): string => {
     const year = date.getFullYear();
@@ -22,7 +22,7 @@ const formatDayLabel = (dateStr: string) => {
     return { dayName, dayNum, monthName };
 };
 
-/** Calendario de la Liga con sus marcadores en vivo. */
+/** Calendario de la Liga y de las otras competiciones (la Copa) con sus marcadores en vivo. */
 export const SidebarFixtureList = () => {
     const {
         season,
@@ -30,17 +30,23 @@ export const SidebarFixtureList = () => {
         isError: isSeasonError,
         retry: retrySeason,
     } = useCurrentSeason(LEAGUE_SLUG);
-    const { calendarData, isLoading: isCalendarLoading } = useCalendarWithLive(season, LEAGUE_SLUG);
+    const { data: competitions } = useCompetitions();
+    // Referencias estables (salen de la query): el calendario las usa como dependencias.
+    const league = useMemo(() => competitions?.find((c) => c.slug === LEAGUE_SLUG), [competitions]);
+    const others = useMemo(() => competitions?.filter((c) => c.slug !== LEAGUE_SLUG) ?? [], [competitions]);
+    const { calendarData, isLoading: isCalendarLoading } = useCalendarWithLive(season, league, others);
     // Mientras llega la temporada el calendario no se pide: también es "cargando".
     const isLoading = isSeasonLoading || isCalendarLoading;
     const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
     const tabsRef = useRef<HTMLDivElement>(null);
 
-    // Al llegar un calendario nuevo, selecciona hoy (o el último día). Se ajusta durante el render, sin efecto.
+    // Al cambiar los días del calendario, selecciona hoy (o el último día). Se compara el contenido:
+    // un refetch con los mismos días no le cambia el día al usuario. Se ajusta durante el render, sin efecto.
     const availableDays = calendarData?.availableDays;
-    const [prevAvailableDays, setPrevAvailableDays] = useState<typeof availableDays>(undefined);
-    if (availableDays !== prevAvailableDays) {
-        setPrevAvailableDays(availableDays);
+    const daysKey = availableDays?.join(',');
+    const [prevDaysKey, setPrevDaysKey] = useState<string | undefined>(undefined);
+    if (daysKey !== prevDaysKey) {
+        setPrevDaysKey(daysKey);
         if (availableDays?.length) {
             const todayKey = getFormattedDateKey(new Date());
             const index = availableDays.findIndex((day: string) => day >= todayKey);
@@ -196,7 +202,7 @@ export const SidebarFixtureList = () => {
             <div className="space-y-2.5">
                 {selectedDateMatches.length > 0 ? (
                     selectedDateMatches.map((match) => (
-                        <SidebarMatchCard key={match.id} match={match} />
+                        <SidebarMatchCard key={match.id} match={match} competitionName={match.competitionName} />
                     ))
                 ) : (
                     <div className="text-center text-[#8c8e76] text-xs py-10 border border-dashed border-[#353534] rounded-xl bg-[#181818]">

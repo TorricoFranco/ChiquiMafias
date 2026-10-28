@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { MatchFixture } from "@/features/fixture/types";
 import { translateStatus } from "@/features/league/utils/translateStatus";
 import { formatMatchTime } from "@/features/league/utils/formatMatchTime";
+import { shootoutScore } from "@/features/fixture/utils/liveStatus";
 
 interface MatchScorecardProps {
   match: MatchFixture & { minute?: string };
+  /** Competición del partido: el carrusel de Social mezcla la Liga y la Copa. */
+  competitionName?: string;
   odds?: { home: number; draw: number; away: number };
   selectedBetOption?: { matchId: string; option: "home" | "draw" | "away" } | null;
   onSelectOdds?: (matchId: string, option: "home" | "draw" | "away", oddsValue: number, teamName: string) => void;
@@ -16,6 +19,7 @@ interface MatchScorecardProps {
 
 export const MatchScorecard: React.FC<MatchScorecardProps> = ({
   match,
+  competitionName,
   odds = { home: 2.15, draw: 3.10, away: 2.80 },
   selectedBetOption,
   onSelectOdds,
@@ -28,6 +32,7 @@ export const MatchScorecard: React.FC<MatchScorecardProps> = ({
 
   const isLive = ['1H', '2H', 'HT', 'ET', 'BT', 'P', 'LIVE'].includes(match.status_short);
   const isFinished = ['FT', 'PEN', 'AET'].includes(match.status_short);
+  const pens = shootoutScore(match.status_short, match.home_penalty_goals, match.away_penalty_goals);
 
   const handleGoToMatch = () => {
     router.push(`/match/${match.id}`);
@@ -92,6 +97,12 @@ export const MatchScorecard: React.FC<MatchScorecardProps> = ({
           </button>
         )}
       </div>
+      {competitionName && (
+        <p className="-mt-2 mb-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-[#8e9285]">
+          {competitionName}
+        </p>
+      )}
+
       {/* ENFRENTAMIENTO PRINCIPAL */}
       <div
         className="flex justify-between items-center px-1 cursor-pointer my-1 w-full"
@@ -135,6 +146,13 @@ export const MatchScorecard: React.FC<MatchScorecardProps> = ({
               <span className="text-sm md:text-base font-bold text-[#8c8e76] tracking-widest">VS</span>
             )}
           </div>
+          {pens && (
+            <span
+              className={`mt-0.5 text-[10px] md:text-xs font-bold tabular-nums ${isLive ? 'text-red-400' : 'text-[#c6c9ab]'}`}
+            >
+              ({pens.home} - {pens.away})
+            </span>
+          )}
         </div>
 
         {/* EQUIPO VISITANTE */}

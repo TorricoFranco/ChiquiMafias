@@ -106,11 +106,14 @@ export const usePendingFixtures = (season: string, tournament: string) => {
   });
 };
 
+/** Marcadores en vivo de una competición por REST (los iniciales; después llegan por socket). */
+export const liveScoresQuery = (slug: string) => ({
+  queryKey: [...fixtureKeys.all, 'live-scores', slug],
+  queryFn: () => competitionsApi.live(slug),
+  staleTime: 1 * MINUTE,
+  enabled: !!slug,
+});
+
 export const useLiveScores = (slug: string) => {
-  return useQuery<GetLiveScoresResponse[], Error>({
-    queryKey: [...fixtureKeys.all, 'live-scores', slug],
-    queryFn: () => competitionsApi.live(slug),
-    staleTime: 1 * MINUTE,
-    enabled: !!slug,
-  });
+  return useQuery<GetLiveScoresResponse[], Error>(liveScoresQuery(slug));
 };

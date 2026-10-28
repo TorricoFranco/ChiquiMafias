@@ -1,4 +1,4 @@
-import type { GetYearlyCalendarResponse, MatchFixture } from "@/features/fixture/types";
+import type { GetLiveScoresResponse, GetYearlyCalendarResponse, MatchFixture } from "@/features/fixture/types";
 import { LOCAL_IMAGE, nextId } from "./ids";
 
 export function buildMatchFixture(overrides: Partial<MatchFixture> = {}): MatchFixture {
@@ -18,6 +18,24 @@ export function buildMatchFixture(overrides: Partial<MatchFixture> = {}): MatchF
     away_team: { name: "River Plate", logo_url: LOCAL_IMAGE },
     home_team_id: "team-boca",
     away_team_id: "team-river",
+    ...overrides,
+  };
+}
+
+/** Marcador en vivo de `GET /competitions/:slug/live`; por defecto, Boca 1-0 River en el segundo tiempo. */
+export function buildLiveScore(overrides: Partial<GetLiveScoresResponse> = {}): GetLiveScoresResponse {
+  return {
+    matchId: nextId("fixture"),
+    h: 1,
+    a: 0,
+    hp: null,
+    ap: null,
+    homeTeamId: "team-boca",
+    awayTeamId: "team-river",
+    status: "2H",
+    elapsed: 60,
+    isLive: true,
+    isPlayoff: false,
     ...overrides,
   };
 }

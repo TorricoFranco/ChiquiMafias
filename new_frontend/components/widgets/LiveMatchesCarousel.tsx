@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { MatchScorecard } from "./MatchScorecard";
-import type { MatchFixture } from "@/features/fixture/types";
+import type { CalendarMatch } from "@/features/fixture/hooks/useCalendarWithLive";
 
 interface LiveMatchesCarouselProps {
-    matches: MatchFixture[];
+    matches: CalendarMatch[];
 }
 
 export const LiveMatchesCarousel: React.FC<LiveMatchesCarouselProps> = ({ matches }) => {
@@ -38,7 +38,7 @@ export const LiveMatchesCarousel: React.FC<LiveMatchesCarouselProps> = ({ matche
     if (!matches || matches.length === 0) return null;
 
     return (
-        <div className="bg-[#1e1414] border border-red-900/40 rounded-xl p-4 overflow-hidden w-full flex flex-col">
+        <section aria-label="Partidos en vivo" className="bg-[#1e1414] border border-red-900/40 rounded-xl p-4 overflow-hidden w-full flex flex-col">
             <div className="flex items-center justify-between mb-3">
                 <h3 className="font-['Montserrat',sans-serif] text-xs font-extrabold text-white uppercase tracking-widest flex items-center gap-2">
                     <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
@@ -76,11 +76,11 @@ export const LiveMatchesCarousel: React.FC<LiveMatchesCarouselProps> = ({ matche
                 >
                     {matches.map((match) => (
                         <div key={match.id} className="w-full flex-shrink-0">
-                            <MatchScorecard match={match} showOdds={false} />
+                            <MatchScorecard match={match} competitionName={match.competitionName} showOdds={false} />
                         </div>
                     ))}
                 </div>
             </div>
-        </div>
+        </section>
     );
 };

@@ -1,17 +1,35 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useQueries } from '@tanstack/react-query';
 import { useUserStore } from '@/store/useUserStore';
-import { useLiveScores } from '../hooks/useFixture';
+import { liveScoresQuery } from '../hooks/useFixture';
 import { formatToMapFixtureSocket } from '../utils/formatToMapFixtureSocket';
 import { FINAL_STATUSES, LIVE_STATUSES } from '../utils/liveStatus';
-import type { LeagueLiveUpdate, LiveResult } from '../types';
+import type { GetLiveScoresResponse, LeagueLiveUpdate, LiveResult } from '../types';
 
-/** Marcadores en vivo de una competición: los iniciales por REST y después por socket. */
-export const useLeagueLive = (slug: string) => {
+// Fuera del hook: con una referencia estable, useQueries solo vuelve a combinar si cambian los datos.
+const combineLiveScores = (results: { data?: GetLiveScoresResponse[]; isLoading: boolean }[]) => ({
+  // Se mezcla lo que va llegando: si una competición falla, las demás no pierden su vivo.
+  data: results.some((r) => r.data) ? results.flatMap((r) => r.data ?? []) : undefined,
+  // Solo la principal: la Liga no espera los reintentos de la Copa.
+  isLoading: results[0]?.isLoading ?? false,
+});
+
+/**
+ * Marcadores en vivo de varias competiciones (Social sigue la Liga y la Copa a
+ * la vez): los iniciales por REST y después por un solo socket. La primera de
+ * `slugs` es la principal: solo esa cuenta para `isLoading`.
+ */
+export const useCompetitionsLive = (slugs: string[]) => {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const { accessToken } = useUserStore(); 
+  const { accessToken } = useUserStore();
+  // Clave estable para el efecto: el array puede ser otro en cada render.
+  const slugsKey = slugs.join(',');
 
-  const { data: initialLive, isLoading } = useLiveScores(slug);
+  const { data: initialLive, isLoading } = useQueries({
+    queries: slugs.map(liveScoresQuery),
+    combine: combineLiveScores,
+  });
   const [liveResults, setLiveResults] = useState<Record<string, LiveResult>>(() =>
     initialLive ? formatToMapFixtureSocket(initialLive) : {}
   );
@@ -29,7 +47,8 @@ export const useLeagueLive = (slug: string) => {
   }
 
   useEffect(() => {
-    if (!slug) return;
+    const rooms = slugsKey ? slugsKey.split(',') : [];
+    if (rooms.length === 0) return;
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -42,12 +61,14 @@ export const useLeagueLive = (slug: string) => {
 
     wsSocket.on("connect", () => {
       console.log(`✅ Conectado al socket de ligas`);
-      // El backend responde `{ status: 'ok' }` o el error (competición inexistente).
-      wsSocket.emit('join_competition', { slug }, (res?: { status?: string; code?: string; message?: string }) => {
-        if (res?.status && res.status !== 'ok') {
-          console.warn(`No se pudo seguir en vivo "${slug}": ${res.message ?? res.code ?? 'error desconocido'}`);
-        }
-      });
+      for (const slug of rooms) {
+        // El backend responde `{ status: 'ok' }` o el error (competición inexistente).
+        wsSocket.emit('join_competition', { slug }, (res?: { status?: string; code?: string; message?: string }) => {
+          if (res?.status && res.status !== 'ok') {
+            console.warn(`No se pudo seguir en vivo "${slug}": ${res.message ?? res.code ?? 'error desconocido'}`);
+          }
+        });
+      }
     });
 
     wsSocket.on("disconnect", () => {
@@ -59,14 +80,14 @@ export const useLeagueLive = (slug: string) => {
 
     return () => {
       if (wsSocket.connected) {
-        wsSocket.emit('leave_competition', { slug });
+        for (const slug of rooms) wsSocket.emit('leave_competition', { slug });
       }
       wsSocket.disconnect();
     };
-  }, [accessToken, slug]);
+  }, [accessToken, slugsKey]);
 
   const handleLeagueUpdate = useCallback((matches: Record<string, LeagueLiveUpdate>) => {
-    console.log('🏆 on_league_update payload:', matches); 
+    console.log('🏆 on_league_update payload:', matches);
 
     setLiveResults((prev) => {
       const newUpdates: Record<string, LiveResult> = {};
@@ -105,3 +126,6 @@ export const useLeagueLive = (slug: string) => {
 
   return { liveResults, isLoading };
 };
+
+/** Marcadores en vivo de una competición: los iniciales por REST y después por socket. */
+export const useLeagueLive = (slug: string) => useCompetitionsLive([slug]);
