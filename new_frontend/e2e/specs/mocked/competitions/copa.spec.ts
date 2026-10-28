@@ -204,6 +204,39 @@ test.describe("Copa Argentina", () => {
     await expect(page.getByText(/Local:|Visita:/)).toHaveCount(0);
   });
 
+  test("la tanda en vivo se ve en la lista y en el cuadro, con el marcador por socket", async ({ app, page, api, socket }) => {
+    mockCopa(api);
+
+    await app.open(COPA);
+    const semi = page.getByRole("link", { name: /^Atletico Tucuman vs Platense/ });
+    await expect(semi).toBeVisible();
+    await socket.waitForEmit("join_competition");
+
+    await socket.emit("on_league_update", {
+      "m-semi-1": {
+        h: 1,
+        a: 1,
+        hp: 3,
+        ap: 2,
+        homeTeamId: tucuman.id,
+        awayTeamId: platense.id,
+        status: "P",
+        elapsed: 120,
+        isLive: true,
+        isPlayoff: true,
+      },
+    });
+
+    await expect(semi).toHaveAccessibleName("Atletico Tucuman vs Platense, penales en vivo, 1 a 1, penales 3 a 2");
+    await expect(semi).toContainText("Penales en vivo");
+    await expect(semi).toContainText("(3 - 2)");
+
+    await page.getByRole("tab", { name: "Cuadro" }).click();
+    const llave = page.getByRole("link", { name: /^Atletico Tucuman vs Platense/ });
+    await expect(llave).toHaveAccessibleName(/penales en vivo, 1 a 1, penales 3 a 2/);
+    await expect(llave).toContainText("Penales en vivo");
+  });
+
   test("un partido terminado no vuelve a estar en vivo por un dato viejo del socket", async ({ app, page, api, socket }) => {
     mockCopa(api);
 

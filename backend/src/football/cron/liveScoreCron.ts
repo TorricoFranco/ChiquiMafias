@@ -38,6 +38,8 @@ const ACTIVE_MATCH_SELECT = {
   api_fixture_id: true,
   home_goals: true,
   away_goals: true,
+  home_penalty_goals: true,
+  away_penalty_goals: true,
   status_short: true,
   elapsed: true,
   home_team_id: true,
@@ -222,7 +224,10 @@ export class LiveScoreCron {
         this.toLiveData(matchDb, apiMatch),
       )
 
-      const hasPenaltiesChanged = apiMatch.penalty.home !== null
+      // Cada tiro de la tanda: se publica como cambio de marcador.
+      const hasPenaltiesChanged =
+        matchDb.home_penalty_goals !== apiMatch.penalty.home ||
+        matchDb.away_penalty_goals !== apiMatch.penalty.away
 
       const hasScoreChanged =
         matchDb.home_goals !== (apiMatch.goals.home ?? 0) ||
@@ -259,6 +264,15 @@ export class LiveScoreCron {
         })
 
         changedMatchIds.push(matchDb.id)
+        // El detalle pisa la base con este hash: tiene que estar al día antes
+        // del aviso, o un refetch provocado por el aviso (o por un evento que
+        // llega a la vez) arma el detalle con el marcador del tick anterior.
+        // En la tanda el reloj no corre y no hay otro aviso que lo corrija.
+        await this.redisService.redis.hset(
+          `live_scores:league:${leagueId}`,
+          matchDb.id,
+          liveScoresHash[matchDb.id],
+        )
         await this.redisService.redis.del(
           `match:details:v2:${matchDb.id}`,
           // El chat consulta el estado con esta caché: se abre o se pausa ya.

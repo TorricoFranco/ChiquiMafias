@@ -41,12 +41,42 @@ export function toWireEvent(event: FootballEvent) {
 export function buildEventKey(event: FootballEvent): string {
   const detail =
     event.detail === null || event.detail === 'null' ? 'NONE' : event.detail
-  const playerId = event.player?.externalId || 0
+  // Sin id, el nombre: si no, dos tiros de la tanda del mismo equipo (todos en
+  // el 120) quedaban con la misma clave y se pisaban.
+  const playerId = event.player?.externalId || event.player?.name || 0
   const type = event.type || 'UNKNOWN'
 
   return `${event.minute}-${event.team?.externalId}-${playerId}-${type}-${detail}`
     .replace(/\s+/g, '_')
     .toLowerCase()
+}
+
+/** La clave sin el minuto: el proveedor a veces corrige el minuto de un evento. */
+const withoutMinute = (key: string) => key.slice(key.indexOf('-') + 1)
+
+/**
+ * Eventos que no estaban guardados. Un evento al que el proveedor le corrigió
+ * el minuto no cuenta como nuevo: el bot del chat no tiene que volver a
+ * anunciar un gol por eso.
+ */
+export function findNewEvents<T extends { key: string }>(
+  savedKeys: string[],
+  events: T[],
+): T[] {
+  const saved = new Map<string, number>()
+  for (const key of savedKeys) {
+    const id = withoutMinute(key)
+    saved.set(id, (saved.get(id) ?? 0) + 1)
+  }
+  return events.filter((e) => {
+    const id = withoutMinute(e.key)
+    const left = saved.get(id) ?? 0
+    if (left > 0) {
+      saved.set(id, left - 1)
+      return false
+    }
+    return true
+  })
 }
 
 @Injectable()
@@ -141,8 +171,16 @@ export class EventsFetchCron {
         )
 
         const currentApiEventIds: string[] = []
+        const stored: { key: string; event: FootballEvent }[] = []
+        let savedKeys: string[] = []
 
         await this.prisma.$transaction(async (tx) => {
+          const saved = await tx.matchEvents.findMany({
+            where: { match_id: match.id },
+            select: { api_event_id: true },
+          })
+          savedKeys = saved.map((e) => e.api_event_id)
+
           for (const event of apiEvents) {
             const uniqueEventId = buildEventKey(event)
 
@@ -173,6 +211,7 @@ export class EventsFetchCron {
               assistInternal?.id || null,
               uniqueEventId,
             )
+            stored.push({ key: uniqueEventId, event })
           }
 
           // Borrado de eventos que ya no están
@@ -190,6 +229,11 @@ export class EventsFetchCron {
         if (isFinished) await this.markEventsFinalized(match.id)
 
         const lastEvent = apiEvents[apiEvents.length - 1]
+        // En la tanda caen dos tiros por minuto: el bot del chat reacciona a
+        // todos los eventos nuevos, no solo al último.
+        const newEvents = findNewEvents(savedKeys, stored).map((s) =>
+          toWireEvent(s.event),
+        )
 
         await this.redisService.publish('match_updates', {
           matchId: match.id,
@@ -197,6 +241,7 @@ export class EventsFetchCron {
           payload: {
             count: apiEvents.length,
             lastEvent: lastEvent ? toWireEvent(lastEvent) : undefined,
+            newEvents,
             status: match.status_short,
           },
         })

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BracketMatch } from '../../type';
 import { X, GitBranch, Radio } from 'lucide-react';
+import { LIVE_STATUSES } from '@/features/fixture/utils/liveStatus';
 
 interface BracketModalProps {
     isOpen: boolean;
@@ -40,7 +41,8 @@ export const BracketModal: React.FC<BracketModalProps> = ({
     const finalMatch = brackets.find((b) => b.round.includes('final') && !b.round.includes('semifinal'));
 
     const renderMatchCard = (m: BracketMatch, roundName: string, isCenter = false, fluid = false) => {
-        const isLive = m.status_short === 'LIVE' || m.status_short === '1H' || m.status_short === '2H';
+        // Con todos los estados en juego: sin entretiempo, prórroga ni penales el cruce figuraba "Programado".
+        const isLive = LIVE_STATUSES.includes(m.status_short);
         const isFinished = m.status_short === 'FT' || m.status_short === 'PEN' || m.status_short === 'AET';
 
         const isTBD =
@@ -95,7 +97,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                     </span>
                     {isLive ? (
                         <span className="inline-flex items-center gap-1 text-red-400 font-bold animate-pulse font-mono">
-                            <Radio className="w-2.5 h-2.5 text-red-500" /> VIVO
+                            <Radio className="w-2.5 h-2.5 text-red-500" /> {m.status_short === 'P' ? 'PENALES' : 'VIVO'}
                         </span>
                     ) : isFinished ? (
                         <span className="text-[#8e9285] font-semibold">

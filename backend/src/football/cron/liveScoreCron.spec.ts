@@ -23,6 +23,8 @@ const activeMatch = {
   api_fixture_id: 1001,
   home_goals: 0,
   away_goals: 0,
+  home_penalty_goals: null,
+  away_penalty_goals: null,
   status_short: '1H',
   elapsed: 30,
   home_team_id: 'h',
@@ -133,6 +135,83 @@ describe('LiveScoreCron', () => {
     // anterior: el último borrado tiene que ir después del hset.
     expect(order[order.length - 1]).toBe('del')
     expect(order.lastIndexOf('del')).toBeGreaterThan(order.indexOf('hset'))
+  })
+
+  describe('tanda de penales en curso', () => {
+    const inShootout = {
+      ...activeMatch,
+      home_goals: 1,
+      away_goals: 1,
+      status_short: 'P',
+      elapsed: 120,
+      home_penalty_goals: 2,
+      away_penalty_goals: 1,
+    }
+    const shootoutFixture = (home: number, away: number) =>
+      baseFixture({
+        status: { short: 'P', long: 'Penalties', elapsed: 120 },
+        goals: { home: 1, away: 1 },
+        penalty: { home, away },
+      })
+
+    it('Debe publicar SCORE_UPDATED con el marcador de la tanda cuando entra un tiro', async () => {
+      prisma.matches.findMany.mockResolvedValue([inShootout])
+      provider.getLiveFixtures.mockResolvedValue([shootoutFixture(3, 1)])
+
+      await cron.handleLiveScores()
+
+      expect(prisma.matches.update).toHaveBeenCalledWith({
+        where: { id: 'm1' },
+        data: expect.objectContaining({
+          home_penalty_goals: 3,
+          away_penalty_goals: 1,
+        }),
+      })
+      expect(redisService.publish).toHaveBeenCalledWith(
+        'match_updates',
+        expect.objectContaining({
+          type: 'SCORE_UPDATED',
+          payload: expect.objectContaining({
+            home_penalty_goals: 3,
+            away_penalty_goals: 1,
+            status: 'P',
+          }),
+        }),
+      )
+    })
+
+    it('Debe actualizar el hash del vivo antes de avisar el tiro por socket', async () => {
+      prisma.matches.findMany.mockResolvedValue([inShootout])
+      provider.getLiveFixtures.mockResolvedValue([shootoutFixture(3, 1)])
+      const order: string[] = []
+      redis.hset.mockImplementation((_key: string, field: unknown) => {
+        if (field === 'm1') order.push('hset')
+        return Promise.resolve(1)
+      })
+      redisService.publish.mockImplementation((channel: string) => {
+        if (channel === 'match_updates') order.push('publish')
+        return Promise.resolve()
+      })
+
+      await cron.handleLiveScores()
+
+      // El detalle pisa la base con el hash: si el aviso sale antes, un
+      // refetch vuelve a mostrar el marcador del tick anterior.
+      expect(order.slice(0, 2)).toEqual(['hset', 'publish'])
+    })
+
+    it('No debe escribir ni publicar en cada tick si la tanda no cambió', async () => {
+      prisma.matches.findMany.mockResolvedValue([inShootout])
+      provider.getLiveFixtures.mockResolvedValue([shootoutFixture(2, 1)])
+
+      await cron.handleLiveScores()
+
+      expect(prisma.matches.update).not.toHaveBeenCalled()
+      expect(redisService.publish).not.toHaveBeenCalledWith(
+        'match_updates',
+        expect.anything(),
+      )
+    })
   })
 
   it('No debe borrar el detalle después del hset si el partido no cambió', async () => {

@@ -11,7 +11,7 @@ import { MatchLineups } from './MatchLineups';
 import { MatchChat } from './MatchChat';
 import { ArrowLeft, AlertOctagon, RefreshCw, MessageSquare } from 'lucide-react';
 import { MatchMarketWidget } from '@/features/bets/components/MatchMarketWidget';
-import { chatStateFor } from '../types';
+import { chatStateFor, FINISHED_STATUSES, hasPenaltyScore } from '../types';
 import type { MatchChatState } from '../types';
 
 interface MatchDetailViewProps {
@@ -137,13 +137,19 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({ matchId, onBac
 
                     {activeTab === 'resumen' && (
                         <div className="flex flex-col gap-6">
-                            {matchDetails.shootout && matchDetails.shootout.length > 0 && (
+                            {/* Aparece al empezar la tanda: los tiros pueden llegar después o no llegar.
+                                Terminada, hace falta el marcador o los tiros: sin datos no hay qué mostrar. */}
+                            {(matchDetails.metadata.status === 'P' ||
+                                hasPenaltyScore(matchDetails.score) ||
+                                (matchDetails.shootout?.length ?? 0) > 0) && (
                                 <MatchPenaltyShootout
-                                    kicks={matchDetails.shootout}
+                                    kicks={matchDetails.shootout ?? []}
                                     homeTeam={matchDetails.teams.home}
                                     awayTeam={matchDetails.teams.away}
                                     homePenalties={matchDetails.score.home_penalties}
                                     awayPenalties={matchDetails.score.away_penalties}
+                                    inProgress={matchDetails.metadata.status === 'P'}
+                                    decided={FINISHED_STATUSES.includes(matchDetails.metadata.status)}
                                 />
                             )}
                             <MatchTimeline

@@ -1,5 +1,8 @@
 import { MatchEventResponseDto } from '../dto/response/match-events-response.dto'
-import { splitPenaltyShootout } from './penalty-shootout.util'
+import {
+  hasPenaltyShootout,
+  splitPenaltyShootout,
+} from './penalty-shootout.util'
 
 const ev = ({
   team,
@@ -61,5 +64,30 @@ describe('splitPenaltyShootout', () => {
 
     expect(events).toEqual([early])
     expect(shootout).toHaveLength(4)
+  })
+})
+
+describe('hasPenaltyShootout', () => {
+  const match = (
+    status_short: string,
+    home_penalty_goals: number | null = null,
+    away_penalty_goals: number | null = null,
+  ) => ({ status_short, home_penalty_goals, away_penalty_goals })
+
+  it('Debe dar tanda en curso aunque el proveedor todavía no mande el marcador', () => {
+    expect(hasPenaltyShootout(match('P'))).toBe(true)
+  })
+
+  it('Debe dar tanda en un partido terminado por penales', () => {
+    expect(hasPenaltyShootout(match('PEN', 4, 3))).toBe(true)
+  })
+
+  it('Debe dar tanda si hay marcador de penales aunque el estado sea otro', () => {
+    expect(hasPenaltyShootout(match('FT', 4, 3))).toBe(true)
+  })
+
+  it('No debe dar tanda en un partido sin penales', () => {
+    expect(hasPenaltyShootout(match('2H'))).toBe(false)
+    expect(hasPenaltyShootout(match('FT'))).toBe(false)
   })
 })

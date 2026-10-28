@@ -148,5 +148,110 @@ describe('MatchesGateway (estado del chat)', () => {
         expect.objectContaining({ chatState: 'PAUSED', chatActive: false }),
       )
     })
+
+    it('Debe mandar el marcador de la tanda en match_live_update', () => {
+      onMessage(
+        JSON.stringify({
+          matchId: 'match-1',
+          type: 'SCORE_UPDATED',
+          payload: {
+            home_goals: 1,
+            away_goals: 1,
+            home_penalty_goals: 3,
+            away_penalty_goals: 2,
+            status: 'P',
+            elapsed: 120,
+          },
+        }),
+      )
+
+      expect(emit).toHaveBeenCalledWith(
+        'match_live_update',
+        expect.objectContaining({
+          hp: 3,
+          ap: 2,
+          status: 'P',
+          chatState: 'OPEN',
+        }),
+      )
+    })
+
+    it('Debe mandar null como marcador de la tanda si no hubo penales', () => {
+      publish('SCORE_UPDATED', '2H')
+
+      expect(emit).toHaveBeenCalledWith(
+        'match_live_update',
+        expect.objectContaining({ hp: null, ap: null }),
+      )
+    })
+
+    it('No debe romperse con un mensaje que no es JSON', () => {
+      expect(() => onMessage('no-json')).not.toThrow()
+    })
+
+    describe('bot del chat', () => {
+      const kick = (detail: string, player: string) => ({
+        time: { elapsed: 120, extra: 1 },
+        team: { id: 1, name: 'Boca' },
+        player: { id: 9, name: player },
+        assist: null,
+        type: 'Goal',
+        detail,
+      })
+      const eventsUpdated = (newEvents: unknown[]) =>
+        onMessage(
+          JSON.stringify({
+            matchId: 'match-1',
+            type: 'EVENTS_UPDATED',
+            payload: {
+              count: 10,
+              lastEvent: newEvents[newEvents.length - 1],
+              newEvents,
+              status: 'P',
+            },
+          }),
+        )
+      const botMessages = () =>
+        (emit.mock.calls as unknown[][])
+          .filter((c) => c[0] === 'on-message')
+          .map((c) => (c[1] as { message: string }).message)
+
+      beforeEach(() => {
+        Object.assign(redis, {
+          rpush: jest.fn().mockResolvedValue(1),
+          ltrim: jest.fn().mockResolvedValue('OK'),
+        })
+      })
+
+      it('Debe cargar a cada pateador que erra, aunque lleguen dos tiros juntos', async () => {
+        eventsUpdated([
+          kick('Missed Penalty', 'Zenón'),
+          kick('Penalty', 'Blanco'),
+          kick('Missed Penalty', 'Gómez'),
+        ])
+        await new Promise((r) => setImmediate(r))
+
+        const messages = botMessages()
+        expect(messages).toHaveLength(2)
+        expect(messages.some((m) => /GOL/i.test(m))).toBe(false)
+        expect(emit).not.toHaveBeenCalledWith('goal_scored', expect.anything())
+      })
+
+      it('Debe anunciar un gol del partido con goal_scored', async () => {
+        eventsUpdated([
+          {
+            ...kick('Normal Goal', 'Cavani'),
+            time: { elapsed: 70, extra: null },
+          },
+        ])
+        await new Promise((r) => setImmediate(r))
+
+        expect(emit).toHaveBeenCalledWith(
+          'goal_scored',
+          expect.objectContaining({ matchId: 'match-1', player: 'Cavani' }),
+        )
+        expect(botMessages()).toHaveLength(1)
+      })
+    })
   })
 })

@@ -308,6 +308,36 @@ function seasonStandings({ withBocaRiver = false, withRacingIndependiente = fals
 const BOCA_RIVER = { home_team_id: "team-boca-juniors", away_team_id: "team-river-plate" };
 const finalScore = (h: number, a: number, homeTeamId: string, awayTeamId: string) => ({ h, a, hp: 0, ap: 0, homeTeamId, awayTeamId, status: "FT", elapsed: 90 });
 
+test.describe("Ligas: penales en el fixture", () => {
+  test("un cruce que se define por penales muestra la tanda en vivo y al terminar", async ({ app, page, api, session, socket }) => {
+    session.loginAs("USER");
+    const live = buildMatchFixture({ id: "m-pen", ...BOCA_RIVER, status_short: "2H", elapsed: 90, home_goals: 1, away_goals: 1, is_live: true });
+    mockLeague(api, { matchdays: { "5": buildMatchday("5", [live]) } });
+
+    await app.open("/?tab=ligas");
+    const row = page.getByRole("link", { name: "Boca Juniors vs River Plate" });
+    await expect(row).toContainText("1-1");
+    await socket.waitForEmit("join_competition");
+
+    const tick = (status: string, hp: number, ap: number) =>
+      socket.emit("on_league_update", {
+        "m-pen": { h: 1, a: 1, hp, ap, homeTeamId: BOCA_RIVER.home_team_id, awayTeamId: BOCA_RIVER.away_team_id, status, elapsed: 120, isLive: status === "P", isPlayoff: true },
+      });
+
+    await tick("P", 2, 1);
+    await expect(row).toHaveAccessibleName("Boca Juniors vs River Plate, penales en vivo, 1 a 1, penales 2 a 1");
+    await expect(row).toContainText("Penales en vivo");
+    await expect(row).toContainText("(2 - 1)");
+    // En la tanda el reloj no corre: no se muestra el 120.
+    await expect(row).not.toContainText("120'");
+
+    await tick("PEN", 4, 3);
+    await expect(row).toHaveAccessibleName("Boca Juniors vs River Plate, final, 1 a 1, penales 4 a 3");
+    await expect(row).toContainText("(4 - 3)");
+    await expect(row).not.toContainText("Penales en vivo");
+  });
+});
+
 test.describe("Ligas: la tabla con partidos en vivo", () => {
   const zoneTable = (page: import("@playwright/test").Page) =>
     page.getByRole("table").filter({ has: page.getByRole("columnheader", { name: "Pos" }) });
