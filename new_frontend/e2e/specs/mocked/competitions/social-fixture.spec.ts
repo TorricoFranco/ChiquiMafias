@@ -87,6 +87,25 @@ test.describe("Fixture de Social con la Liga y la Copa", () => {
     await expect(page.getByRole("region", { name: "Partidos en vivo" })).toContainText("Boca Juniors", { timeout: 4_000 });
   });
 
+  test("si termina un partido mientras el carrusel muestra el último, pasa al que sigue en vivo", async ({ app, page, api, socket }) => {
+    mockSocial(api, copaMatch({ status_short: "2H", elapsed: 80, home_goals: 0, away_goals: 0, is_live: true }));
+    api.on("GET", "/fixtures/seasons/:season/calendar", buildCalendar({ [DAY]: [{ ...ligaMatch, status_short: "2H", elapsed: 85, home_goals: 1, away_goals: 0, is_live: true }] }));
+
+    await app.open();
+    const live = page.getByRole("region", { name: "Partidos en vivo" });
+    await expect(live).toContainText("1 de 2");
+    await live.getByRole("button", { name: "Partido siguiente" }).click();
+    await expect(live).toContainText("2 de 2");
+
+    // Termina el de la Liga: queda solo el de la Copa, que el carrusel tiene que mostrar.
+    await socket.emit("on_league_update", {
+      "m-liga": { h: 1, a: 0, hp: 0, ap: 0, homeTeamId: "team-boca", awayTeamId: "team-river", status: "FT", elapsed: 90, isLive: false, isPlayoff: false },
+    });
+
+    await expect(live).toContainText("1 de 1");
+    await expect(live).toContainText("Atletico Tucuman");
+  });
+
   test("un partido de la Copa terminado por penales muestra la tanda", async ({ app, page, api }) => {
     mockSocial(api, copaMatch({ status_short: "PEN", home_goals: 1, away_goals: 1, home_penalty_goals: 4, away_penalty_goals: 3 }));
 
