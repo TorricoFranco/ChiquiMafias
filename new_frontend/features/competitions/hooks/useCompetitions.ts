@@ -8,6 +8,8 @@ export const competitionKeys = {
   bracket: (slug: string) => ['competitions', slug, 'bracket'] as const,
   roundMatches: (slug: string, round: string) =>
     ['competitions', slug, 'matches', round] as const,
+  upcomingMatches: (slug: string) =>
+    ['competitions', slug, 'upcoming-matches'] as const,
 };
 
 /** Las competiciones cambian muy de vez en cuando (alta de temporada). */
@@ -61,6 +63,13 @@ export const useCompetitionBracket = (slug: string, enabled = true) =>
     staleTime: 60 * 1000,
     enabled: !!slug && enabled,
   });
+
+/** Partidos cercanos de una competición (de una semana atrás a dos adelante). */
+export const upcomingMatchesQuery = (slug: string) => ({
+  queryKey: competitionKeys.upcomingMatches(slug),
+  queryFn: () => competitionsApi.upcomingMatches(slug),
+  staleTime: 60 * 1000,
+});
 
 /** Partidos de una ronda (por su nombre, `32avos de final`). */
 export const useRoundMatches = (slug: string, round: string | null) =>

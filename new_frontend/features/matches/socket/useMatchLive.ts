@@ -38,6 +38,10 @@ export const useMatchLive = (matchId: string) => {
             ...prev.score,
             home: payload.h ?? prev.score.home,
             away: payload.a ?? prev.score.away,
+            // Cada tiro de la tanda llega como cambio de marcador. Un aviso sin
+            // el campo (backend viejo) no borra lo que ya había.
+            home_penalties: payload.hp !== undefined ? payload.hp : prev.score.home_penalties,
+            away_penalties: payload.ap !== undefined ? payload.ap : prev.score.away_penalties,
             elapsed: payload.elapsed ?? prev.score.elapsed,
           },
           metadata: {

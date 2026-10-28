@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { LiveResult, MatchFixture } from '@/features/fixture/types';
 import { useRoundMatches } from '../hooks/useCompetitions';
 import { formatKickoff } from '../utils/bracket';
+import { SHOOTOUT_STATUSES, shootoutScore } from '@/features/fixture/utils/liveStatus';
 
 const LIVE = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'];
 const FINISHED = ['FT', 'AET', 'PEN', 'AWD', 'WO', 'CANC', 'ABD'];
@@ -42,18 +43,22 @@ const KnockoutMatchCard: React.FC<{ match: MatchFixture; live?: LiveResult }> = 
   const status = live?.status ?? match.status_short;
   const home = live ? live.h : match.home_goals;
   const away = live ? live.a : match.away_goals;
-  const penalties = ['P', 'PEN'].includes(status);
-  const homePens = live ? live.hp : match.home_penalty_goals;
-  const awayPens = live ? live.ap : match.away_penalty_goals;
+  const penalties = SHOOTOUT_STATUSES.includes(status);
+  const pens = shootoutScore(
+    status,
+    live ? live.hp : match.home_penalty_goals,
+    live ? live.ap : match.away_penalty_goals,
+  );
   const isLive = LIVE.includes(status);
   const isFinished = FINISHED.includes(status);
-  const showPens = penalties && homePens !== null && awayPens !== null;
+  const inShootout = status === 'P';
+  const pensText = pens ? `, penales ${pens.home} a ${pens.away}` : '';
 
   // El nombre accesible reemplaza al contenido: tiene que decir el resultado.
   const summary = isLive
-    ? `en vivo, ${home ?? 0} a ${away ?? 0}`
+    ? `${inShootout ? 'penales en vivo' : 'en vivo'}, ${home ?? 0} a ${away ?? 0}${pensText}`
     : isFinished
-      ? `final, ${home ?? 0} a ${away ?? 0}${showPens ? `, penales ${homePens} a ${awayPens}` : ''}`
+      ? `final, ${home ?? 0} a ${away ?? 0}${pensText}`
       : formatKickoff(match.date);
 
   return (
@@ -63,20 +68,20 @@ const KnockoutMatchCard: React.FC<{ match: MatchFixture; live?: LiveResult }> = 
       className="flex items-center gap-3 p-3 rounded-xl bg-[#201f1f] border border-[#353534] hover:border-[#d2f000]/50 transition-colors"
     >
       <Team name={match.home_team.name} logo={match.home_team.logo_url} align="end" />
-      <div className="w-24 flex-shrink-0 flex flex-col items-center py-1 bg-[#181818] rounded-lg border border-[#30302f]">
+      <div className="w-28 flex-shrink-0 flex flex-col items-center py-1 bg-[#181818] rounded-lg border border-[#30302f]">
         {isLive || isFinished ? (
           <>
             <span
               className={`text-[9px] font-black uppercase tracking-wider ${isLive ? 'text-[#ffb4ab]' : 'text-[#909378]'}`}
             >
-              {isLive ? 'En vivo' : penalties ? 'Penales' : 'Final'}
+              {isLive ? (inShootout ? 'Penales en vivo' : 'En vivo') : penalties ? 'Penales' : 'Final'}
             </span>
             <span className="text-sm font-black text-[#e5e2e1] tabular-nums">
               {home ?? 0} - {away ?? 0}
             </span>
-            {showPens && (
-              <span className="text-[10px] font-bold text-[#c6c9ab] tabular-nums">
-                ({homePens} - {awayPens})
+            {pens && (
+              <span className={`text-[10px] font-bold tabular-nums ${inShootout ? 'text-[#ffb4ab]' : 'text-[#c6c9ab]'}`}>
+                ({pens.home} - {pens.away})
               </span>
             )}
           </>

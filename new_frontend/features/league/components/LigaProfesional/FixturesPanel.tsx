@@ -5,6 +5,7 @@ import { formatDateHeader } from '@/features/league/utils/formatDateHeader';
 import { formatMatchTime } from '@/features/league/utils/formatMatchTime';
 import { groupMatchesByDate } from '@/features/league/utils/groupMatchesByDate';
 import { translateStatus } from '@/features/league/utils/translateStatus';
+import { shootoutScore } from '@/features/fixture/utils/liveStatus';
 
 import {
     TournamentType,
@@ -160,13 +161,19 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
                                     const isLive = ['1H', '2H', 'HT', 'ET', 'BT', 'P', 'LIVE'].includes(match.status_short);
                                     const isFinished = ['FT', 'PEN', 'AET'].includes(match.status_short);
                                     const showScore = (isLive || isFinished) && match.home_goals !== null && match.away_goals !== null;
+                                    const pens = shootoutScore(match.status_short, match.home_pen, match.away_pen);
+                                    // El nombre accesible reemplaza al contenido: con tanda, tiene que decirla.
+                                    const teams = `${match.home_team.name} vs ${match.away_team.name}`;
+                                    const label = pens
+                                        ? `${teams}, ${isLive ? 'penales en vivo' : 'final'}, ${match.home_goals ?? 0} a ${match.away_goals ?? 0}, penales ${pens.home} a ${pens.away}`
+                                        : teams;
 
                                     return (
                                         <div
                                             key={`match-${match.id}-${index}`}
                                             role="link"
                                             tabIndex={0}
-                                            aria-label={`${match.home_team.name} vs ${match.away_team.name}`}
+                                            aria-label={label}
                                             onClick={() => handleMatchClick(String(match.id))}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') handleMatchClick(String(match.id));
@@ -183,7 +190,8 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
                                                 <div className="absolute top-1 left-2 flex items-center gap-1 text-[9px] font-bold text-red-400 font-mono">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
                                                     <span>{translateStatus(match.status_short)}</span>
-                                                    {match.minute && <span>{match.minute}&apos;</span>}
+                                                    {/* En la tanda el reloj no corre: el proveedor deja el 120. */}
+                                                    {match.minute && match.status_short !== 'P' && <span>{match.minute}&apos;</span>}
                                                 </div>
                                             )}
 
@@ -219,6 +227,13 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
                                                     </div>
                                                 ) : (
                                                     <span className="text-[10px] font-bold text-[#8e9285] font-mono leading-none">VS</span>
+                                                )}
+                                                {pens && (
+                                                    <span
+                                                        className={`mt-0.5 font-mono font-bold text-[9px] leading-none ${isLive ? 'text-red-400' : 'text-[#c6c9ab]'}`}
+                                                    >
+                                                        ({pens.home} - {pens.away})
+                                                    </span>
                                                 )}
                                                 <div className="mt-1 leading-none">{renderMatchStatus(match)}</div>
                                             </div>

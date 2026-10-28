@@ -2,6 +2,7 @@ import React from 'react';
 import {
     MatchDetails,
     getDerivedMatchState,
+    hasPenaltyScore,
     MatchStatus,
 } from '../types';
 import { MapPin, User, Shield } from 'lucide-react';
@@ -35,8 +36,10 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
             case 'ET':
             case 'BT':
                 return { label: `TIEMPO EXTRA ${score.elapsed ? `${score.elapsed}'` : ''}`, bg: 'bg-red-500/20 text-red-400 border-red-500/30' };
+            case 'P':
+                return { label: 'PENALES EN VIVO', bg: 'bg-red-500/20 text-red-400 border-red-500/30' };
             case 'PEN':
-                return { label: 'PENALES', bg: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
+                return { label: 'FINAL POR PENALES', bg: 'bg-[#2b2a2a] text-[#c6c9ab] border-[#3e3d3c]' };
             case 'FT':
                 return { label: 'FINALIZADO', bg: 'bg-[#2b2a2a] text-[#c6c9ab] border-[#3e3d3c]' };
             case 'AET':
@@ -70,7 +73,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
     const homeReds = score.summary?.redCards?.filter((rc) => rc.team === teams.home.id).length || 0;
     const awayReds = score.summary?.redCards?.filter((rc) => rc.team === teams.away.id).length || 0;
 
-    const hasPenaltyScore = score.home_penalties !== null && score.away_penalties !== null;
+    const showPenaltyScore = hasPenaltyScore(score);
 
     // Filtramos los goles por equipo
     const homeGoals = score.summary?.goals?.filter((g) => g.team === teams.home.id) || [];
@@ -165,14 +168,15 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
                                 </div>
                             )}
 
-                            {hasPenaltyScore && (
+                            {showPenaltyScore && (
                                 <div className="px-3 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs font-mono font-bold border border-purple-500/30 whitespace-nowrap">
                                     <span className="hidden md:inline">Penales:</span>
                                     <span className="md:hidden">Pen.</span> ({score.home_penalties}) - ({score.away_penalties})
                                 </div>
                             )}
 
-                            {isLive && score.elapsed && (
+                            {/* En la tanda el reloj no corre: el proveedor deja el 120. */}
+                            {isLive && metadata.status !== 'P' && score.elapsed && (
                                 <span className="text-xs font-mono font-bold text-red-400 flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                                     {score.elapsed}&apos;

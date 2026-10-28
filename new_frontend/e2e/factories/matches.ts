@@ -1,5 +1,12 @@
 import { chatStateFor } from "@/features/matches/types";
-import type { MatchDetails, MatchLineup, MatchMetadata, MatchScore, PreMatchResponse } from "@/features/matches/types";
+import type {
+  MatchDetails,
+  MatchLineup,
+  MatchMetadata,
+  MatchScore,
+  PreMatchResponse,
+  ShootoutKick,
+} from "@/features/matches/types";
 import { LOCAL_IMAGE, nextId } from "./ids";
 
 /** leagueId que las páginas de partido mandan fijo al backend. */
@@ -46,6 +53,17 @@ export function buildMatchDetails(overrides: MatchOverrides = {}): MatchDetails 
     chatActive: chatState === "OPEN",
     chatState,
     ...rest,
+  };
+}
+
+/** Tiro de la tanda de penales (`ShootoutKick`); por defecto, el primero de Boca convertido. */
+export function buildShootoutKick(overrides: Partial<ShootoutKick> = {}): ShootoutKick {
+  return {
+    order: 1,
+    teamId: "team-boca",
+    player: "Edinson Cavani",
+    scored: true,
+    ...overrides,
   };
 }
 

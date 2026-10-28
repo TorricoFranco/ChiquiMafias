@@ -5,7 +5,7 @@ export const translateStatus = (status: string): string => {
         'HT': 'ET',
         'ET': 'Prórroga',
         'BT': 'Prórroga',
-        'P': 'Penales',
+        'P': 'Penales en vivo',
         'PEN': 'Penales',
         'LIVE': 'En Vivo',
         'FT': 'Finalizado',
