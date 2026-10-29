@@ -36,6 +36,43 @@ describe('resolveLigaDivididaRound', () => {
     })
   })
 
+  it('Debe resolver los octavos del Clausura con la etiqueta de Highlightly', () => {
+    expect(resolveLigaDivididaRound('Clausura - Round of 16', 'N/A')).toEqual({
+      round: 'Clausura - octavos',
+      tournament: 'CLAUSURA',
+      matchdayKey: 'octavos',
+    })
+  })
+
+  it.each([
+    ['Clausura - 8th Finals', 'Clausura - octavos'],
+    ['Clausura - 1/4 Finals', 'Clausura - cuartos'],
+    ['Clausura - Semi-final', 'Clausura - semifinal'],
+    ['Clausura - Grand Final', 'Clausura - final'],
+    ['Apertura - Quarterfinals', 'Regular Season - cuartos'],
+  ])(
+    'Debe reconocer el playoff "%s" aunque no esté en ROUND_MAP',
+    (raw, round) => {
+      expect(resolveLigaDivididaRound(raw, 'N/A').round).toBe(round)
+    },
+  )
+
+  it('Debe dejar igual una fecha numerada que no está en ROUND_MAP', () => {
+    expect(resolveLigaDivididaRound('Regular Season - 3', 'N/A')).toEqual({
+      round: 'Regular Season - 3',
+      tournament: 'APERTURA',
+      matchdayKey: 'fecha:3',
+    })
+  })
+
+  it('Debe dejar igual una ronda desconocida', () => {
+    expect(resolveLigaDivididaRound('Clausura - Repechaje', 'N/A')).toEqual({
+      round: 'Clausura - Repechaje',
+      tournament: 'CLAUSURA',
+      matchdayKey: 'repechaje',
+    })
+  })
+
   it('Debe usar el fallback si no hay ronda', () => {
     expect(resolveLigaDivididaRound(undefined, 'N/A').round).toBe('N/A')
     expect(resolveLigaDivididaRound(null, 'Unknown Round').round).toBe(

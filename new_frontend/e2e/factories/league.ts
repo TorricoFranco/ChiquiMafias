@@ -1,4 +1,10 @@
-import type { GetFixtureMatchdayResponse, MatchFixture, TournamentBracketsResponse } from "@/features/fixture/types";
+import type {
+  GetFixtureMatchdayResponse,
+  GetPendingFixturesResponse,
+  MatchFixture,
+  PendingTeam,
+  TournamentBracketsResponse,
+} from "@/features/fixture/types";
 import type { BracketMatch, PlayoffStageKey } from "@/features/league/type";
 import type { FullStandingsResponse, StandingRow } from "@/features/standings/types";
 import { LOCAL_IMAGE } from "./ids";
@@ -36,6 +42,33 @@ export function buildStandings(zoneA: StandingRow[], zoneB: StandingRow[] = []):
 
 export function buildMatchday(matchday: string, matches: MatchFixture[] = [buildMatchFixture()]): GetFixtureMatchdayResponse {
   return { tournament: "CLAUSURA", season: "2026", current_matchday: matchday, matches };
+}
+
+/**
+ * Grupo de `GET /fixtures/pendings/...`: una fecha (`"16"`) o una ronda de playoff (`"octavos"`)
+ * con sus partidos sin jugar, como `[local, visitante]`.
+ */
+export function buildPendingGroup(matchday: string, matches: [string, string][]): GetPendingFixturesResponse {
+  const isPlayoff = Number.isNaN(Number(matchday));
+  const team = (name: string): PendingTeam => ({
+    id: `team-${name.toLowerCase().replace(/\s+/g, "-")}`,
+    name,
+    short_code: null,
+    logo_url: LOCAL_IMAGE,
+  });
+  return {
+    matchday,
+    is_playoff: isPlayoff,
+    matches: matches.map(([home, away], index) => ({
+      id: `pending-${matchday}-${index}`,
+      date: "2026-11-08T21:00:00.000Z",
+      status_short: "NS",
+      tournament: "CLAUSURA",
+      is_playoff: isPlayoff,
+      home_team: team(home),
+      away_team: team(away),
+    })),
+  };
 }
 
 type BracketTeam = BracketMatch["home_team"];

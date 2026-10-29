@@ -212,6 +212,8 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
     const flatMatches: LeagueMatch[] = [];
 
     pendingFixturesData.forEach(group => {
+      // Los cruces de playoff no suman a la tabla: no se simulan (y su ronda no es un número de fecha).
+      if (group.is_playoff) return;
       group.matches.forEach(m => {
         const isPending = m.status_short === 'NS' || m.status_short === 'TBD';
 

@@ -2,7 +2,7 @@ import { expect, test } from "../../../fixtures/test";
 import { buildCompetition, buildCopaArgentina } from "../../../factories/competitions";
 import { buildMatchFixture } from "../../../factories/fixtures";
 import type { FullStandingsResponse } from "@/features/standings/types";
-import { buildBracketTeam, buildMatchday, buildPlayoffBrackets, buildStandingRow } from "../../../factories/league";
+import { buildBracketTeam, buildMatchday, buildPendingGroup, buildPlayoffBrackets, buildStandingRow } from "../../../factories/league";
 import { buildMatchDetails, buildPreMatch } from "../../../factories/matches";
 import { BASE_URL } from "../../../support/env";
 import { mockLeague } from "../../../support/league";
@@ -224,6 +224,50 @@ test.describe("Ligas: Liga Profesional", () => {
     await expect(winner("Rosario Central")).toHaveCount(0);
     // Ni el cruce por penales sin cargar ni el que todavía no se jugó tienen ganador.
     await expect(page.getByText("(ganador)").filter({ visible: true })).toHaveCount(2);
+  });
+
+  test("en el cuadro de playoffs los cruces sin definir no figuran como programados", { tag: "@mobile" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, {
+      brackets: buildPlayoffBrackets({
+        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan") },
+      }),
+    });
+
+    await app.open("/?tab=ligas");
+    await page.getByRole("button", { name: "VER LLAVES PLAYOFFS", exact: true }).click();
+
+    // El backend manda "A confirmar": antes no se reconocía y los 14 cruces vacíos decían "Programado".
+    await expect(page.getByText("Instituto").filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Programado").filter({ visible: true })).toHaveCount(1);
+  });
+
+  test("el simulador ofrece las fechas pendientes y no los cruces de playoff", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, {
+      pendings: [buildPendingGroup("16", [["Tigre", "Banfield"]]), buildPendingGroup("octavos", [["Instituto", "Huracan"]])],
+    });
+
+    await app.open("/?tab=ligas");
+
+    await expect(page.getByRole("heading", { name: "Simulador" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Simulador de Resultados/ })).toBeVisible();
+    await expect(page.getByText("Tigre", { exact: true })).toBeVisible();
+    // Con el cruce de octavos aparecía una segunda ronda, "Fecha NaN", sin partidos.
+    await expect(page.getByText("Fecha 16")).toHaveCount(0);
+    await expect(page.getByText("Instituto", { exact: true })).toHaveCount(0);
+  });
+
+  test("durante los playoffs no muestra el simulador", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, { pendings: [buildPendingGroup("octavos", [["Instituto", "Huracan"]])] });
+
+    await app.open("/?tab=ligas");
+
+    await expect(page.getByRole("link", { name: "Boca Juniors vs River Plate" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Simulador" })).toHaveCount(0);
+    // Tampoco el atajo del menú, que no tendría adónde ir.
+    await expect(page.getByRole("button", { name: /Simulador de Resultados/ })).toHaveCount(0);
   });
 
   test.describe("si no se puede cargar la temporada", () => {
