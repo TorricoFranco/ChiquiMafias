@@ -48,8 +48,9 @@ export class FixtureService {
     const season = String(competition.season)
     let matchdayKey = ''
     let dbSearchTerm = ''
+    const isNumbered = typeof matchday === 'number' || !isNaN(Number(matchday))
 
-    if (typeof matchday === 'number' || !isNaN(Number(matchday))) {
+    if (isNumbered) {
       matchdayKey = `fecha:${matchday}`
       dbSearchTerm = ` - ${matchday}`
     } else {
@@ -66,16 +67,19 @@ export class FixtureService {
     let matches
 
     if (cached) {
-      matches = JSON.parse(cached)
+      // Una caché de antes de buscar la fecha exacta puede traer otras fechas.
+      matches = (JSON.parse(cached) as { round: string | null }[]).filter(
+        (m) => !isNumbered || m.round?.endsWith(dbSearchTerm),
+      )
     } else {
       const whereClause: any = {
         league_id: competition.leagueId,
         season: competition.season,
         tournament: tournament.toUpperCase() as any,
-        round: {
-          contains: dbSearchTerm,
-          mode: 'insensitive',
-        },
+        // La fecha numerada va exacta: `contains ' - 1'` traía también de la 10 a la 16.
+        round: isNumbered
+          ? { endsWith: dbSearchTerm }
+          : { contains: dbSearchTerm, mode: 'insensitive' },
       }
 
       if (dbSearchTerm === 'final') {

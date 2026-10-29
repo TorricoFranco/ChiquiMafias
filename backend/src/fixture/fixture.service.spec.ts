@@ -241,6 +241,43 @@ describe('FixtureService', () => {
     })
   })
 
+  describe('getFixtureByMatchday', () => {
+    const roundWhere = () =>
+      (
+        prisma.matches.findMany.mock.calls[0] as [{ where: { round: unknown } }]
+      )[0].where.round
+
+    it('Debe buscar la fecha 1 exacta, sin traer de la 10 a la 16', async () => {
+      await service.getFixtureByMatchday(liga, 'CLAUSURA', '1')
+
+      expect(roundWhere()).toEqual({ endsWith: ' - 1' })
+    })
+
+    it('Una ronda de playoff debe seguir buscando por texto', async () => {
+      await service.getFixtureByMatchday(liga, 'CLAUSURA', 'octavos')
+
+      expect(roundWhere()).toEqual({ contains: 'octavos', mode: 'insensitive' })
+    })
+
+    it('Debe descartar de una caché vieja los partidos de otras fechas', async () => {
+      redis.get.mockResolvedValue(
+        JSON.stringify([
+          { id: 'fecha-1', round: 'Clausura - 1' },
+          { id: 'fecha-10', round: 'Clausura - 10' },
+        ]),
+      )
+
+      const { matches } = await service.getFixtureByMatchday(
+        liga,
+        'CLAUSURA',
+        '1',
+      )
+
+      expect(matches.map((m) => m.id)).toEqual(['fecha-1'])
+      expect(prisma.matches.findMany).not.toHaveBeenCalled()
+    })
+  })
+
   describe('nunca mezcla competiciones (RF-A03)', () => {
     it('El calendario debe filtrar por la liga y usar su clave', async () => {
       await service.getYearlyCalendar(copa)
