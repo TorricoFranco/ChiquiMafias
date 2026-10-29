@@ -122,6 +122,8 @@ export interface LeagueMatch {
 // El backend no manda el id de los equipos ni `winnerTeamId`: solo los traen los datos de ejemplo.
 export interface BracketMatch {
   id: string;
+  /** `null` en los cruces sin partido: los octavos proyectados con la tabla y los "A confirmar". */
+  date: string | null;
   /** `octavos` en los cruces armados con la tabla; el nombre de la fecha (`Regular Season - octavos`) en los que ya están en la DB. */
   round: string;
   position: number;

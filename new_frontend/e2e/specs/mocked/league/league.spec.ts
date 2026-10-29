@@ -63,8 +63,8 @@ test.describe("Ligas: Liga Profesional", () => {
       brackets: buildPlayoffBrackets({
         "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan") },
         "octavos:right:0": { home_team: buildBracketTeam("Rosario Central"), away_team: buildBracketTeam("Independiente") },
-        "semifinal:left:0": { home_team: buildBracketTeam("Talleres"), away_team: buildBracketTeam("Lanus") },
-        "final:center:0": { home_team: buildBracketTeam("Boca Juniors"), away_team: buildBracketTeam("River Plate") },
+        "semifinal:left:0": { home_team: buildBracketTeam("Talleres"), away_team: buildBracketTeam("Lanus"), date: "2026-11-28T22:00:00.000Z" },
+        "final:center:0": { home_team: buildBracketTeam("Boca Juniors"), away_team: buildBracketTeam("River Plate"), date: "2026-12-06T22:00:00.000Z" },
       }),
     });
 
@@ -230,7 +230,7 @@ test.describe("Ligas: Liga Profesional", () => {
     session.loginAs("USER");
     mockLeague(api, {
       brackets: buildPlayoffBrackets({
-        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan") },
+        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan"), date: "2026-11-07T22:00:00.000Z" },
       }),
     });
 
@@ -239,6 +239,27 @@ test.describe("Ligas: Liga Profesional", () => {
 
     // El backend manda "A confirmar": antes no se reconocía y los 14 cruces vacíos decían "Programado".
     await expect(page.getByText("Instituto").filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Programado").filter({ visible: true })).toHaveCount(1);
+    await expect(page.getByText("Proyectado").filter({ visible: true })).toHaveCount(0);
+  });
+
+  test("en el cuadro de playoffs los octavos armados con la tabla figuran como proyectados", { tag: "@mobile" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, {
+      brackets: buildPlayoffBrackets({
+        // Sin fecha: el backend los armó con la tabla actual y todavía no tienen partido.
+        "octavos:left:0": { home_team: buildBracketTeam("Instituto"), away_team: buildBracketTeam("Huracan") },
+        "octavos:left:1": { home_team: buildBracketTeam("Rosario Central"), away_team: buildBracketTeam("Independiente") },
+        "octavos:right:0": { home_team: buildBracketTeam("Talleres"), away_team: buildBracketTeam("Lanus"), date: "2026-11-08T22:00:00.000Z" },
+      }),
+    });
+
+    await app.open("/?tab=ligas");
+    await page.getByRole("button", { name: "VER LLAVES PLAYOFFS", exact: true }).click();
+
+    // Antes los tres decían "Programado", aunque los proyectados pueden cambiar con la tabla.
+    await expect(page.getByText("Talleres").filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Proyectado").filter({ visible: true })).toHaveCount(2);
     await expect(page.getByText("Programado").filter({ visible: true })).toHaveCount(1);
   });
 

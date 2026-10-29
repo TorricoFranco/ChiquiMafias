@@ -78,7 +78,11 @@ export function buildBracketTeam(name: string): BracketTeam {
   return { name, logo_url: LOCAL_IMAGE };
 }
 
-/** Cruce del cuadro de playoffs de la LPF. Sin equipos queda "A confirmar", como lo manda el backend. */
+/**
+ * Cruce del cuadro de playoffs de la LPF. Sin equipos queda "A confirmar", como lo manda el backend.
+ * Sin `date` es un cruce sin partido: con equipos, un octavo proyectado con la tabla. De cuartos en
+ * adelante el backend solo manda equipos con el partido real: pasales `date`.
+ */
 export function buildBracketMatch(
   round: PlayoffStageKey,
   side: BracketMatch["side"],
@@ -88,6 +92,7 @@ export function buildBracketMatch(
   const tbd: BracketTeam = { name: "A confirmar", logo_url: null };
   return {
     id: `bracket-${round}-${side}-${position}`,
+    date: null,
     round,
     position,
     side,
