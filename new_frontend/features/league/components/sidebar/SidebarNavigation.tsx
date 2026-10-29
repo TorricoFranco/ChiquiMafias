@@ -6,12 +6,15 @@ import { useLeagueSeasonLabel } from '@/features/competitions/hooks/useCompetiti
 interface SidebarNavigationProps {
     activeZone: ZoneType;
     simulatedCount?: number;
+    /** Sin fechas por jugar (por ejemplo, en los playoffs) no hay simulador al que ir. */
+    showSimulator?: boolean;
     onNavigate: (sectionId: string) => void;
 }
 
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
     activeZone,
     simulatedCount = 0,
+    showSimulator = true,
     onNavigate,
 }) => {
     const seasonLabel = useLeagueSeasonLabel();
@@ -47,7 +50,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
             icon: Gamepad2,
             badge: simulatedCount > 0 ? `${simulatedCount} SIM` : 'PROYECTAR',
         },
-    ];
+    ].filter((section) => showSimulator || section.id !== 'simulador');
 
     return (
         <div className="flex flex-col gap-1 px-1">

@@ -4,6 +4,8 @@ import { LigaProfesionalView } from './LigaProfesional/LigaProfesionalView';
 import { UpcomingCompetitionView } from './UpcomingCompetitionView';
 import { TournamentType, ZoneType } from '../type';
 import { LEAGUE_SLUG } from '@/features/competitions/constants';
+import { useCurrentSeason } from '@/features/competitions/hooks/useCompetitions';
+import { usePendingFixtures } from '@/features/fixture/hooks/useFixture';
 
 interface LeagueViewProps {
   onSwitchToSocial: () => void;
@@ -17,6 +19,12 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
   const [isBracketOpen, setIsBracketOpen] = useState(false);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Las mismas consultas que la vista de la Liga (misma clave): no suman requests.
+  const { season } = useCurrentSeason(LEAGUE_SLUG);
+  const { data: pendingFixtures } = usePendingFixtures(season, activeTournament);
+  // El simulador solo existe con fechas por jugar: los cruces de playoff no se simulan.
+  const hasSimulator = pendingFixtures === undefined || pendingFixtures.some((group) => !group.is_playoff);
 
   const handleScrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -41,6 +49,7 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         simulatedCount={0}
+        hasSimulator={hasSimulator}
         onResetSimulations={() => console.log('Resetear simulaciones')}
       />
 

@@ -1,4 +1,5 @@
 import { CompetitionFormat } from '@prisma/client'
+import { Logger } from '@nestjs/common'
 import { FootballFixture } from '../football.types'
 import { matchdayKeyOf, ResolvedRound } from '../mappers/round'
 import {
@@ -11,6 +12,45 @@ import { ROUND_MAP } from './liga-dividida.round-map'
 const FROM_DAYS_AGO = 10
 const DAYS_FORWARD = 7
 
+const logger = new Logger('LigaDivididaStrategy')
+// Etiquetas desconocidas ya avisadas: el fixture se sincroniza seguido.
+const warnedRounds = new Set<string>()
+
+// Fases de playoff de una etiqueta que no está en ROUND_MAP. Un playoff que
+// quedara como una fecha más no aparecería en el cuadro y el front lo sumaría a
+// la tabla mientras se juega. El orden importa: "Semi-finals" y "Octavos de
+// final" también contienen "final".
+const PLAYOFF_PATTERNS: readonly [RegExp, string][] = [
+  [/round of 16|1\/8|8th|octavos/i, 'octavos'],
+  [/quarter|1\/4|cuartos/i, 'cuartos'],
+  [/semi/i, 'semifinal'],
+  [/final/i, 'final'],
+]
+
+/**
+ * Ronda de una etiqueta que no está en ROUND_MAP: una fecha numerada queda
+ * igual, un playoff se reconoce por patrón y lo demás queda igual con un aviso.
+ */
+function unmappedRound(rawRound: string, tournament: string): string {
+  const detail = rawRound.split(' - ').pop()!.trim()
+  if (/^\d+$/.test(detail)) return rawRound
+
+  const playoff = PLAYOFF_PATTERNS.find(([pattern]) => pattern.test(detail))
+  if (playoff) {
+    // Mismo prefijo que ROUND_MAP: el Apertura guarda sus playoffs como `Regular Season - …`.
+    const prefix = tournament === 'CLAUSURA' ? 'Clausura' : 'Regular Season'
+    return `${prefix} - ${playoff[1]}`
+  }
+
+  if (!warnedRounds.has(rawRound)) {
+    warnedRounds.add(rawRound)
+    logger.warn(
+      `Ronda desconocida de la Liga: "${rawRound}". Se guarda tal cual; si es de playoff, sumala a ROUND_MAP.`,
+    )
+  }
+  return rawRound
+}
+
 /**
  * Traduce la etiqueta de ronda del proveedor y deriva torneo y fecha.
  * Antes esta lógica estaba copiada en `FixturesSyncCron` y `LiveScoreCron`.
@@ -19,11 +59,13 @@ export function resolveLigaDivididaRound(
   rawRound: string | null | undefined,
   fallback: string,
 ): ResolvedRound {
-  const round = (rawRound && ROUND_MAP[rawRound]) || rawRound || fallback
-
-  const tournament = round.toUpperCase().includes('CLAUSURA')
+  const tournament = (rawRound || fallback).toUpperCase().includes('CLAUSURA')
     ? 'CLAUSURA'
     : 'APERTURA'
+
+  const round = rawRound
+    ? (ROUND_MAP[rawRound] ?? unmappedRound(rawRound, tournament))
+    : fallback
 
   return { round, tournament, matchdayKey: matchdayKeyOf(round) }
 }
