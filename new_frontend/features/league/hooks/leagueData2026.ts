@@ -319,6 +319,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     // Left side Octavos
     {
         id: 'oct-1',
+        date: '2026-05-16T19:00:00.000Z',
         round: 'octavos',
         position: 1,
         side: 'left',
@@ -331,6 +332,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'oct-2',
+        date: '2026-05-16T21:30:00.000Z',
         round: 'octavos',
         position: 2,
         side: 'left',
@@ -343,6 +345,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'oct-3',
+        date: '2026-05-16T23:45:00.000Z',
         round: 'octavos',
         position: 3,
         side: 'left',
@@ -355,6 +358,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'oct-4',
+        date: '2026-05-17T00:00:00.000Z',
         round: 'octavos',
         position: 4,
         side: 'left',
@@ -371,6 +375,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     // Right side Octavos
     {
         id: 'oct-5',
+        date: '2026-05-17T19:00:00.000Z',
         round: 'octavos',
         position: 5,
         side: 'right',
@@ -383,6 +388,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'oct-6',
+        date: '2026-05-17T21:30:00.000Z',
         round: 'octavos',
         position: 6,
         side: 'right',
@@ -395,6 +401,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'oct-7',
+        date: '2026-05-17T23:45:00.000Z',
         round: 'octavos',
         position: 7,
         side: 'right',
@@ -407,6 +414,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'oct-8',
+        date: '2026-05-18T00:00:00.000Z',
         round: 'octavos',
         position: 8,
         side: 'right',
@@ -421,6 +429,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     // CUARTOS DE FINAL (4 partidos: 2 left, 2 right)
     {
         id: 'cuart-1',
+        date: '2026-05-23T19:00:00.000Z',
         round: 'cuartos',
         position: 1,
         side: 'left',
@@ -433,6 +442,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'cuart-2',
+        date: '2026-05-23T21:30:00.000Z',
         round: 'cuartos',
         position: 2,
         side: 'left',
@@ -445,6 +455,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'cuart-3',
+        date: '2026-05-24T19:00:00.000Z',
         round: 'cuartos',
         position: 3,
         side: 'right',
@@ -457,6 +468,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'cuart-4',
+        date: '2026-05-24T21:30:00.000Z',
         round: 'cuartos',
         position: 4,
         side: 'right',
@@ -471,6 +483,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     // SEMIFINALES (2 partidos: 1 left, 1 right)
     {
         id: 'semi-1',
+        date: '2026-05-30T21:30:00.000Z',
         round: 'semifinal',
         position: 1,
         side: 'left',
@@ -483,6 +496,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     },
     {
         id: 'semi-2',
+        date: '2026-05-31T21:30:00.000Z',
         round: 'semifinal',
         position: 2,
         side: 'right',
@@ -496,6 +510,7 @@ export const PLAYOFF_BRACKETS_APERTURA: BracketMatch[] = [
     // FINAL (1 partido: center)
     {
         id: 'final-1',
+        date: null,
         round: 'final',
         position: 1,
         side: 'center',
