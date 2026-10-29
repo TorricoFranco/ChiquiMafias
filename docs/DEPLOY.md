@@ -176,10 +176,52 @@ crontab -e
 30 3 * * * /srv/chiquimafias/scripts/ops/backup.sh >> /var/log/chiquimafias-backup.log 2>&1
 ```
 
-Un backup en el mismo disco no sirve si se pierde el servidor. Configurá un destino externo con `rclone`
-(S3, Backblaze B2, Google Drive, otro servidor) y definí `BACKUP_RCLONE_REMOTE`, por ejemplo agregando
-`BACKUP_RCLONE_REMOTE=b2:mi-bucket/chiquimafias` delante del comando del cron. **Probá una restauración
-al menos una vez** (en otro servidor o en una base descartable) antes de confiar en los backups.
+Un backup en el mismo disco no sirve si se pierde el servidor. El destino externo es un bucket privado de
+**Cloudflare R2** (10 GB gratis; los backups pesan unos pocos MB), subido con `rclone` y **cifrado**.
+
+Configuración, una sola vez, en el VPS (las claves se cargan a mano: nunca en el chat, en un commit ni en un log):
+
+```bash
+# 1. rclone oficial (el de apt es de 2022 y R2 le responde 501 en el primer intento)
+cd /tmp && curl -fsSLO https://downloads.rclone.org/rclone-current-linux-amd64.deb
+sudo dpkg -i rclone-current-linux-amd64.deb
+
+# 2. Acceso a R2: token "Object Read & Write" acotado al bucket (Cloudflare → R2 → API Tokens)
+read -p "Access Key ID: " K; read -s -p "Secret: " S; echo
+rclone config create r2 s3 provider=Cloudflare access_key_id="$K" secret_access_key="$S" \
+  endpoint=https://<ACCOUNT_ID>.r2.cloudflarestorage.com no_check_bucket=true > /dev/null
+unset K S
+
+# 3. Cifrado del contenido (los nombres quedan visibles, con sufijo .bin)
+P1=$(openssl rand -base64 32); P2=$(openssl rand -base64 32)
+echo "Contraseña 1: $P1"; echo "Contraseña 2: $P2"     # guardalas en el gestor de contraseñas
+rclone config create r2crypt crypt remote=r2:<BUCKET> password="$P1" password2="$P2" \
+  filename_encryption=off directory_name_encryption=false --obscure > /dev/null
+unset P1 P2
+```
+
+Y en el cron, `BACKUP_RCLONE_REMOTE=r2crypt:` delante del comando:
+
+```
+30 3 * * * BACKUP_RCLONE_REMOTE=r2crypt: /srv/chiquimafias/scripts/ops/backup.sh >> /var/log/chiquimafias-backup.log 2>&1
+```
+
+- **Las dos contraseñas del cifrado tienen que estar también fuera del servidor.** Sin ellas los backups de R2 no
+  se pueden abrir, y la copia que guarda `rclone` en el VPS se pierde con el VPS.
+- No uses `rclone config update` para cambiar las claves sin `> /dev/null`: imprime la configuración con el secreto.
+- `backup.sh` usa `rclone sync`: R2 guarda lo mismo que el servidor (7 diarios, 4 semanales, 6 mensuales).
+
+**Restaurar** (probado el 2026-10-29 contra una base temporal: 0 errores y los mismos conteos que la real):
+
+```bash
+rclone lsf r2crypt:daily                              # elegir un db-*.sql.gz
+rclone copy r2crypt:daily/<archivo> /tmp/restore/
+# base descartable para probar; para restaurar de verdad, vaciar la base real antes
+docker compose exec -T postgres sh -c 'psql -U $POSTGRES_USER -d postgres -c "CREATE DATABASE restore_test"'
+gunzip -c /tmp/restore/<archivo> | docker compose exec -T postgres sh -c 'psql -U $POSTGRES_USER -d restore_test -q'
+```
+
+Repetí la prueba de restauración cada tanto y después de cualquier cambio en la configuración de `rclone`.
 
 ## Actualizar
 
