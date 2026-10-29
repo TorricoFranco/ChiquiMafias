@@ -34,7 +34,7 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
   };
 
   return (
-    <div className="flex h-full w-full relative">
+    <div className="flex flex-col md:flex-row h-full w-full relative">
 
       <LeagueSidebar
         activeTournament={activeTournament}
@@ -53,12 +53,6 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
         onResetSimulations={() => console.log('Resetear simulaciones')}
       />
 
-      <button
-        onClick={() => setIsMobileSidebarOpen(true)}
-        className="md:hidden fixed bottom-24 right-4 z-30 bg-[#d2f000] text-[#191e00] px-4 py-3 rounded-full shadow-lg font-black uppercase text-xs tracking-wider"
-      >
-        Menú Ligas
-      </button>
       <div className="flex-1 w-full md:pl-64 overflow-y-auto bg-[#131313]">
         <div className="p-4 md:p-6 lg:p-8 min-h-full">
           {selectedLeagueId === LEAGUE_SLUG ? (
@@ -78,6 +72,16 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
             />
           )}
         </div>
+      </div>
+
+      {/* En mobile va en su franja debajo del contenido: flotando encima, el botón tapaba las filas de la tabla. */}
+      <div className="md:hidden shrink-0 flex justify-end px-4 py-2 bg-[#131313] border-t border-[#353534]">
+        <button
+          onClick={() => setIsMobileSidebarOpen(true)}
+          className="bg-[#d2f000] text-[#191e00] px-4 py-3 rounded-full shadow-lg font-black uppercase text-xs tracking-wider"
+        >
+          Menú Ligas
+        </button>
       </div>
 
     </div>
