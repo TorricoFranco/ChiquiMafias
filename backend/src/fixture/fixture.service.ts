@@ -6,9 +6,14 @@ import { GetYearlyCalendarResponseDto } from './dto/response/year-calender.dto'
 import { GetFixtureMatchdayResponseDto } from './dto/response/fixture-matchday.dto'
 import { GetPendingFixturesResponseDto } from 'src/fixture/dto/response/pending-match.dto'
 
-import { formatMatch, isPlayoffRound } from './utils/match-format'
+import {
+  formatMatch,
+  isPlayoffRound,
+  matchdaySortWeight,
+} from './utils/match-format'
 
 import { StandingRow } from 'src/standings/types/standings'
+import { StandingsService } from 'src/standings/standings.service'
 import { BracketMatch } from './types/fixtures'
 import { LiveMatchData } from './types/fixtures'
 import { GetLiveScoresResponseDto } from './dto/response/live-score.dto'
@@ -32,6 +37,7 @@ export class FixtureService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
+    private standingsService: StandingsService,
   ) {}
 
   async getFixtureByMatchday(
@@ -42,8 +48,9 @@ export class FixtureService {
     const season = String(competition.season)
     let matchdayKey = ''
     let dbSearchTerm = ''
+    const isNumbered = typeof matchday === 'number' || !isNaN(Number(matchday))
 
-    if (typeof matchday === 'number' || !isNaN(Number(matchday))) {
+    if (isNumbered) {
       matchdayKey = `fecha:${matchday}`
       dbSearchTerm = ` - ${matchday}`
     } else {
@@ -60,16 +67,19 @@ export class FixtureService {
     let matches
 
     if (cached) {
-      matches = JSON.parse(cached)
+      // Una caché de antes de buscar la fecha exacta puede traer otras fechas.
+      matches = (JSON.parse(cached) as { round: string | null }[]).filter(
+        (m) => !isNumbered || m.round?.endsWith(dbSearchTerm),
+      )
     } else {
       const whereClause: any = {
         league_id: competition.leagueId,
         season: competition.season,
         tournament: tournament.toUpperCase() as any,
-        round: {
-          contains: dbSearchTerm,
-          mode: 'insensitive',
-        },
+        // La fecha numerada va exacta: `contains ' - 1'` traía también de la 10 a la 16.
+        round: isNumbered
+          ? { endsWith: dbSearchTerm }
+          : { contains: dbSearchTerm, mode: 'insensitive' },
       }
 
       if (dbSearchTerm === 'final') {
@@ -295,18 +305,14 @@ export class FixtureService {
       matchdaysMap.get(roundKey)!.push(m)
     })
 
+    // Los playoffs en orden de cuadro: por orden alfabético la final quedaba
+    // antes que los octavos y la semifinal, la última.
     const sortedMatchdays = Array.from(matchdaysMap.entries())
       .map(([matchday, matches]) => ({ matchday, matches }))
-      .sort((a, b) => {
-        const numA = parseInt(a.matchday)
-        const numB = parseInt(b.matchday)
-
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB
-        }
-
-        return a.matchday.localeCompare(b.matchday)
-      })
+      .sort(
+        (a, b) =>
+          matchdaySortWeight(a.matchday) - matchdaySortWeight(b.matchday),
+      )
 
     const now = new Date()
     const todayStart = new Date(now.setHours(0, 0, 0, 0)).getTime()
@@ -432,21 +438,9 @@ export class FixtureService {
       {} as Record<string, any>,
     )
 
-    const getSortWeight = (item: any) => {
-      if (item.is_playoff) {
-        const weights: Record<string, number> = {
-          octavos: 101,
-          cuartos: 102,
-          semifinal: 103,
-          final: 104,
-        }
-        return weights[item.matchday] || 200
-      }
-      return parseInt(item.matchday, 10) || 0
-    }
-
     return Object.values(grouped).sort(
-      (a: any, b: any) => getSortWeight(a) - getSortWeight(b),
+      (a: { matchday: string }, b: { matchday: string }) =>
+        matchdaySortWeight(a.matchday) - matchdaySortWeight(b.matchday),
     )
   }
 
@@ -489,31 +483,17 @@ export class FixtureService {
   ): Promise<TournamentBracketsResponseDto> {
     const leagueId = competition.leagueId
     const season = String(competition.season)
-    const tournamentLower = tournament.toLowerCase()
 
-    const octavosCacheKey = `brackets:octavos:${leagueId}:${season}:${tournamentLower}`
-    let octavosRaw: any[]
-
-    const cachedOctavos = await this.redisService.redis.get(octavosCacheKey)
-    if (cachedOctavos) {
-      octavosRaw = JSON.parse(cachedOctavos)
-    } else {
-      const standingsCache = await this.redisService.redis.get(
-        `standings:${leagueId}:${season}`,
-      )
-      if (standingsCache) {
-        const data = JSON.parse(standingsCache)
-        octavosRaw = this.generateOctavos(data[tournamentLower].groups)
-        await this.redisService.redis.set(
-          octavosCacheKey,
-          JSON.stringify(octavosRaw),
-          'EX',
-          86400,
-        )
-      } else {
-        octavosRaw = []
-      }
-    }
+    // Los cruces se proyectan con la tabla de cada momento, sin caché propia: una
+    // de 24 h dejaba los cruces de antes de la última fecha.
+    const standings = await this.standingsService.getStandings(competition)
+    const stageStandings =
+      tournament.toUpperCase() === 'CLAUSURA'
+        ? standings.clausura
+        : standings.apertura
+    const octavosRaw = stageStandings
+      ? this.generateOctavos(stageStandings.groups)
+      : []
 
     const [playoffDbMatches, liveScores] = await Promise.all([
       this.prisma.matches.findMany({
@@ -540,26 +520,29 @@ export class FixtureService {
           home_team: { select: { name: true, logo_url: true } },
           away_team: { select: { name: true, logo_url: true } },
         },
+        orderBy: { date: 'asc' },
       }),
       this.redisService.redis.hgetall(
         `live_scores:league:${competition.cacheKey}`,
       ),
     ])
 
-    const enrichedOctavos = octavosRaw.map((oct) => {
-      const matchInDb = playoffDbMatches.find(
-        (dbM) =>
-          dbM.round?.toLowerCase().includes('octavos') &&
-          ((dbM.home_team.name === oct.home_team.name &&
-            dbM.away_team.name === oct.away_team.name) ||
-            (dbM.home_team.name === oct.away_team.name &&
-              dbM.away_team.name === oct.home_team.name)),
-      )
+    const placedOctavos = this.placeOctavos(
+      octavosRaw,
+      playoffDbMatches.filter((m) =>
+        m.round?.toLowerCase().includes('octavos'),
+      ),
+    )
+
+    const enrichedOctavos = octavosRaw.map((oct, index) => {
+      const matchInDb = placedOctavos[index]
 
       if (!matchInDb) {
         return {
           ...oct,
           id: oct.id || `tbd-octavos-${oct.side}-${oct.position}`,
+          // Como los cruces sin partido de cuartos en adelante.
+          date: null,
           home_goals: null,
           away_goals: null,
           is_live: false,
@@ -658,6 +641,50 @@ export class FixtureService {
     })
 
     return { tournament, season, brackets }
+  }
+
+  /**
+   * Partido real de cada cruce proyectado con la tabla, en el mismo orden. Si la
+   * tabla del proveedor desempata distinto que la AFA, el cruce real no tiene
+   * los dos equipos de la proyección: se ubica por el que comparte, primero en
+   * el mismo papel (local el mejor ubicado). Los que no comparten ninguno van
+   * a los cruces libres por fecha, para que ningún partido real quede afuera.
+   */
+  private placeOctavos<
+    T extends {
+      id: string
+      home_team: { name: string }
+      away_team: { name: string }
+    },
+  >(projected: BracketMatch[], octavos: T[]): (T | undefined)[] {
+    const sameTeams = (p: BracketMatch, m: T) =>
+      (m.home_team.name === p.home_team.name &&
+        m.away_team.name === p.away_team.name) ||
+      (m.home_team.name === p.away_team.name &&
+        m.away_team.name === p.home_team.name)
+    const sameRole = (p: BracketMatch, m: T) =>
+      m.home_team.name === p.home_team.name ||
+      m.away_team.name === p.away_team.name
+    const sharesTeam = (p: BracketMatch, m: T) =>
+      [m.home_team.name, m.away_team.name].some(
+        (name) => name === p.home_team.name || name === p.away_team.name,
+      )
+    const anySlot = () => true
+
+    const placed: (T | undefined)[] = projected.map(() => undefined)
+    const used = new Set<string>()
+
+    for (const fits of [sameTeams, sameRole, sharesTeam, anySlot]) {
+      projected.forEach((p, index) => {
+        if (placed[index]) return
+        const match = octavos.find((m) => !used.has(m.id) && fits(p, m))
+        if (!match) return
+        placed[index] = match
+        used.add(match.id)
+      })
+    }
+
+    return placed
   }
 
   private formatBracketMatch(match: any, live?: LiveMatchData) {

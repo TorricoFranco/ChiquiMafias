@@ -1,4 +1,10 @@
-import type { GetFixtureMatchdayResponse, MatchFixture, TournamentBracketsResponse } from "@/features/fixture/types";
+import type {
+  GetFixtureMatchdayResponse,
+  GetPendingFixturesResponse,
+  MatchFixture,
+  PendingTeam,
+  TournamentBracketsResponse,
+} from "@/features/fixture/types";
 import type { BracketMatch, PlayoffStageKey } from "@/features/league/type";
 import type { FullStandingsResponse, StandingRow } from "@/features/standings/types";
 import { LOCAL_IMAGE } from "./ids";
@@ -38,6 +44,33 @@ export function buildMatchday(matchday: string, matches: MatchFixture[] = [build
   return { tournament: "CLAUSURA", season: "2026", current_matchday: matchday, matches };
 }
 
+/**
+ * Grupo de `GET /fixtures/pendings/...`: una fecha (`"16"`) o una ronda de playoff (`"octavos"`)
+ * con sus partidos sin jugar, como `[local, visitante]`.
+ */
+export function buildPendingGroup(matchday: string, matches: [string, string][]): GetPendingFixturesResponse {
+  const isPlayoff = Number.isNaN(Number(matchday));
+  const team = (name: string): PendingTeam => ({
+    id: `team-${name.toLowerCase().replace(/\s+/g, "-")}`,
+    name,
+    short_code: null,
+    logo_url: LOCAL_IMAGE,
+  });
+  return {
+    matchday,
+    is_playoff: isPlayoff,
+    matches: matches.map(([home, away], index) => ({
+      id: `pending-${matchday}-${index}`,
+      date: "2026-11-08T21:00:00.000Z",
+      status_short: "NS",
+      tournament: "CLAUSURA",
+      is_playoff: isPlayoff,
+      home_team: team(home),
+      away_team: team(away),
+    })),
+  };
+}
+
 type BracketTeam = BracketMatch["home_team"];
 
 /** Equipo de un cruce: el backend manda solo el nombre y el escudo, sin id. */
@@ -45,7 +78,11 @@ export function buildBracketTeam(name: string): BracketTeam {
   return { name, logo_url: LOCAL_IMAGE };
 }
 
-/** Cruce del cuadro de playoffs de la LPF. Sin equipos queda "A confirmar", como lo manda el backend. */
+/**
+ * Cruce del cuadro de playoffs de la LPF. Sin equipos queda "A confirmar", como lo manda el backend.
+ * Sin `date` es un cruce sin partido: con equipos, un octavo proyectado con la tabla. De cuartos en
+ * adelante el backend solo manda equipos con el partido real: pasales `date`.
+ */
 export function buildBracketMatch(
   round: PlayoffStageKey,
   side: BracketMatch["side"],
@@ -55,6 +92,7 @@ export function buildBracketMatch(
   const tbd: BracketTeam = { name: "A confirmar", logo_url: null };
   return {
     id: `bracket-${round}-${side}-${position}`,
+    date: null,
     round,
     position,
     side,

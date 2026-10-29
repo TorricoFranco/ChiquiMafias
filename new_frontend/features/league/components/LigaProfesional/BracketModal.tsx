@@ -45,13 +45,17 @@ export const BracketModal: React.FC<BracketModalProps> = ({
         const isLive = LIVE_STATUSES.includes(m.status_short);
         const isFinished = m.status_short === 'FT' || m.status_short === 'PEN' || m.status_short === 'AET';
 
+        // El backend manda "A confirmar" (o "Por definir (1A)" si falta la tabla): buscarlo en mayúsculas no lo encontraba.
+        const isPlaceholder = (name: string) => /a confirmar|por definir/i.test(name);
         const isTBD =
             !m.home_team?.name ||
             !m.away_team?.name ||
-            m.home_team.name.includes('CONFIRMAR') ||
+            isPlaceholder(m.home_team.name) ||
             m.home_team.id === 'tbd' ||
-            m.away_team.name.includes('CONFIRMAR') ||
+            isPlaceholder(m.away_team.name) ||
             m.away_team.id === 'tbd';
+        // Un cruce con equipos y sin partido es un octavo armado con la tabla actual: puede cambiar.
+        const isProjected = !isTBD && m.date === null;
 
         let calculatedWinnerId: string | undefined;
         if (isFinished && !m.winnerTeamId) {
@@ -104,7 +108,7 @@ export const BracketModal: React.FC<BracketModalProps> = ({
                             {m.status_short === 'PEN' ? 'Penales' : m.status_short === 'AET' ? 'Prórroga' : 'Final'}
                         </span>
                     ) : (
-                        <span className="text-[#555]">{isTBD ? '' : 'Programado'}</span>
+                        <span className="text-[#555]">{isTBD ? '' : isProjected ? 'Proyectado' : 'Programado'}</span>
                     )}
                 </div>
 

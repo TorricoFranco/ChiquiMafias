@@ -11,6 +11,21 @@ export const isPlayoffRound = (round: string): boolean => {
   )
 }
 
+// Las rondas de playoff van después de las fechas numeradas, en orden de cuadro.
+const PLAYOFF_ORDER: Record<string, number> = {
+  octavos: 101,
+  cuartos: 102,
+  semifinal: 103,
+  final: 104,
+}
+
+/** Orden de una fecha (`9`) o de una ronda de playoff (`cuartos`). */
+export const matchdaySortWeight = (matchday: string): number => {
+  const number = parseInt(matchday, 10)
+  if (!isNaN(number)) return number
+  return PLAYOFF_ORDER[matchday.toLowerCase()] ?? 200
+}
+
 export const formatMatch = (m: any, liveData?: LiveMatchData) => {
   const finishedStatuses = ['FT', 'AET', 'PEN', 'TBD']
 

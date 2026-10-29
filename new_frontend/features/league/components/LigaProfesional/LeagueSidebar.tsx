@@ -37,6 +37,8 @@ interface LeagueSidebarProps {
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   simulatedCount?: number;
+  /** Si hay simulador en la vista: sin él, el atajo del menú no tendría adónde ir. */
+  hasSimulator?: boolean;
   onResetSimulations?: () => void;
   onShowNotice?: (message: string) => void;
 }
@@ -109,6 +111,7 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
               <SidebarNavigation
                 activeZone={props.activeZone}
                 simulatedCount={props.simulatedCount}
+                showSimulator={props.hasSimulator}
                 onNavigate={(id) => {
                   props.onScrollToSection(id);
                   if (props.isOpenMobile) props.onCloseMobile();
