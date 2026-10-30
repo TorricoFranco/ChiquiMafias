@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { LeagueSidebar } from './LigaProfesional/LeagueSidebar';
 import { LigaProfesionalView } from './LigaProfesional/LigaProfesionalView';
 import { UpcomingCompetitionView } from './UpcomingCompetitionView';
@@ -19,6 +19,31 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
   const [isBracketOpen, setIsBracketOpen] = useState(false);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerWasOpen = useRef(false);
+
+  // Si la ventana pasa a escritorio con el drawer abierto, el contenido quedaría inerte: el drawer se cierra.
+  useEffect(() => {
+    const escritorio = window.matchMedia('(min-width: 768px)');
+    const cerrarEnEscritorio = () => {
+      if (escritorio.matches) setIsMobileSidebarOpen(false);
+    };
+    escritorio.addEventListener('change', cerrarEnEscritorio);
+    return () => escritorio.removeEventListener('change', cerrarEnEscritorio);
+  }, []);
+
+  // Al cerrarse el drawer el foco queda en el body: lo devolvemos al disparador, salvo que otro elemento lo haya tomado (por ejemplo el cuadro de playoffs).
+  useEffect(() => {
+    if (isMobileSidebarOpen) {
+      drawerWasOpen.current = true;
+      return;
+    }
+    if (!drawerWasOpen.current) return;
+    drawerWasOpen.current = false;
+    const foco = document.activeElement;
+    if (!isBracketOpen && (foco === null || foco === document.body)) menuButtonRef.current?.focus();
+  }, [isMobileSidebarOpen, isBracketOpen]);
 
   // Las mismas consultas que la vista de la Liga (misma clave): no suman requests.
   const { season } = useCurrentSeason(LEAGUE_SLUG);
@@ -53,7 +78,7 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
         onResetSimulations={() => console.log('Resetear simulaciones')}
       />
 
-      <div className="flex-1 w-full md:pl-64 overflow-y-auto bg-[#131313]">
+      <div className="flex-1 w-full md:pl-64 overflow-y-auto bg-[#131313]" inert={isMobileSidebarOpen}>
         <div className="p-4 md:p-6 lg:p-8 min-h-full">
           {selectedLeagueId === LEAGUE_SLUG ? (
             <LigaProfesionalView
@@ -75,8 +100,9 @@ export const LeagueView: React.FC<LeagueViewProps> = ({ onSwitchToSocial }) => {
       </div>
 
       {/* En mobile va en su franja debajo del contenido: flotando encima, el botón tapaba las filas de la tabla. */}
-      <div className="md:hidden shrink-0 flex justify-end px-4 py-2 bg-[#131313] border-t border-[#353534]">
+      <div className="md:hidden shrink-0 flex justify-end px-4 py-2 bg-[#131313] border-t border-[#353534]" inert={isMobileSidebarOpen}>
         <button
+          ref={menuButtonRef}
           onClick={() => setIsMobileSidebarOpen(true)}
           className="bg-[#d2f000] text-[#191e00] px-4 py-3 rounded-full shadow-lg font-black uppercase text-xs tracking-wider"
         >

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { TournamentType, ZoneType } from '../../type';
@@ -58,6 +58,13 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
   ];
 
   const [isLpfExpanded, setIsLpfExpanded] = useState(isLPF);
+
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Al abrir el drawer, el foco pasa a su panel: el contenido de fondo queda inerte (ver LeagueView).
+  useEffect(() => {
+    if (props.isOpenMobile) drawerRef.current?.focus();
+  }, [props.isOpenMobile]);
 
   const handleLeagueClick = (leagueId: string) => {
     props.onSelectLeague(leagueId);
@@ -175,7 +182,7 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
       {props.isOpenMobile && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={props.onCloseMobile} />
-          <div className="relative w-72 max-w-[80vw] h-full z-10 animate-in slide-in-from-left duration-200">
+          <div ref={drawerRef} tabIndex={-1} className="relative w-72 max-w-[80vw] h-full z-10 animate-in slide-in-from-left duration-200 outline-none">
             {content}
           </div>
         </div>

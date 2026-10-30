@@ -575,15 +575,21 @@ test.describe("Ligas: título, zonas y menú de la tabla", () => {
     mockLeague(api, { standings: seasonStandings() });
 
     await app.open("/?tab=ligas");
-    await page.getByRole("button", { name: "Menú Ligas", exact: true }).click();
+    const menu = page.getByRole("button", { name: "Menú Ligas", exact: true });
+    await menu.click();
+    // Con el menú abierto, la tabla queda inerte: no recibe foco ni clics.
+    await expect.poll(() => zoneTable(page).evaluate((tabla) => tabla.closest("[inert]") !== null)).toBe(true);
     await page.getByRole("button", { name: "Apertura", exact: true }).click();
+    // Al elegir, el menú se cierra y el foco vuelve a «Menú Ligas».
+    await expect(menu).toBeFocused();
     await expect(page.getByRole("heading", { name: "apertura 2026 (zona a)" })).toBeVisible();
     await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toContainText("30");
-    // Al elegir se cierra el menú: el clic de prueba falla si su fondo sigue tapando la fila.
+    // El clic de prueba falla si el fondo del menú sigue tapando la fila.
     await zoneTable(page).getByRole("row", { name: /Boca Juniors/ }).click({ trial: true });
 
-    await page.getByRole("button", { name: "Menú Ligas", exact: true }).click();
+    await menu.click();
     await page.getByRole("button", { name: "Zona B", exact: true }).click();
+    await expect(menu).toBeFocused();
     await expect(page.getByRole("heading", { name: "apertura 2026 (zona b)" })).toBeVisible();
     await expect(zoneTable(page).getByRole("row", { name: /Racing Club/ })).toContainText("23");
     await zoneTable(page).getByRole("row", { name: /Racing Club/ }).click({ trial: true });
