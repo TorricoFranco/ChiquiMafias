@@ -1,7 +1,8 @@
 # ChiquiMafias — Bot de Discord
 
 Microservicio de backoffice de [ChiquiMafias](../README.md): el soporte (tickets) y la
-moderación (reportes) se operan desde un servidor de Discord, sin panel web.
+moderación (reportes) se operan desde un servidor de Discord, además del panel de admin
+de la web. Ambos canales trabajan sobre los mismos datos.
 
 **Node · Express 5 · discord.js 14**
 
