@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Param, UseGuards } from '@nestjs/common'
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common'
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -10,7 +18,7 @@ import { RedisService } from 'src/redis/redis.service'
 import { TimeoutDto } from './dto/timeout.dto'
 import { UnmuteUserDto } from './dto/unmute-user.dto'
 import { ChatGateway } from 'src/chat/chat.gateway'
-import { SystemRole } from '../auth/enums/roles.enum'
+import { ROLE_HIERARCHY, SystemRole } from '../auth/enums/roles.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { RolesGuard } from 'src/auth/guards/roles.guard'
 import { PrismaService } from 'src/prisma/prisma.service'
@@ -68,7 +76,7 @@ export class ModerationController {
     })
   }
   @ApiOperation({
-    summary: 'Silenciar (timeout) a un usuario en el chat (solo ADMIN)',
+    summary: 'Silenciar (timeout) a un usuario en el chat (solo MODERATOR+)',
     description:
       'El actor no puede sancionar a un usuario de igual o mayor jerarquía (ver `assertCanSanction`). Emite el evento de socket `user-timeout`.',
   })
@@ -79,7 +87,7 @@ export class ModerationController {
   })
   @Post('timeout')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   async applyTimeout(@Body() dto: TimeoutDto, @GetUser('id') actorId: string) {
     const { userId, durationMinutes } = dto
     await assertCanSanction(this.prisma, actorId, userId)
@@ -107,7 +115,7 @@ export class ModerationController {
   }
 
   @ApiOperation({
-    summary: 'Levantar el timeout de un usuario (solo ADMIN)',
+    summary: 'Levantar el timeout de un usuario (solo MODERATOR+)',
     description: 'Emite el evento de socket `user-unmuted`.',
   })
   @ApiResponse({ status: 201, description: 'Usuario desmuteado.' })
@@ -117,7 +125,7 @@ export class ModerationController {
   })
   @Post('unmute')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
+  @Roles(SystemRole.MODERATOR)
   async removeTimeout(
     @Body() dto: UnmuteUserDto,
     @GetUser('id') actorId: string,
@@ -136,14 +144,35 @@ export class ModerationController {
 
   @ApiOperation({
     summary:
-      'Consultar si un usuario está muteado y cuánto le queda (solo ADMIN)',
+      'Consultar si un usuario está muteado y cuánto le queda (uno mismo, o cualquiera si sos MODERATOR+)',
   })
   @ApiParam({ name: 'userId', description: 'ID del usuario a consultar' })
   @ApiResponse({ status: 200, description: 'Estado del timeout.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Consultar el mute de otro usuario requiere MODERATOR+.',
+  })
   @Get('status/:userId')
-  @UseGuards(RolesGuard)
-  @Roles(SystemRole.ADMIN)
-  async checkTimeout(@Param('userId') userId: string) {
+  async checkTimeout(
+    @Param('userId') userId: string,
+    @GetUser('id') actorId: string,
+  ) {
+    if (userId !== actorId) {
+      const actor = await this.prisma.user.findUnique({
+        where: { id: actorId },
+        select: { role: true },
+      })
+      if (
+        !actor ||
+        ROLE_HIERARCHY.indexOf(actor.role) <
+          ROLE_HIERARCHY.indexOf(SystemRole.MODERATOR)
+      ) {
+        throw new ForbiddenException(
+          'Solo un MODERATOR+ puede consultar el mute de otro usuario.',
+        )
+      }
+    }
+
     const isMuted = await this.redisService.redis.get(`timeout:${userId}`)
     if (!isMuted) return { isMuted: false }
 
