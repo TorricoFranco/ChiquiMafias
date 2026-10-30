@@ -579,9 +579,10 @@ test.describe("Ligas: título, zonas y menú de la tabla", () => {
     await page.getByRole("button", { name: "Apertura", exact: true }).click();
     await expect(page.getByRole("heading", { name: "apertura 2026 (zona a)" })).toBeVisible();
     await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toContainText("30");
-    // El menú sigue abierto y tapa la tabla: el clic de prueba falla si el fondo del menú recibe el clic en la fila.
+    // Al elegir se cierra el menú: el clic de prueba falla si su fondo sigue tapando la fila.
     await zoneTable(page).getByRole("row", { name: /Boca Juniors/ }).click({ trial: true });
 
+    await page.getByRole("button", { name: "Menú Ligas", exact: true }).click();
     await page.getByRole("button", { name: "Zona B", exact: true }).click();
     await expect(page.getByRole("heading", { name: "apertura 2026 (zona b)" })).toBeVisible();
     await expect(zoneTable(page).getByRole("row", { name: /Racing Club/ })).toContainText("23");

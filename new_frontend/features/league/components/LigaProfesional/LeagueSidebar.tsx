@@ -96,9 +96,15 @@ export const LeagueSidebar: React.FC<LeagueSidebarProps> = ({ ...props }) => {
             <div className="ml-4 mt-2 pl-3 border-l-2 border-[#353534] flex flex-col gap-4 animate-in slide-in-from-top-2">
               <TournamentFilters
                 activeTournament={props.activeTournament}
-                onChangeTournament={props.onChangeTournament}
+                onChangeTournament={(tournament) => {
+                  props.onChangeTournament(tournament);
+                  if (props.isOpenMobile) props.onCloseMobile();
+                }}
                 activeZone={props.activeZone}
-                onChangeZone={props.onChangeZone}
+                onChangeZone={(zone) => {
+                  props.onChangeZone(zone);
+                  if (props.isOpenMobile) props.onCloseMobile();
+                }}
               />
 
               <BracketButton
