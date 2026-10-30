@@ -8,7 +8,7 @@ interface StandingsSectionProps {
   activeZone: ZoneType;
   onChangeZone: (zone: ZoneType) => void;
   standings: StandingRow[];
-  tournament?: TournamentType;
+  tournament: TournamentType;
 }
 
 export const StandingsSection: React.FC<StandingsSectionProps> = ({

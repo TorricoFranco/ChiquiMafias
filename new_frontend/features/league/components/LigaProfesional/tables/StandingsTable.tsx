@@ -1,17 +1,17 @@
 import React from 'react';
 import { StandingRow, TournamentType, ZoneType } from '../../../type';
 import { TeamRowCell } from '../utils/TeamRowCell';
-import { Sparkles, Radio } from 'lucide-react';
+import { Radio } from 'lucide-react';
 import { useLeagueSeasonLabel } from '@/features/competitions/hooks/useCompetitions';
 
 interface StandingsTableProps {
-    tournament?: TournamentType;
+    tournament: TournamentType;
     zone: ZoneType;
     standings: StandingRow[];
 }
 
 export const StandingsTable: React.FC<StandingsTableProps> = ({
-    tournament = 'Apertura',
+    tournament,
     zone,
     standings,
 }) => {
