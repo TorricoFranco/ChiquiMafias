@@ -67,7 +67,7 @@ export class UsersController {
 
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Cambiar el rol de otro usuario (solo MODERATOR+)',
+    summary: 'Cambiar el rol de otro usuario (solo ADMIN+)',
     description:
       'No se puede modificar el propio rol, ni el de un usuario de igual o mayor jerarquía que el actor, ni asignar un rol superior al del actor (jerarquía USER < MODERATOR < ADMIN < PRESIDENT).',
   })
@@ -81,7 +81,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'El usuario objetivo no existe.' })
   @Patch(':id/role')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.MODERATOR)
+  @Roles(SystemRole.ADMIN)
   async updateRole(
     @Param('id') targetUserId: string,
     @Body() dto: UpdateRoleDto,
@@ -135,7 +135,7 @@ export class UsersController {
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Banear a un usuario (solo MODERATOR+)' })
+  @ApiOperation({ summary: 'Banear a un usuario (solo ADMIN+)' })
   @ApiParam({ name: 'id', description: 'ID del usuario a banear' })
   @ApiResponse({ status: 200, description: 'Usuario baneado.' })
   @ApiResponse({
@@ -145,19 +145,19 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'El usuario no existe.' })
   @Patch(':id/ban')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.MODERATOR)
+  @Roles(SystemRole.ADMIN)
   async banUser(@Param('id') id: string, @GetUser() currentUser: ActiveUser) {
     return this.usersService.banUser(currentUser, id)
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Desbanear a un usuario (solo MODERATOR+)' })
+  @ApiOperation({ summary: 'Desbanear a un usuario (solo ADMIN+)' })
   @ApiParam({ name: 'id', description: 'ID del usuario a desbanear' })
   @ApiResponse({ status: 200, description: 'Usuario desbaneado.' })
   @ApiResponse({ status: 404, description: 'El usuario no existe.' })
   @Patch(':id/unban')
   @UseGuards(RolesGuard)
-  @Roles(SystemRole.MODERATOR)
+  @Roles(SystemRole.ADMIN)
   async unbanUser(@Param('id') id: string, @GetUser() currentUser: ActiveUser) {
     return this.usersService.unbanUser(currentUser, id)
   }
