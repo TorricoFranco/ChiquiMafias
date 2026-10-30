@@ -4,7 +4,7 @@ Scripts para medir el backend antes de tocar la infraestructura de producción. 
 
 ## Requisitos
 
-- [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/). En Windows: `winget install k6.k6`.
+- [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/). En Windows: `winget install GrafanaLabs.k6`.
 - Postgres y Redis de `docker-compose.dev.yml` levantados.
 - La DB migrada y las variables del backend en tu entorno local (las mismas que usás para `npm run start:dev`).
 
