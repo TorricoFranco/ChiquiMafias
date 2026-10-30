@@ -7,6 +7,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
 import { UserStatusGuard } from './auth/guards/user-status.guard'
 import { BullModule } from '@nestjs/bullmq'
 import { ConfigModule, ConfigService } from '@nestjs/config'
+import { EnvironmentVariables } from './config/interfaces/env.interface'
+import { throttleLimit } from './config/throttle'
 
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
@@ -47,13 +49,22 @@ import { PricingModule } from './pricing/pricing.module'
       validationSchema: envValidationSchema,
     }),
 
-    ThrottlerModule.forRoot([
-      {
-        name: 'default',
-        ttl: 60000,
-        limit: 150,
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (
+        configService: ConfigService<EnvironmentVariables, true>,
+      ) => [
+        {
+          name: 'default',
+          ttl: 60000,
+          limit: throttleLimit(
+            configService.get('NODE_ENV', { infer: true }),
+            configService.get('THROTTLE_LIMIT', { infer: true }),
+          ),
+        },
+      ],
+    }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
