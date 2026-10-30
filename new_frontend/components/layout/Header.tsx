@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
     const tierLabel: Record<string, string> = {
         NONE: "HINCHA",
         TIER_1: "POPULAR",
-        TIER_2: "PLATEA",
+        TIER_2: "PLATEÍSTA",
         TIER_3: "PALCO VIP",
     };
     const currentTier = tierLabel[tier] ?? "HINCHA";

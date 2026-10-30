@@ -17,7 +17,8 @@ import {
 interface FixturesPanelProps {
     tournament: TournamentType;
     availableStages: AvailableStages;
-    selectedRound: number | PlayoffStageKey;
+    /** Null mientras no llega la fecha activa del torneo: el encabezado no muestra una fecha. */
+    selectedRound: number | PlayoffStageKey | null;
     onSelectRound: (round: number | PlayoffStageKey) => void;
     matches: LeagueMatch[];
     /** El fixture de la fecha todavía no llegó: no es lo mismo que una fecha sin partidos. */
@@ -40,7 +41,8 @@ export const FixturesPanel: React.FC<FixturesPanelProps> = ({
         if (!matchId || matchId === 'null' || matchId === 'undefined') return;
         router.push(`/match/${matchId}`);
     };
-    const getRoundLabel = (round: number | PlayoffStageKey) => {
+    const getRoundLabel = (round: number | PlayoffStageKey | null) => {
+        if (round === null) return '—';
         if (typeof round === 'number') {
             return `FECHA ${round}`;
         }

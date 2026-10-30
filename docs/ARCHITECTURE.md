@@ -215,15 +215,15 @@ usuario (`inventory`).
 No es un chat simple: hay **chat global y por partido**, historial en Redis,
 **stickers** comprables, **mensajes fijados** con el "megáfono" (Redis con TTL),
 **rate limiting** por usuario y **moderación**. Los mods pueden **eliminar mensajes** y
-aplicar un **timeout o mute global** que silencia al usuario en todos los chats a la
-vez (Redis TTL + evento WebSocket).
+**silenciar** a un usuario en el chat o al resolver un reporte. El silencio es un
+**timeout global** que alcanza a todos los chats a la vez (Redis TTL + evento WebSocket).
 
 #### Backoffice en Discord
 
 ¿Para qué obligar a los admins a entrar a un panel web si ya pasan el día en Discord?
-El soporte y la moderación no tienen panel tradicional: se operan desde un
-**microservicio de Discord independiente** (contenedor propio), comunicado con el
-backend por un contrato de webhooks.
+El soporte y la moderación también se operan desde Discord, además del panel web: el
+bot es un **microservicio independiente** (contenedor propio), comunicado con el
+backend por un contrato de webhooks, y ambos canales trabajan sobre los mismos datos.
 
 - **Tickets:** cuando un usuario abre un ticket o un reporte en la web, el backend
   emite un evento de dominio y el bot **crea un hilo privado** en el servidor de los

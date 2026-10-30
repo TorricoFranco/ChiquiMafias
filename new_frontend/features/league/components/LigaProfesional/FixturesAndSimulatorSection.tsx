@@ -13,7 +13,7 @@ import { SimulatorPanel } from './SimulatorPanel';
 interface FixturesAndSimulatorSectionProps {
     tournament: TournamentType;
     availableStages: AvailableStages;
-    selectedRound: number | PlayoffStageKey;
+    selectedRound: number | PlayoffStageKey | null;
     onSelectRound: (round: number | PlayoffStageKey) => void;
     matches: LeagueMatch[];
     isLoading?: boolean;

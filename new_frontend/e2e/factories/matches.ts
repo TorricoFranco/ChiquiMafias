@@ -1,6 +1,7 @@
 import { chatStateFor } from "@/features/matches/types";
 import type {
   MatchDetails,
+  MatchEvent,
   MatchLineup,
   MatchMetadata,
   MatchScore,
@@ -63,6 +64,22 @@ export function buildShootoutKick(overrides: Partial<ShootoutKick> = {}): Shooto
     teamId: "team-boca",
     player: "Edinson Cavani",
     scored: true,
+    ...overrides,
+  };
+}
+
+/** Evento de la cronología (`MatchEvent`); por defecto, una amarilla de River a los 90'. */
+export function buildMatchEvent(overrides: Partial<MatchEvent> = {}): MatchEvent {
+  return {
+    id: nextId("event"),
+    minute: 90,
+    extraMinute: null,
+    type: "Card",
+    detail: "Yellow Card",
+    team: { id: "team-river", name: "River Plate", logo_url: LOCAL_IMAGE },
+    player: { id: nextId("player"), name: "Enzo Pérez", photo: null },
+    assist: null,
+    substitutionLog: null,
     ...overrides,
   };
 }
