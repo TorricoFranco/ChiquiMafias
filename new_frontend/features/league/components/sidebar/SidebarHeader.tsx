@@ -31,6 +31,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             {isOpenMobile && (
                 <button
                     onClick={onCloseMobile}
+                    aria-label="Cerrar menú"
                     className="md:hidden text-[#c6c9ab] hover:text-[#e5e2e1] p-1.5 rounded-lg hover:bg-[#2a2a2a]"
                 >
                     <X className="w-5 h-5" />

@@ -25,6 +25,7 @@ export const TournamentFilters: React.FC<TournamentFiltersProps> = ({
             <button
               key={torneo}
               onClick={() => onChangeTournament(torneo as TournamentType)}
+              aria-pressed={activeTournament === torneo}
               className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
                 activeTournament === torneo
                   ? 'bg-[#d2f000] text-[#191e00] shadow-sm'
@@ -46,6 +47,7 @@ export const TournamentFilters: React.FC<TournamentFiltersProps> = ({
             <button
               key={zona}
               onClick={() => onChangeZone(zona as ZoneType)}
+              aria-pressed={activeZone === zona}
               className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
                 activeZone === zona
                   ? 'bg-[#2a2a2a] text-[#d2f000] border border-[#d2f000]/40'
