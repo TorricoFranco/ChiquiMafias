@@ -6,6 +6,7 @@ import { MatchDetailView } from '@/features/matches/components/MatchDetailView';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { LeagueSidebar } from '@/features/league/components/LigaProfesional/LeagueSidebar';
+import { MobileMenuBar } from '@/features/league/components/sidebar/MobileMenuBar';
 import { TournamentType, ZoneType } from '@/features/league/type';
 import { LEAGUE_SLUG } from '@/features/competitions/constants';
 
@@ -56,21 +57,17 @@ export default function FullMatchPage() {
             onResetSimulations={() => console.log('Resetear simulaciones')}
           />
 
-          <button
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="md:hidden fixed bottom-24 right-4 z-30 bg-[#d2f000] text-[#191e00] px-4 py-3 rounded-full shadow-lg font-black uppercase text-xs tracking-wider"
-          >
-            Menú Ligas
-          </button>
-
-          <div className="flex-1 w-full md:pl-64 overflow-y-auto bg-[#131313] flex flex-col">
-            <div className="p-4 md:p-6 lg:p-8 flex-1">
-              <MatchDetailView
-                matchId={matchId}
-                onBack={() => router.push('/')}
-              />
+          <div className="flex-1 w-full flex flex-col min-h-0">
+            <div className="flex-1 min-h-0 w-full md:pl-64 overflow-y-auto bg-[#131313] flex flex-col">
+              <div className="p-4 md:p-6 lg:p-8 flex-1">
+                <MatchDetailView
+                  matchId={matchId}
+                  onBack={() => router.push('/')}
+                />
+              </div>
+              <Footer />
             </div>
-            <Footer />
+            <MobileMenuBar onOpen={() => setIsMobileSidebarOpen(true)} />
           </div>
 
         </div>

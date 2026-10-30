@@ -123,7 +123,7 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
     retry: retrySeason,
   } = useCurrentSeason(LEAGUE_SLUG);
 
-  const { data: activeMatchdayData } = useActiveMatchday(currentSeason, activeTournament);
+  const { data: activeMatchdayData, isError: isActiveMatchdayError } = useActiveMatchday(currentSeason, activeTournament);
   const { data: availableStagesData } = useAvailableStages(currentSeason, activeTournament);
   const { data: bracketsData } = useTournamentBrackets(currentSeason, activeTournament);
   const { data: pendingFixturesData } = usePendingFixtures(currentSeason, activeTournament);
@@ -173,7 +173,10 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
     }
   }
 
-  const currentRoundStr = selectedRound?.toString() || '1';
+  // Sin ronda, la consulta de fixtures queda deshabilitada: no se pide la fecha 1 antes de tiempo.
+  // Si la fecha activa falla sin datos, se muestra la 1 sin guardarla: si la activa llega después, manda ella.
+  const round = selectedRound ?? (isActiveMatchdayError && activeMatchdayData === undefined ? 1 : null);
+  const currentRoundStr = round === null ? '' : String(round);
   const { matches: liveMatches, liveResults, isLoading: isFixtureLoading } = useFixtureWithLive(
     currentSeason,
     activeTournament,
@@ -186,7 +189,7 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
     return liveMatches.map((m) => ({
       id: m.id,
       tournament: activeTournament,
-      round: selectedRound as number | PlayoffStageKey,
+      round: round as number | PlayoffStageKey,
       date: m.date,
       status_short: m.status_short as MatchStatus,
       minute: m.elapsed ? m.elapsed.toString() : undefined,
@@ -205,7 +208,7 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
       home_pen: m.home_penalty_goals,
       away_pen: m.away_penalty_goals,
     }));
-  }, [liveMatches, activeTournament, selectedRound]);
+  }, [liveMatches, activeTournament, round]);
 
   const pendingRegularMatches = useMemo<LeagueMatch[]>(() => {
     if (!pendingFixturesData) return [];
@@ -391,8 +394,8 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
 
   return {
     isLoading: isSeasonLoading || isFixtureLoading || isStandingsLoading,
-    /** El fixture de la fecha todavía no llegó (incluye esperar a la temporada, de la que sale su clave). */
-    isFixtureLoading: isSeasonLoading || isFixtureLoading,
+    /** El fixture de la fecha todavía no llegó (incluye esperar a la temporada y a la fecha activa; con la temporada caída no hay nada que esperar). */
+    isFixtureLoading: isSeasonLoading || isFixtureLoading || (round === null && !isSeasonError),
     /** Etiqueta de la temporada actual (`2026`); vacía mientras carga. */
     seasonLabel,
     isSeasonError,
@@ -400,7 +403,7 @@ export function useLigaProfesionalData(options?: UseLigaProfesionalDataOptions) 
     hasLiveMatches,
     activeTournament,
     activeZone,
-    selectedRound: selectedRound || 1,
+    selectedRound: round,
     isBracketOpen,
     simulations,
     simulatedCount: Object.keys(simulations).length,

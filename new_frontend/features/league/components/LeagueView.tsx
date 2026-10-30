@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { LeagueSidebar } from './LigaProfesional/LeagueSidebar';
 import { LigaProfesionalView } from './LigaProfesional/LigaProfesionalView';
