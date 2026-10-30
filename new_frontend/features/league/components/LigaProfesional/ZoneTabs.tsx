@@ -19,7 +19,7 @@ export const ZoneTabs: React.FC<ZoneTabsProps> = ({ activeZone, onChangeZone }) 
         <button
           onClick={() => onChangeZone('A')}
           aria-pressed={activeZone === 'A'}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
             activeZone === 'A'
               ? 'bg-sky-500 text-white shadow-[0_0_10px_rgba(14,165,233,0.35)]'
               : 'text-[#c6c9ab] hover:text-[#e5e2e1]'
@@ -31,7 +31,7 @@ export const ZoneTabs: React.FC<ZoneTabsProps> = ({ activeZone, onChangeZone }) 
         <button
           onClick={() => onChangeZone('B')}
           aria-pressed={activeZone === 'B'}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
             activeZone === 'B'
               ? 'bg-sky-500 text-white shadow-[0_0_10px_rgba(14,165,233,0.35)]'
               : 'text-[#c6c9ab] hover:text-[#e5e2e1]'

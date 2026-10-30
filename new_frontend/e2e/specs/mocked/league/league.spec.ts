@@ -403,9 +403,10 @@ test.describe("Ligas: penales en el fixture", () => {
   });
 });
 
+const zoneTable = (page: import("@playwright/test").Page) =>
+  page.getByRole("table").filter({ has: page.getByRole("columnheader", { name: "Pos" }) });
+
 test.describe("Ligas: la tabla con partidos en vivo", () => {
-  const zoneTable = (page: import("@playwright/test").Page) =>
-    page.getByRole("table").filter({ has: page.getByRole("columnheader", { name: "Pos" }) });
   const annualTable = (page: import("@playwright/test").Page) =>
     page.getByRole("table").filter({ has: page.getByRole("columnheader", { name: "Estado" }) });
   const standingsRequests = (api: import("../../../support/api-mock").ApiMock) => api.requests("GET", "/standings/seasons/:season").length;
@@ -535,5 +536,96 @@ test.describe("Ligas: la tabla con partidos en vivo", () => {
     await page.clock.fastForward("02:30");
     await expect.poll(() => standingsRequests(api)).toBeGreaterThan(before);
     await expect(bocaRow).toContainText("24");
+  });
+});
+
+test.describe("Ligas: título, zonas y menú de la tabla", () => {
+  test("el título de la tabla acompaña al torneo y a la zona activos", { tag: "@mobile" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, { standings: seasonStandings() });
+
+    await app.open("/?tab=ligas");
+    await expect(page.getByRole("heading", { name: "clausura 2026 (zona a)" })).toBeVisible();
+
+    await page.getByRole("button", { name: "TORNEO APERTURA", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "apertura 2026 (zona a)" })).toBeVisible();
+
+    await page.getByRole("button", { name: "ZONA B", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "apertura 2026 (zona b)" })).toBeVisible();
+    await expect(zoneTable(page).getByRole("row", { name: /Racing Club/ })).toContainText("23");
+  });
+
+  test("elegir torneo y zona en el menú lateral cambia también la tabla", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, { standings: seasonStandings() });
+
+    await app.open("/?tab=ligas");
+    await page.getByRole("button", { name: "Apertura", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "apertura 2026 (zona a)" })).toBeVisible();
+    await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toContainText("30");
+
+    await page.getByRole("button", { name: "Zona B", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "apertura 2026 (zona b)" })).toBeVisible();
+    await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toHaveCount(0);
+    await expect(zoneTable(page).getByRole("row", { name: /Racing Club/ })).toContainText("23");
+  });
+
+  test("en el celular elegir torneo y zona desde el menú de Ligas cambia también la tabla", { tag: "@mobile-only" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, { standings: seasonStandings() });
+
+    await app.open("/?tab=ligas");
+    const menu = page.getByRole("button", { name: "Menú Ligas", exact: true });
+    await menu.click();
+    // Con el menú abierto, la tabla queda inerte: no recibe foco ni clics.
+    await expect.poll(() => zoneTable(page).evaluate((tabla) => tabla.closest("[inert]") !== null)).toBe(true);
+    await page.getByRole("button", { name: "Apertura", exact: true }).click();
+    // Al elegir, el menú se cierra y el foco vuelve a «Menú Ligas».
+    await expect(menu).toBeFocused();
+    await expect(page.getByRole("heading", { name: "apertura 2026 (zona a)" })).toBeVisible();
+    await expect(zoneTable(page).getByRole("row", { name: /Boca Juniors/ })).toContainText("30");
+    // El clic de prueba falla si el fondo del menú sigue tapando la fila.
+    await zoneTable(page).getByRole("row", { name: /Boca Juniors/ }).click({ trial: true });
+
+    await menu.click();
+    await page.getByRole("button", { name: "Zona B", exact: true }).click();
+    await expect(menu).toBeFocused();
+    await expect(page.getByRole("heading", { name: "apertura 2026 (zona b)" })).toBeVisible();
+    await expect(zoneTable(page).getByRole("row", { name: /Racing Club/ })).toContainText("23");
+    await zoneTable(page).getByRole("row", { name: /Racing Club/ }).click({ trial: true });
+  });
+
+  test("los botones de zona no se parten en dos líneas", { tag: "@mobile" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, { standings: seasonStandings() });
+
+    await app.open("/?tab=ligas");
+    const zonaA = page.getByRole("button", { name: "ZONA A", exact: true });
+    const zonaB = page.getByRole("button", { name: "ZONA B", exact: true });
+    await expect(zonaA).toBeVisible();
+    await expect(zonaB).toBeVisible();
+
+    // Con una línea el botón mide 28 px; con el texto partido en ZONA / A pasa de 40.
+    expect((await zonaA.boundingBox())?.height).toBeLessThan(36);
+    expect((await zonaB.boundingBox())?.height).toBeLessThan(36);
+  });
+
+  test("en el celular el botón Menú Ligas no tapa la tabla", { tag: "@mobile-only" }, async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    mockLeague(api, { standings: seasonStandings() });
+
+    await app.open("/?tab=ligas");
+    const menu = page.getByRole("button", { name: "Menú Ligas", exact: true });
+    await expect(menu).toBeVisible();
+
+    // El botón tiene que quedar debajo del área que se desplaza con la tabla: flotando encima de ella,
+    // tapaba las filas al bajar.
+    const bordeDelArea = await zoneTable(page).evaluate((tabla) => {
+      let area = tabla.parentElement;
+      while (area && getComputedStyle(area).overflowY !== "auto") area = area.parentElement;
+      return area?.getBoundingClientRect().bottom ?? null;
+    });
+    expect(bordeDelArea).not.toBeNull();
+    expect((await menu.boundingBox())?.y).toBeGreaterThanOrEqual(bordeDelArea!);
   });
 });

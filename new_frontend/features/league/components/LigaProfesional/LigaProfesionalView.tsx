@@ -51,6 +51,15 @@ export const LigaProfesionalView: React.FC<LigaProfesionalViewProps> = ({
         externalSimulations: externalSimulatedResults,
     });
 
+    // LeagueView cambia el torneo y la zona también desde su barra lateral, sin pasar por el hook: el hook los sigue
+    // acá, durante el render (sin efecto), igual que las fechas.
+    if (externalTournament !== undefined && externalTournament !== data.activeTournament) {
+        data.setTournament(externalTournament);
+    }
+    if (externalZone !== undefined && externalZone !== data.activeZone) {
+        data.setZone(externalZone);
+    }
+
     const currentTournament = externalTournament ?? data.activeTournament;
     const currentZone = externalZone ?? data.activeZone;
     const bracketOpen = externalBracketOpen ?? data.isBracketOpen;
@@ -130,6 +139,7 @@ export const LigaProfesionalView: React.FC<LigaProfesionalViewProps> = ({
                         activeZone={currentZone}
                         onChangeZone={handleZoneChange}
                         standings={data.activeZoneStandings}
+                        tournament={currentTournament}
                     />
                 </div>
 
