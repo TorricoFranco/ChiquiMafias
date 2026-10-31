@@ -16,9 +16,11 @@ test.describe("Navegación entre vistas (escritorio)", () => {
     await expect(page.getByRole("row", { name: /Boca Juniors/ }).first()).toBeVisible();
     await expect(views.getByRole("button", { name: "LIGAS" })).toHaveAttribute("aria-current", "page");
 
-    await views.getByRole("button", { name: "CALENDARIO" }).click();
-    await expect(page).toHaveURL(`${BASE_URL}/?tab=calendario`);
-    await expect(page.getByRole("heading", { name: /Vista Calendario/ })).toBeVisible();
+    await views.getByRole("button", { name: "SOCIAL" }).click();
+    await expect(page).toHaveURL(`${BASE_URL}/?tab=social`);
+    await expect(views.getByRole("button", { name: "SOCIAL" })).toHaveAttribute("aria-current", "page");
+    // CALENDARIO no tiene botón: la vista todavía no está lista.
+    await expect(views.getByRole("button", { name: "CALENDARIO" })).toHaveCount(0);
 
     await page.goBack();
     await expect(page).toHaveURL(`${BASE_URL}/?tab=ligas`);
@@ -26,11 +28,21 @@ test.describe("Navegación entre vistas (escritorio)", () => {
     await expect(views.getByRole("button", { name: "LIGAS" })).toHaveAttribute("aria-current", "page");
   });
 
-  test("entrar con ?tab=calendario abre esa vista directamente", async ({ app, page }) => {
+  test("entrar con ?tab=ligas abre esa vista directamente", async ({ app, page, api }) => {
+    mockLeague(api);
+
+    await app.open("/?tab=ligas");
+
+    await expect(app.header.getByRole("navigation", { name: "Vistas" }).getByRole("button", { name: "LIGAS" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("row", { name: /Boca Juniors/ }).first()).toBeVisible();
+    await expect(new ChatPanel(page).log).toBeHidden();
+  });
+
+  test("un ?tab de una vista que ya no existe abre Social", async ({ app, page }) => {
     await app.open("/?tab=calendario");
 
-    await expect(page.getByRole("heading", { name: /Vista Calendario/ })).toBeVisible();
-    await expect(new ChatPanel(page).input).toBeHidden();
+    await expect(app.header.getByRole("navigation", { name: "Vistas" }).getByRole("button", { name: "SOCIAL" })).toHaveAttribute("aria-current", "page");
+    await expect(new ChatPanel(page).log).toBeVisible();
   });
 
   test("las secciones de la barra lateral se marcan como actuales", async ({ app, session }) => {

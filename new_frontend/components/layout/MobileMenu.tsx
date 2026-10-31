@@ -10,7 +10,6 @@ import { SidebarNav } from "@/components/Social/SidebarNav";
 const MAIN_TABS = [
   { id: "social", label: "Social" },
   { id: "ligas", label: "Ligas" },
-  { id: "calendario", label: "Calendario" },
 ];
 
 interface MobileMenuProps {

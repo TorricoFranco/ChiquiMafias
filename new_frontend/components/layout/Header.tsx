@@ -99,16 +99,6 @@ export const Header: React.FC<HeaderProps> = ({
                                 LIGAS
                             </button>
                             <button
-                                onClick={() => setActiveTab('calendario')}
-                                aria-current={activeTab === 'calendario' ? 'page' : undefined}
-                                className={`font-semibold text-xs md:text-sm uppercase tracking-wider px-2 py-1 rounded transition-colors ${activeTab === 'calendario'
-                                    ? 'text-[#d2f000] border-b-2 border-[#d2f000]'
-                                    : 'text-[#c6c9ab] hover:text-[#e5e2e1] hover:bg-[#353534]/50'
-                                    }`}
-                            >
-                                CALENDARIO
-                            </button>
-                            <button
                                 onClick={() => setActiveTab('social')}
                                 aria-current={activeTab === 'social' ? 'page' : undefined}
                                 className={`font-semibold text-xs md:text-sm uppercase tracking-wider px-2 py-1 transition-transform ${activeTab === 'social'

@@ -9,12 +9,16 @@ import { SocialView } from "@/components/Social/SocialView";
 import { LeagueView } from "@/features/league/components/LeagueView";
 import { useNavigationStore } from "@/store/useNavigationStore";
 
+// Vistas que se abren con ?tab=. Cualquier otro valor (por ejemplo un ?tab=calendario de antes) abre Social.
+const VIEWS = ["social", "ligas"];
+const viewFromParam = (tab: string | null) => (tab && VIEWS.includes(tab) ? tab : "social");
+
 function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const tabParam = searchParams.get("tab");
 
-  const [mainTab, setMainTab] = useState(tabParam || "social");
+  const [mainTab, setMainTab] = useState(viewFromParam(tabParam));
   const activeSection = useNavigationStore((state) => state.activeTab);
   const setActiveSection = useNavigationStore((state) => state.setActiveTab);
 
@@ -22,7 +26,7 @@ function HomeContent() {
   const [prevTabParam, setPrevTabParam] = useState(tabParam);
   if (tabParam !== prevTabParam) {
     setPrevTabParam(tabParam);
-    setMainTab(tabParam || "social");
+    setMainTab(viewFromParam(tabParam));
   }
 
   const handleTabChange = (tab: string) => {
@@ -46,12 +50,6 @@ function HomeContent() {
 
           {mainTab === "ligas" && (
             <LeagueView onSwitchToSocial={() => handleTabChange("social")} />
-          )}
-
-          {mainTab === "calendario" && (
-            <div className="flex-1 flex items-center justify-center h-full">
-              <h1 className="text-2xl text-[#d2f000]">Vista Calendario (Próximamente)</h1>
-            </div>
           )}
         </div>
         <Footer />

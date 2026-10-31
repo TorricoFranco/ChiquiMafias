@@ -6,6 +6,7 @@ import { buildInventoryItem } from "../../../factories/store";
 import { BetsPage } from "../../../pages/bets-page";
 import { ChatPanel } from "../../../pages/chat-panel";
 import { BASE_URL } from "../../../support/env";
+import { mockLeague } from "../../../support/league";
 
 // La barra inferior y el menú hamburguesa solo existen debajo del breakpoint `lg`.
 test.describe("Navegación en móvil", { tag: "@mobile-only" }, () => {
@@ -77,15 +78,19 @@ test.describe("Navegación en móvil", { tag: "@mobile-only" }, () => {
     await expect(app.mobileNav.locator("[aria-current]")).toHaveCount(0);
   });
 
-  test("el menú cambia de vista y la barra inferior vuelve a Social", async ({ app, page }) => {
+  test("el menú cambia de vista y la barra inferior vuelve a Social", async ({ app, page, api }) => {
+    mockLeague(api);
     await app.open();
 
     await app.openMenu();
-    await app.menu.getByRole("button", { name: "Calendario" }).click();
+    const views = app.menu.getByRole("navigation", { name: "Vistas" });
+    await expect(views.getByRole("button", { name: "Calendario" })).toHaveCount(0);
+    await views.getByRole("button", { name: "Ligas" }).click();
 
     await expect(app.menu).toBeHidden();
-    await expect(page).toHaveURL(`${BASE_URL}/?tab=calendario`);
-    await expect(page.getByRole("heading", { name: /Vista Calendario/ })).toBeVisible();
+    await expect(page).toHaveURL(`${BASE_URL}/?tab=ligas`);
+    // Ligas no está en la barra inferior: ninguna pestaña queda marcada.
+    await expect(app.mobileNav.locator("[aria-current]")).toHaveCount(0);
 
     await app.mobileTab("Tribuna").click();
 
