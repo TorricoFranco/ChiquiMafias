@@ -19,7 +19,7 @@ test.describe("Apuesta directa desde el carrusel del chat", () => {
     await card.getByRole("button", { name: /^River / }).click();
     await card.getByLabel("Monto a apostar").fill("150");
 
-    await expect(card).toContainText("Potencial: $375.00");
+    await expect(card).toContainText("Potencial: 375.00");
     await card.getByRole("button", { name: "Apostar" }).click();
 
     await expect(page.getByText("¡Apuesta realizada con éxito!")).toBeVisible();
