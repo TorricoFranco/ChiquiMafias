@@ -233,6 +233,7 @@ La guía completa, con los pasos del servidor, está en [docs/DEPLOY.md](docs/DE
 - **Frontend**: suite e2e de Playwright con la API y los sockets mockeados, en desktop
   y mobile, contra el build de producción. CI: [`frontend.yml`](.github/workflows/frontend.yml)
   en cada push o PR a `develop` y `main`.
+- **Pruebas de carga (local, no corren en CI):** scripts de k6 en [`scripts/load/`](scripts/load/) con los escenarios `smoke`, `escalonada` y `sostenida` contra los endpoints públicos del backend. Cómo correrlas y cuándo no, en [`scripts/load/README.md`](scripts/load/README.md). Resultados y conclusiones, en [`scripts/load/RESULTADOS.md`](scripts/load/RESULTADOS.md).
 - **Deploy:** el CI no despliega. El deploy se hace a mano en el VPS: backup previo, `git pull` de `main` y `docker compose up -d --build`. El procedimiento completo está en [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Desarrollo asistido por IA
