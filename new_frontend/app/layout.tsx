@@ -27,6 +27,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  // Base de las URLs absolutas de og:image y twitter:image. Sin esto Next usa localhost:3000.
+  metadataBase: new URL("https://chiquimafias.com"),
   title: "ESTADIO DIGITAL - Chiqui Mafias",
   description: "Plataforma interactiva de fútbol en vivo, chat y pronósticos con monedas virtuales",
   keywords: ["fútbol argentino", "en vivo", "pronósticos", "chat", "estadísticas", "liga profesional"],
@@ -36,7 +38,7 @@ export const metadata: Metadata = {
     siteName: "Estadio Digital",
     images: [
       {
-        url: "/og-image.jpg", // Crea una imagen de 1200x630px y guárdala en tu carpeta public/
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Estadio Digital Preview",

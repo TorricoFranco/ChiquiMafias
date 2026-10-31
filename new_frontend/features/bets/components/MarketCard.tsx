@@ -195,7 +195,12 @@ export const MarketCard: React.FC<MarketCardProps> = ({
               Monto a apostar: <span className="text-[#e5e2e1]">{localSelectedOption.name}</span>
             </span>
             <span className="text-xs font-mono font-bold text-[#d2f000] flex-shrink-0">
-              Potencial: ${betAmount ? (Number(betAmount) * (localSelectedOption.currentOdds ?? 1)).toFixed(2) : '0.00'}
+              Potencial:{' '}
+              <span className="inline-flex items-center gap-1">
+                <img src="/icons/chiqui-coin-icon.png" alt="" className="w-3.5 h-3.5 opacity-80" />
+                {betAmount ? (Number(betAmount) * (localSelectedOption.currentOdds ?? 1)).toFixed(2) : '0.00'}
+                <span className="sr-only"> monedas</span>
+              </span>
             </span>
           </div>
 
@@ -217,7 +222,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
 
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#909378] font-bold">$</span>
+              <img src="/icons/chiqui-coin-icon.png" alt="" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-80" />
               <input
                 type="number"
                 aria-label="Monto a apostar"
@@ -253,7 +258,12 @@ export const MarketCard: React.FC<MarketCardProps> = ({
       <div className="flex items-center justify-between text-[11px] text-[#909378]">
         <span className="inline-flex items-center gap-1">
           <span aria-hidden="true" className="material-symbols-outlined text-[14px] text-[#d2f000]/80">savings</span>
-          Pozo total: ${totalPool.toLocaleString('es-AR')}
+          Pozo total:{' '}
+          <span className="inline-flex items-center gap-1">
+            <img src="/icons/chiqui-coin-icon.png" alt="" className="w-3.5 h-3.5 opacity-80" />
+            {totalPool.toLocaleString('es-AR')}
+            <span className="sr-only"> monedas</span>
+          </span>
         </span>
       </div>
     </article>

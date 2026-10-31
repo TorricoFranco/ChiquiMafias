@@ -13,7 +13,7 @@ const TABS = [
 ];
 
 interface MobileNavProps {
-  /** Sección activa de la vista social, o null si se está en otra vista (Ligas, Calendario). */
+  /** Sección activa de la vista social, o null si se está en otra vista (Ligas). */
   activeSection: string | null;
   onSelect: (section: string) => void;
 }

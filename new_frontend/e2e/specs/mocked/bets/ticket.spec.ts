@@ -141,7 +141,7 @@ test.describe("Mercados en vivo", () => {
     );
 
     await expect(bets.option(market.title, "Boca")).toContainText("1.85");
-    await expect(bets.market(market.title)).toContainText("Pozo total: $5.000");
+    await expect(bets.market(market.title)).toContainText("Pozo total: 5.000");
   });
 
   test("un mercado nuevo aparece y uno bloqueado se cierra sin recargar", async ({ app, page, api, socket }) => {
