@@ -61,4 +61,7 @@ export const envValidationSchema = Joi.object({
   REDIS_HOST: Joi.string().default('redis'),
   REDIS_PORT: Joi.number().default(6379),
   REDIS_PASSWORD: Joi.string().required(),
+
+  // Solo se respeta fuera de producción y staging (ver src/config/throttle.ts).
+  THROTTLE_LIMIT: Joi.number().integer().min(1).default(150),
 })
