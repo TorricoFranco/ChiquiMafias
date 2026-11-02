@@ -15,6 +15,8 @@ import {
 } from './bets.scripts'
 
 const DRAW_OPTION_NAME = 'Empate'
+// El mercado automático se abre 24 horas antes del inicio.
+const OPEN_BEFORE_KICKOFF_MS = 24 * 60 * 60 * 1000
 // El mercado automático cierra 5 minutos antes del inicio.
 const CLOSE_BEFORE_KICKOFF_MS = 5 * 60 * 1000
 // Estados en los que el partido todavía no empezó.
@@ -45,7 +47,6 @@ export function teamBadge(team: {
 @Injectable()
 export class BetsCronService {
   private readonly logger = new Logger(BetsCronService.name)
-  private readonly FOUR_HOURS = 4 * 60 * 60 * 1000
 
   constructor(
     private readonly prisma: PrismaService,
@@ -60,7 +61,7 @@ export class BetsCronService {
     this.logger.debug('[APUESTAS] Buscando partidos para abrir mercados')
 
     const now = new Date()
-    const endWindow = new Date(now.getTime() + this.FOUR_HOURS)
+    const endWindow = new Date(now.getTime() + OPEN_BEFORE_KICKOFF_MS)
 
     // Solo temporadas con apuestas activadas (RF-A13c) que además se
     // sincronizan: un partido que ningún cron actualiza nunca se liquidaría.
@@ -449,6 +450,15 @@ export class BetsCronService {
           )
           await this.betsService.settleMarket(market.id, {
             status: 'REFUNDED',
+          })
+          // Un partido postergado vuelve a "no empezado" con fecha nueva: tiene
+          // que poder abrir otro mercado. La creación solo mira los partidos con
+          // market_created en false, y con la ventana de 24 h este caso es más
+          // probable. Si el partido quedó cancelado o abandonado no pasa nada:
+          // la creación exige que esté sin empezar.
+          await this.prisma.matches.updateMany({
+            where: { id: match.id },
+            data: { market_created: false },
           })
           continue
         }
