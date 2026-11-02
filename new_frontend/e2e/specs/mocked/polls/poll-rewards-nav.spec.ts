@@ -33,7 +33,7 @@ test.describe("Recompensas pendientes en la navegación", () => {
 
   test("el aviso flotante lleva a Comunidad para reclamar", async ({ app, page, api, session }) => {
     session.loginAs("USER");
-    api.on("GET", "/polls/rewards/pending", { count: 1, potentialCoins: 50 });
+    api.on("GET", "/polls/rewards/pending", { count: 1, potentialCoins: 10 });
 
     await app.open();
     await page.getByRole("button", { name: "¡Recompensa para reclamar!" }).click();

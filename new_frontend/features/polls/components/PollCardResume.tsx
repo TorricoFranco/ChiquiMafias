@@ -8,6 +8,7 @@ import { useNavigationStore } from '@/store/useNavigationStore';
 import { useReactToPoll } from '../hooks/usePolls';
 import { Poll } from "@/features/polls/types";
 import { getPollTypeMeta } from "../constants/pollTypes";
+import { POLL_VOTE_REWARD_COINS } from "../constants/rewards";
 
 interface PollCardResumeProps {
     poll: Poll;
@@ -56,7 +57,7 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
                         <div className="w-3.5 h-3.5 rounded-full overflow-hidden flex-shrink-0">
                             <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover" />
                         </div>
-                        <span>+50</span>
+                        <span>+{POLL_VOTE_REWARD_COINS}</span>
                     </span>
                 )}
             </div>
