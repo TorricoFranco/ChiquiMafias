@@ -14,6 +14,7 @@ import {
   POLL_TYPE_LABELS,
   POLL_TYPE_RULES,
 } from './constants/poll-types.constant'
+import { POLL_VOTE_REWARD_COINS } from './constants/poll-rewards.constant'
 import {
   buildPollShape,
   parsePollConfig,
@@ -600,8 +601,6 @@ export class PollsService {
       )
     }
 
-    const COINS_PER_VOTE = 50
-
     const voteIds = pendingVotes.map((v) => v.id)
 
     // Update condicional: con dos claims simultáneos cada voto se paga una sola vez
@@ -619,7 +618,7 @@ export class PollsService {
       await this.walletService.addCoins(
         {
           userId,
-          amount: count * COINS_PER_VOTE,
+          amount: count * POLL_VOTE_REWARD_COINS,
           type: 'POLL_VOTE',
           description: `Recompensa por participar en ${count} encuestas`,
         },
@@ -630,7 +629,7 @@ export class PollsService {
 
     await this.walletService.syncBalanceCache(userId)
 
-    const totalCoins = claimedCount * COINS_PER_VOTE
+    const totalCoins = claimedCount * POLL_VOTE_REWARD_COINS
 
     return {
       status: 'success',
@@ -647,7 +646,7 @@ export class PollsService {
         rewardClaimed: false,
       },
     })
-    return { count, potentialCoins: count * 50 }
+    return { count, potentialCoins: count * POLL_VOTE_REWARD_COINS }
   }
 
   async getClosedPolls(page: number = 1, limit: number = 10, userId?: string) {

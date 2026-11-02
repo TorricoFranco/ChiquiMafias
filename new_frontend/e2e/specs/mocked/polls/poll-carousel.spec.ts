@@ -19,6 +19,17 @@ test.describe("Carrusel de encuestas de la barra derecha", () => {
     await expect(page.getByText("Encuesta 6 del carrusel")).toBeVisible();
   });
 
+  test("avisa que votar una encuesta sin votar paga 10 monedas", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    api.on("GET", "/polls/active", [buildPoll({ title: "Encuesta con premio" })]);
+
+    await app.open();
+    await page.getByRole("tab", { name: "Apuestas" }).click();
+
+    await expect(page.getByText("Encuesta con premio")).toBeVisible();
+    await expect(page.getByText("+10", { exact: true })).toBeVisible();
+  });
+
   test("Comentar lleva a esa encuesta en Comunidad con sus comentarios abiertos", async ({ app, page, api, session }) => {
     session.loginAs("USER");
     // Es la sexta del carrusel: en el feed queda debajo del pliegue, así que hay que scrollear.

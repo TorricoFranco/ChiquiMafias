@@ -15,7 +15,7 @@ describe('PollsService', () => {
       .mockImplementation((callback: (tx: unknown) => Promise<unknown>) =>
         callback(mockPrisma),
       ),
-    vote: { findMany: jest.fn(), updateMany: jest.fn() },
+    vote: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     poll: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -807,7 +807,7 @@ describe('PollsService', () => {
 
   describe('claimAllPendingRewards', () => {
     it('Debe pagar solo los votos que este claim logró marcar, en la misma transacción', async () => {
-      // Un claim simultáneo ya se llevó uno de los tres votos
+      // Un claim simultáneo ya se llevó uno de los tres votos; cada voto paga 10 monedas
       mockPrisma.vote.updateMany.mockResolvedValue({ count: 2 })
 
       const result = await service.claimAllPendingRewards('user-1')
@@ -821,11 +821,11 @@ describe('PollsService', () => {
       })
       expect(addCoinsCall()[0]).toMatchObject({
         userId: 'user-1',
-        amount: 100,
+        amount: 20,
       })
       expect(addCoinsCall()[1]).toBe(mockPrisma)
       expect(mockWalletService.syncBalanceCache).toHaveBeenCalledWith('user-1')
-      expect(result).toMatchObject({ claimedCount: 2, coinsAwarded: 100 })
+      expect(result).toMatchObject({ claimedCount: 2, coinsAwarded: 20 })
     })
 
     it('Debe lanzar BadRequestException si otro claim simultáneo ya marcó todos los votos', async () => {
@@ -845,6 +845,27 @@ describe('PollsService', () => {
         BadRequestException,
       )
       expect(mockPrisma.$transaction).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getPendingRewardsCount', () => {
+    it('Debe calcular las monedas pendientes a 10 por cada voto sin reclamar', async () => {
+      mockPrisma.vote.count.mockResolvedValue(3)
+
+      const result = await service.getPendingRewardsCount('user-1')
+
+      expect(mockPrisma.vote.count).toHaveBeenCalledWith({
+        where: { userId: 'user-1', rewardClaimed: false },
+      })
+      expect(result).toEqual({ count: 3, potentialCoins: 30 })
+    })
+
+    it('Debe devolver cero monedas si no hay votos sin reclamar', async () => {
+      mockPrisma.vote.count.mockResolvedValue(0)
+
+      const result = await service.getPendingRewardsCount('user-1')
+
+      expect(result).toEqual({ count: 0, potentialCoins: 0 })
     })
   })
 })
