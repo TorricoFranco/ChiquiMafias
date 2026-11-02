@@ -139,6 +139,7 @@ model Matches {
   venue         Venues?            @relation(fields: [venue_id], references: [id])
   stats         Stats_team_match[]
   markets       Market[]
+  polls         Poll[]
   bracketSlot   BracketSlot?
 
   @@index([date])
@@ -648,6 +649,12 @@ enum PollType {
   INFO // Placa informativa sin votación, solo la crea un moderador
 }
 
+/// Cuál de las encuestas automáticas de un partido terminado es.
+enum MatchPollKind {
+  REFEREE_RATING // Puntuación del árbitro
+  MATCH_REVIEW // "¿Qué te pareció el partido?", con cuatro categorías fijas
+}
+
 model Poll {
   id          String    @id @default(uuid())
   title       String
@@ -675,11 +682,18 @@ model Poll {
   createdByAdminId String?
   createdByAdmin   User?   @relation("PollOfficialAuthor", fields: [createdByAdminId], references: [id], onDelete: SetNull)
 
+  /// Partido de una encuesta automática de partido terminado. null en las que arma una persona.
+  matchId   String?
+  match     Matches?       @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  /// Cuál de las automáticas del partido es. Junto con matchId es único: el cron no crea dos veces la misma.
+  matchKind MatchPollKind?
+
   reports   Report[]
   votes     Vote[]
   comments  Comment[]
   reactions PollReaction[]
 
+  @@unique([matchId, matchKind])
   @@index([status, type])
   // Postgres no indexa las FK solo: sin esto, borrar un moderador escanea toda la tabla.
   @@index([createdByAdminId])
