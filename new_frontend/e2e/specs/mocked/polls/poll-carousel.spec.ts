@@ -62,6 +62,23 @@ test.describe("Carrusel de encuestas de la barra derecha", () => {
     await expect(card.getByRole("button", { name: "0 Comentarios" })).toHaveAttribute("aria-expanded", "false");
     await expect(card.getByText("Comentario que no se abre")).toHaveCount(0);
   });
+
+  test("una encuesta de partido muestra el partido y el resultado aunque el título quede cortado", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    api.on("GET", "/polls/active", [
+      buildPoll({
+        title: "¿Cómo viste el arbitraje de Facundo Tello en Boca Juniors vs River Plate (Fecha 5 Clausura)?",
+        description: "Boca Juniors 2-1 River Plate · Fecha 5 Clausura",
+        isOfficial: true,
+        user: null,
+      }),
+    ]);
+
+    await app.open();
+    await page.getByRole("tab", { name: "Apuestas" }).click();
+
+    await expect(page.getByText("Boca Juniors 2-1 River Plate · Fecha 5 Clausura")).toBeVisible();
+  });
 });
 
 test.describe("Botón Votar del chat", () => {
