@@ -166,7 +166,8 @@ Cada mercado tiene un ciclo de vida gobernado por una máquina de estados,
   **lock optimista**. Los mercados automáticos se liquidan cada 15 minutos con el
   resultado que `LiveScoreCron` guarda en `Matches` (sin llamar a API-Football). El 1X2
   es a los 90': si el partido se definió en el alargue o por penales, gana el Empate. Si
-  el partido se posterga, se cancela o se abandona, se reembolsa.
+  el partido se posterga, se cancela o se abandona, se reembolsa; si un postergado
+  vuelve a programarse, el cron de creación le abre un mercado nuevo.
 
 El desafío central es mantener la **consistencia eventual** entre tres fuentes
 (Redis, PostgreSQL y los clientes WebSocket) sin bloquear el camino caliente.
@@ -263,7 +264,7 @@ flowchart LR
 | 5 min | `stats/*` | Rankings de chat y de rachas |
 | 1 min (tick) | `fixtures-sync`, `standings` | Fixture y tabla de cada `CompetitionSeason` con `sync_enabled`, cada una según su `fixtures_sync_minutes` / `standings_sync_minutes` (la Liga, cada 10 min). La lógica de cada formato está en `football/formats/` |
 | 15 min | `bets-cron` | Liquida los mercados de partidos terminados |
-| 30 min | `bets-cron` | Crea mercados automáticamente para los próximos partidos |
+| 30 min | `bets-cron` | Crea mercados automáticamente para los partidos que empiezan en las próximas 24 h (cierran 5 min antes del inicio) |
 | 1 h | `subscriptions.cron` | Conciliación de suscripciones vencidas |
 
 ### Estructura

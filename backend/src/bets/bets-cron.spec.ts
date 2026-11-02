@@ -267,6 +267,41 @@ describe('BetsCronService', () => {
       expect(where).not.toHaveProperty('api_fixture_id')
     })
 
+    describe('ventana de apertura', () => {
+      const NOW = new Date('2026-10-20T12:00:00.000Z')
+      const HOUR_MS = 60 * 60 * 1000
+
+      beforeEach(() => jest.useFakeTimers({ now: NOW }))
+      afterEach(() => jest.useRealTimers())
+
+      it('Debe buscar los partidos sin empezar que arrancan en las próximas 24 horas', async () => {
+        await runWith()
+
+        const where = firstArg(mockPrisma.matches.findMany).where
+        expect(where.date).toEqual({
+          gte: NOW,
+          lte: new Date(NOW.getTime() + 24 * HOUR_MS),
+        })
+        expect(where.status_short).toBe('NS')
+        expect(where.market_created).toBe(false)
+      })
+
+      it('Debe abrir el mercado de un partido que empieza en 20 horas y cerrarlo 5 minutos antes del inicio', async () => {
+        const kickoff = new Date(NOW.getTime() + 20 * HOUR_MS)
+
+        const data = await runWith(upcoming({ date: kickoff }))
+
+        expect(data.closesAt).toEqual(new Date(kickoff.getTime() - 5 * 60_000))
+        expect(mockRedisService.redis.hset).toHaveBeenCalledWith(
+          'market:market-1',
+          'status',
+          'OPEN',
+          'closesAt',
+          (kickoff.getTime() - 5 * 60_000).toString(),
+        )
+      })
+    })
+
     it('No debe abrir mercado para un partido sin ID en el proveedor activo', async () => {
       mockRefs.matchExternalIds.mockResolvedValueOnce(new Map())
       mockPrisma.competitionSeason.findMany.mockResolvedValue([
@@ -640,6 +675,53 @@ describe('BetsCronService', () => {
       expect(mockBetsService.settleMarket).toHaveBeenCalledWith('market-1', {
         status: 'REFUNDED',
       })
+    })
+
+    it('Debe dejar que un partido reembolsado abra un mercado nuevo cuando lo reprogramen', async () => {
+      await runWith([buildMatch(100, 'PST', null, null)])
+
+      expect(mockPrisma.matches.updateMany).toHaveBeenCalledWith({
+        where: { id: 'match-100' },
+        data: { market_created: false },
+      })
+      // Primero se reembolsa y recién después se libera el partido.
+      expect(
+        mockBetsService.settleMarket.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockPrisma.matches.updateMany.mock.invocationCallOrder[0])
+    })
+
+    it('Debe liberar también el partido que volvió a NS con una fecha nueva lejos del cierre', async () => {
+      const reprogramado = buildMatch(
+        100,
+        'NS',
+        null,
+        null,
+        'match-100',
+        new Date('2026-10-23T20:00:00.000Z'),
+      )
+
+      await runWith([reprogramado])
+
+      expect(mockPrisma.matches.updateMany).toHaveBeenCalledWith({
+        where: { id: 'match-100' },
+        data: { market_created: false },
+      })
+    })
+
+    it('No debe liberar el partido si el reembolso falla', async () => {
+      mockBetsService.settleMarket.mockRejectedValueOnce(
+        new BadRequestException('El mercado ya está siendo liquidado'),
+      )
+
+      await runWith([buildMatch(100, 'PST', null, null)])
+
+      expect(mockPrisma.matches.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('No debe tocar market_created al liquidar un partido jugado', async () => {
+      await runWith([buildMatch(100, 'FT', 2, 1)])
+
+      expect(mockPrisma.matches.updateMany).not.toHaveBeenCalled()
     })
 
     it('Debe liquidar con la opción del local si ganó el local (FT 2-1)', async () => {

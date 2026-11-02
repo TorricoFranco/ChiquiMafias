@@ -142,6 +142,8 @@ otro UUID, salvo que la base se haya cargado desde un respaldo de dev.
 | **RF-A13c** | Una temporada solo abre mercados si tiene `bets_enabled` **y** `sync_enabled`, y solo para partidos con ID en el proveedor activo. Un partido que ningún cron actualiza nunca se liquidaría. Una competición recién agregada arranca con apuestas apagadas hasta que esté lista. |
 | **RF-A13d** | Se mantiene la regla actual: postergado (`PST`), cancelado, abandonado o resuelto en escritorio (`AWD`, `WO`) **se reembolsa** en el siguiente ciclo de liquidación (cada 15 minutos). No en el mismo instante del cierre: el worker de BullMQ puede tener apuestas aceptadas todavía sin guardar. |
 | **RF-A13e** | Un mercado cerrado cuyo partido **volvió a "no empezado" con una fecha más de 1 hora posterior a su cierre** se trata como postergado y se reembolsa (cubre el `PST` que dura menos de un ciclo). |
+| **RF-A13f** | Un mercado automático se abre cuando faltan **24 horas o menos** para el inicio del partido (el cron corre cada 30 minutos) y cierra 5 minutos antes del inicio. |
+| **RF-A13g** | Si un partido se reembolsó por postergación y vuelve a "no empezado" con fecha nueva, abre un mercado nuevo cuando entra en la ventana de 24 horas: al reembolsar se libera `market_created`. |
 
 ### 4.5 Chat
 
