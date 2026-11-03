@@ -15,6 +15,7 @@ import {
   POLL_TYPE_RULES,
 } from './constants/poll-types.constant'
 import { POLL_VOTE_REWARD_COINS } from './constants/poll-rewards.constant'
+import { POLLS_COMMENTS_DEFAULT_LIMIT } from './constants/polls-comments.constant'
 import { POLLS_HISTORY_DEFAULT_LIMIT } from './constants/polls-history.constant'
 import {
   buildPollShape,
@@ -869,7 +870,7 @@ export class PollsService {
   async getPollComments(
     pollId: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = POLLS_COMMENTS_DEFAULT_LIMIT,
     currentUserId?: string,
   ) {
     const skip = (page - 1) * limit

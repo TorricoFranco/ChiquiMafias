@@ -92,6 +92,16 @@ describe('PollsHistoryQueryDto', () => {
     })
   })
 
+  it('Debe acotar un page o un limit de más de 308 dígitos en vez de rechazarlo', async () => {
+    // Number() los convierte en Infinity.
+    const huge = '9'.repeat(309)
+
+    expect(await parse({ page: huge, limit: huge })).toMatchObject({
+      page: 1_000_000,
+      limit: 50,
+    })
+  })
+
   it('Debe acotar igual si el pipe convierte los tipos solo (enableImplicitConversion)', async () => {
     // La receta habitual de Nest para queries; con ella el valor llega como número.
     const parseImplicit = parseWith(
