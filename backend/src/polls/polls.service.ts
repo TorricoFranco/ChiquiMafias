@@ -15,6 +15,7 @@ import {
   POLL_TYPE_RULES,
 } from './constants/poll-types.constant'
 import { POLL_VOTE_REWARD_COINS } from './constants/poll-rewards.constant'
+import { POLLS_HISTORY_DEFAULT_LIMIT } from './constants/polls-history.constant'
 import {
   buildPollShape,
   parsePollConfig,
@@ -657,7 +658,11 @@ export class PollsService {
     return { count, potentialCoins: count * POLL_VOTE_REWARD_COINS }
   }
 
-  async getClosedPolls(page: number = 1, limit: number = 10, userId?: string) {
+  async getClosedPolls(
+    page: number = 1,
+    limit: number = POLLS_HISTORY_DEFAULT_LIMIT,
+    userId?: string,
+  ) {
     const skip = (page - 1) * limit
     const now = new Date()
     const closedWhere: Prisma.PollWhereInput = {
@@ -667,7 +672,12 @@ export class PollsService {
     const [polls, totalItems] = await Promise.all([
       this.prisma.poll.findMany({
         where: closedWhere,
-        orderBy: { endsAt: 'desc' },
+        // `id` desempata: las encuestas de partido de una misma corrida del
+        // cron comparten `endsAt`, y sin un orden total la paginación repite
+        // o saltea filas entre páginas. Las cerradas sin `endsAt` (NEWS/INFO
+        // cerradas a mano) siguen primero, como siempre: Postgres pone los
+        // NULL antes en DESC.
+        orderBy: [{ endsAt: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
         select: {

@@ -32,6 +32,7 @@ import { OptionalAuth } from 'src/auth/decorators/auth.decorator'
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { CreateCommentDto } from './dto/create-comment.dto'
 import { ReactDto } from './dto/reaction.dto'
+import { PollsHistoryQueryDto } from './dto/polls-history-query.dto'
 
 const MODERATOR_INDEX = ROLE_HIERARCHY.indexOf(SystemRole.MODERATOR)
 
@@ -41,30 +42,20 @@ export class PollsController {
   constructor(private readonly pollsService: PollsService) {}
 
   @ApiOperation({ summary: 'Historial paginado de encuestas cerradas' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Número de página (default 1)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Resultados por página (default 10)',
-  })
   @ApiResponse({
     status: 200,
     description: 'Lista paginada de encuestas cerradas.',
   })
+  @ApiResponse({
+    status: 400,
+    description: 'page o limit no son números enteros.',
+  })
   @Get('history')
   async getHistory(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query() query: PollsHistoryQueryDto,
     @GetUser('id') userId: string,
   ) {
-    const pageNum = parseInt(page, 10) || 1
-    const limitNum = parseInt(limit, 10) || 10
-
-    return this.pollsService.getClosedPolls(pageNum, limitNum, userId)
+    return this.pollsService.getClosedPolls(query.page, query.limit, userId)
   }
 
   @Post('propose')
