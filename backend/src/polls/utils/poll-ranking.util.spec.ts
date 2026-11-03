@@ -58,6 +58,36 @@ describe('poll-ranking.util', () => {
         '2': [0, 0, 1],
       })
     })
+
+    it('suma el `count` de cada grupo de podios iguales, como lo devuelve un groupBy', () => {
+      const groups = [
+        { ranking: [1, 2, 3], count: 2 },
+        { ranking: [2, 1, 3], count: 2 },
+        { ranking: [3, 1, 2], count: 1 },
+      ]
+
+      expect(buildRankingMatrixFromVotes(groups, [1, 2, 3])).toEqual({
+        '1': [2, 3, 0],
+        '2': [2, 2, 1],
+        '3': [1, 0, 4],
+      })
+    })
+
+    it('un grupo y las filas sueltas equivalentes dan la misma matriz', () => {
+      const rows = [
+        { ranking: [1, 2, 3] },
+        { ranking: [1, 2, 3] },
+        { ranking: [3, 1, 2] },
+      ]
+      const groups = [
+        { ranking: [1, 2, 3], count: 2 },
+        { ranking: [3, 1, 2], count: 1 },
+      ]
+
+      expect(buildRankingMatrixFromVotes(groups, [1, 2, 3])).toEqual(
+        buildRankingMatrixFromVotes(rows, [1, 2, 3]),
+      )
+    })
   })
 
   describe('rankingScore', () => {

@@ -258,7 +258,6 @@ flowchart LR
 | 1 min | `events-fetch`, `prematch-tracker` | Eventos de partido (goles, tarjetas) y partidos por empezar |
 | 1 min | `bets-cron` | Cierra los mercados `OPEN → LOCKED` |
 | 1 min | `polls/task.service` | Abre y cierra encuestas según su horario |
-| 5 min | `polls/task.service` | Vuelca los votos de Redis a PostgreSQL (write-behind) |
 | 5 min | `polls/match-polls.cron` | Crea las encuestas oficiales de los partidos terminados (últimas 12 h): puntuación del árbitro, si el partido lo tiene, y "¿qué te pareció el partido?". Duran 48 h y el unique `(matchId, matchKind)` evita duplicarlas |
 | 3 min | `stats-sync` | Estadísticas de partido |
 | 5 min | `lineups-fetch` | Formaciones |
