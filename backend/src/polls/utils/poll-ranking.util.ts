@@ -32,18 +32,25 @@ export function buildRankingMatrix(
   return matrix
 }
 
-/** Misma matriz, pero contando los votos ya persistidos en la tabla `Vote`. */
+/**
+ * Misma matriz, pero contando los podios ya persistidos en la tabla `Vote`.
+ * Cada elemento es un voto o, con `count`, un grupo de votos con el mismo
+ * podio: así sirve tanto para filas sueltas como para un `groupBy`, que no
+ * trae una fila por votante.
+ */
 export function buildRankingMatrixFromVotes(
-  votes: { ranking: number[] }[],
+  votes: { ranking: number[]; count?: number }[],
   optionIds: number[],
   picks: number = RANKING_PICKS,
 ): RankingMatrix {
   const matrix = buildRankingMatrix({}, optionIds, picks)
 
   for (const vote of votes) {
+    const times = vote.count ?? 1
+
     vote.ranking.slice(0, picks).forEach((optionId, index) => {
       const row = matrix[optionId.toString()]
-      if (row) row[index] += 1
+      if (row) row[index] += times
     })
   }
 
