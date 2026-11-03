@@ -5,6 +5,7 @@ import { PollsService } from './polls.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 import { WalletService } from '../wallet/wallet.service'
+import { POLLS_HISTORY_DEFAULT_LIMIT } from './constants/polls-history.constant'
 
 describe('PollsService', () => {
   let service: PollsService
@@ -907,9 +908,12 @@ describe('PollsService', () => {
       ranking: number[] = [],
     ) => ({ pollId, optionId, ranking, _count: { _all: count } })
 
-    type FindManyArg = { select: Record<string, unknown> }
-    const pollsQuery = () =>
-      (mockPrisma.poll.findMany.mock.calls as FindManyArg[][])[0][0]
+    type FindManyArg = { select: Record<string, unknown>; orderBy: unknown }
+    const pollsQueries = () =>
+      (mockPrisma.poll.findMany.mock.calls as FindManyArg[][]).map(
+        ([query]) => query,
+      )
+    const pollsQuery = () => pollsQueries()[0]
 
     beforeEach(() => {
       jest.useFakeTimers({ now: NOW })
@@ -1090,6 +1094,32 @@ describe('PollsService', () => {
       })
     })
 
+    it('Debe ordenar por endsAt descendente y desempatar por id en cada página', async () => {
+      await service.getClosedPolls(1, 10)
+      await service.getClosedPolls(2, 10)
+
+      // Las de partido que arma una misma corrida del cron comparten endsAt: sin
+      // desempate, Postgres puede acomodarlas distinto en cada página. Las
+      // cerradas sin endsAt (NEWS/INFO a mano) siguen primero, como siempre: el
+      // orden no lleva `nulls`.
+      expect(pollsQueries().map((query) => query.orderBy)).toEqual([
+        [{ endsAt: 'desc' }, { id: 'desc' }],
+        [{ endsAt: 'desc' }, { id: 'desc' }],
+      ])
+    })
+
+    it('Debe pedir la página 1 con el límite por defecto si no se indican', async () => {
+      const { meta } = await service.getClosedPolls()
+
+      expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: POLLS_HISTORY_DEFAULT_LIMIT }),
+      )
+      expect(meta).toMatchObject({
+        page: 1,
+        limit: POLLS_HISTORY_DEFAULT_LIMIT,
+      })
+    })
+
     it('Debe paginar las cerradas y mantener la forma de la respuesta', async () => {
       mockPrisma.poll.count.mockResolvedValue(23)
 
@@ -1098,7 +1128,7 @@ describe('PollsService', () => {
       expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: CLOSED_WHERE,
-          orderBy: { endsAt: 'desc' },
+          orderBy: [{ endsAt: 'desc' }, { id: 'desc' }],
           skip: 10,
           take: 10,
         }),
