@@ -1,14 +1,14 @@
-import { Controller, Get, Query, Param } from '@nestjs/common'
+import { Controller, Get, Query } from '@nestjs/common'
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
 import { StatsService } from './stats.service'
 import { UserStreakService } from './statsUserStreak.service'
 import { ChatLeaderboardService } from './ChatLeaderboard.service'
+import { StatsRankingQueryDto } from './dto/stats-ranking-query.dto'
 import { Public } from 'src/auth/decorators/auth.decorator'
 import { GetUser } from 'src/auth/decorators/get-user.decorator'
 
@@ -22,56 +22,44 @@ export class StatsController {
   ) {}
 
   @ApiOperation({ summary: 'Ranking de usuarios con más monedas ganadas' })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Cantidad de resultados (default 10)',
-  })
   @ApiResponse({
     status: 200,
     description: 'Lista de usuarios ordenada por monedas ganadas.',
   })
+  @ApiResponse({ status: 400, description: 'limit no es un número entero.' })
   @Public()
   @Get('top-earners')
-  getTopEarners(@Query('limit') limit?: string) {
-    return this.statsService.getTopEarners(limit ? Number(limit) : 10)
+  getTopEarners(@Query() query: StatsRankingQueryDto) {
+    return this.statsService.getTopEarners(query.limit)
   }
 
   @ApiOperation({
     summary: 'Ranking de usuarios con las rachas diarias más largas',
   })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Cantidad de resultados (default 10)',
-  })
   @ApiResponse({
     status: 200,
     description: 'Lista de usuarios ordenada por racha.',
   })
+  @ApiResponse({ status: 400, description: 'limit no es un número entero.' })
   @Public()
   @Get('top-streaks')
-  getTopStreaks(@Query('limit') limit?: string) {
-    return this.statsService.getTopStreaks(limit ? Number(limit) : 10)
+  getTopStreaks(@Query() query: StatsRankingQueryDto) {
+    return this.statsService.getTopStreaks(query.limit)
   }
 
   @ApiOperation({
     summary:
       'Ranking de usuarios con los multiplicadores de apuestas más altos',
   })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Cantidad de resultados (default 10)',
-  })
   @ApiResponse({
     status: 200,
     description: 'Lista de usuarios ordenada por multiplicador.',
   })
+  @ApiResponse({ status: 400, description: 'limit no es un número entero.' })
   @Public()
   @Get('highest-multipliers')
-  getHighestMultipliers(@Query('limit') limit?: string) {
-    return this.statsService.getHighestMultipliers(limit ? Number(limit) : 10)
+  getHighestMultipliers(@Query() query: StatsRankingQueryDto) {
+    return this.statsService.getHighestMultipliers(query.limit)
   }
 
   @ApiBearerAuth()
@@ -83,37 +71,29 @@ export class StatsController {
   }
 
   @ApiOperation({ summary: 'Ranking de usuarios más activos en la plataforma' })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Cantidad de resultados (default 10)',
-  })
   @ApiResponse({
     status: 200,
     description: 'Lista de usuarios ordenada por actividad.',
   })
+  @ApiResponse({ status: 400, description: 'limit no es un número entero.' })
   @Public()
   @Get('most-active')
-  getMostActive(@Query('limit') limit?: string) {
-    return this.statsService.getMostActive(limit ? Number(limit) : 10)
+  getMostActive(@Query() query: StatsRankingQueryDto) {
+    return this.statsService.getMostActive(query.limit)
   }
 
   @ApiOperation({
     summary: 'Ranking de usuarios que más monedas apostaron (stake total)',
   })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Cantidad de resultados (default 10)',
-  })
   @ApiResponse({
     status: 200,
     description: 'Lista de usuarios ordenada por stake total.',
   })
+  @ApiResponse({ status: 400, description: 'limit no es un número entero.' })
   @Public()
   @Get('top-stakers')
-  getTopStakers(@Query('limit') limit?: string) {
-    return this.statsService.getTopStakers(limit ? Number(limit) : 10)
+  getTopStakers(@Query() query: StatsRankingQueryDto) {
+    return this.statsService.getTopStakers(query.limit)
   }
 
   @ApiOperation({ summary: 'Estadísticas globales agregadas de la plataforma' })
