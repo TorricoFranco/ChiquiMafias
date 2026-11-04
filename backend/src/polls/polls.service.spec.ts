@@ -172,7 +172,9 @@ describe('PollsService', () => {
       )[0]
       expect(select.user.select).not.toHaveProperty('name')
       expect(select.user.select).not.toHaveProperty('email')
-      // Por el plan actual (PALCO VIP primero, sin plan al final) y después por fecha.
+      // Por el plan actual (PALCO VIP primero, sin plan al final), después por
+      // fecha y, si empatan, por id: createdAt es TIMESTAMP(3) y sin un orden
+      // total la paginación repite o saltea comentarios del mismo milisegundo.
       expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: [
@@ -182,6 +184,7 @@ describe('PollsService', () => {
               },
             },
             { createdAt: 'desc' },
+            { id: 'desc' },
           ],
         }),
       )
