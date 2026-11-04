@@ -1,35 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
-import { Transform } from 'class-transformer'
 import { IsInt, IsOptional } from 'class-validator'
+import { ClampedInt } from '../../common/clamped-int.decorator'
 import {
   POLLS_HISTORY_DEFAULT_LIMIT,
   POLLS_HISTORY_MAX_LIMIT,
   POLLS_HISTORY_MAX_PAGE,
 } from '../constants/polls-history.constant'
-
-const INTEGER_PATTERN = /^-?\d+$/
-
-/**
- * Acota a [min, max] un entero que llega como texto (la query) o como número
- * (si el pipe convierte los tipos): un valor fuera de rango se corrige en vez de
- * rechazarse, para no romper a quien ya lo manda. Lo que no es un entero (texto,
- * decimales, vacío, un parámetro repetido) queda como llegó y lo rechaza
- * `@IsInt`.
- */
-const ClampedInt = (min: number, max: number) =>
-  Transform(
-    ({ value }: { value: unknown }) => {
-      const parsed =
-        typeof value === 'string' && INTEGER_PATTERN.test(value)
-          ? Number(value)
-          : value
-
-      return typeof parsed === 'number' && Number.isInteger(parsed)
-        ? Math.min(Math.max(parsed, min), max)
-        : value
-    },
-    { toClassOnly: true },
-  )
 
 export class PollsHistoryQueryDto {
   @ApiPropertyOptional({

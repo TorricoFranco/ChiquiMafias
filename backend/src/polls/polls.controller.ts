@@ -16,7 +16,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from '@nestjs/swagger'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { ROLE_HIERARCHY, SystemRole } from '../auth/enums/roles.enum'
@@ -33,6 +32,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard'
 import { CreateCommentDto } from './dto/create-comment.dto'
 import { ReactDto } from './dto/reaction.dto'
 import { PollsHistoryQueryDto } from './dto/polls-history-query.dto'
+import { PollsCommentsQueryDto } from './dto/polls-comments-query.dto'
 
 const MODERATOR_INDEX = ROLE_HIERARCHY.indexOf(SystemRole.MODERATOR)
 
@@ -209,27 +209,20 @@ export class PollsController {
   @OptionalAuth()
   @ApiOperation({ summary: 'Obtener comentarios de una encuesta (Paginados)' })
   @ApiParam({ name: 'id', description: 'ID de la encuesta' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Número de página (default 1)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Resultados por página (default 20)',
-  })
   @ApiResponse({ status: 200, description: 'Lista paginada de comentarios.' })
+  @ApiResponse({
+    status: 400,
+    description: 'page o limit no son números enteros.',
+  })
   async getComments(
     @Param('id') pollId: string,
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '20',
+    @Query() query: PollsCommentsQueryDto,
     @GetUser('id') userId?: string,
   ) {
     return this.pollsService.getPollComments(
       pollId,
-      Number(page),
-      Number(limit),
+      query.page,
+      query.limit,
       userId,
     )
   }
