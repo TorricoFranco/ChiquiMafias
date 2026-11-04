@@ -8,6 +8,7 @@ import { useNavigationStore } from '@/store/useNavigationStore';
 import { useReactToPoll } from '../hooks/usePolls';
 import { Poll } from "@/features/polls/types";
 import { getPollTypeMeta } from "../constants/pollTypes";
+import { POLL_VOTE_REWARD_COINS } from "../constants/rewards";
 
 interface PollCardResumeProps {
     poll: Poll;
@@ -50,13 +51,19 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
                     <h4 className="text-[#e5e2e1] text-sm font-bold leading-tight line-clamp-2">
                         {poll.title}
                     </h4>
+                    {/* Las encuestas de partido llevan acá el partido y el resultado: el título puede quedar cortado. */}
+                    {poll.description && (
+                        <p title={poll.description} className="text-[11px] text-[#909378] leading-tight truncate">
+                            {poll.description}
+                        </p>
+                    )}
                 </div>
                 {isVotable && !localHasVoted && (
                     <span className="bg-[#d2f000]/20 text-[#d2f000] text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 animate-pulse flex items-center gap-1">
                         <div className="w-3.5 h-3.5 rounded-full overflow-hidden flex-shrink-0">
                             <img src="/icons/chiqui-coin-icon.png" alt="Chiqui Coin" className="w-full h-full object-cover" />
                         </div>
-                        <span>+50</span>
+                        <span>+{POLL_VOTE_REWARD_COINS}</span>
                     </span>
                 )}
             </div>
@@ -76,7 +83,7 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
                                     className="absolute top-0 left-0 h-full bg-[#454932] -z-10"
                                 />
                                 <div className="flex justify-between w-full text-[11px] font-bold text-white z-10">
-                                    <span className="truncate mr-2">{optionText}</span>
+                                    <span title={optionText} className="truncate mr-2">{optionText}</span>
                                     <span>{percentage}%</span>
                                 </div>
                             </div>
@@ -88,6 +95,7 @@ export const PollCardResume: React.FC<PollCardResumeProps> = ({ poll }) => {
                             key={option.id}
                             onClick={() => vote(option.id)}
                             disabled={isVoting || !connected}
+                            title={optionText}
                             className="h-8 bg-[#201f1f] border border-[#353534] rounded-lg text-[11px] font-bold text-[#c6c9ab] hover:bg-[#353534] hover:text-white transition-all text-left px-3 disabled:opacity-50 truncate cursor-pointer"
                         >
                             {optionText}

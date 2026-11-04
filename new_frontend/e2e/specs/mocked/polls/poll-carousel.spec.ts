@@ -19,6 +19,17 @@ test.describe("Carrusel de encuestas de la barra derecha", () => {
     await expect(page.getByText("Encuesta 6 del carrusel")).toBeVisible();
   });
 
+  test("avisa que votar una encuesta sin votar paga 10 monedas", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    api.on("GET", "/polls/active", [buildPoll({ title: "Encuesta con premio" })]);
+
+    await app.open();
+    await page.getByRole("tab", { name: "Apuestas" }).click();
+
+    await expect(page.getByText("Encuesta con premio")).toBeVisible();
+    await expect(page.getByText("+10", { exact: true })).toBeVisible();
+  });
+
   test("Comentar lleva a esa encuesta en Comunidad con sus comentarios abiertos", async ({ app, page, api, session }) => {
     session.loginAs("USER");
     // Es la sexta del carrusel: en el feed queda debajo del pliegue, así que hay que scrollear.
@@ -61,6 +72,23 @@ test.describe("Carrusel de encuestas de la barra derecha", () => {
     await expect(card).toBeInViewport();
     await expect(card.getByRole("button", { name: "0 Comentarios" })).toHaveAttribute("aria-expanded", "false");
     await expect(card.getByText("Comentario que no se abre")).toHaveCount(0);
+  });
+
+  test("una encuesta de partido muestra el partido y el resultado aunque el título quede cortado", async ({ app, page, api, session }) => {
+    session.loginAs("USER");
+    api.on("GET", "/polls/active", [
+      buildPoll({
+        title: "¿Cómo viste el arbitraje de Facundo Tello en Boca Juniors vs River Plate (Fecha 5 Clausura)?",
+        description: "Boca Juniors 2-1 River Plate · Fecha 5 Clausura",
+        isOfficial: true,
+        user: null,
+      }),
+    ]);
+
+    await app.open();
+    await page.getByRole("tab", { name: "Apuestas" }).click();
+
+    await expect(page.getByText("Boca Juniors 2-1 River Plate · Fecha 5 Clausura")).toBeVisible();
   });
 });
 

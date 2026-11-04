@@ -14,6 +14,9 @@ import {
   POLL_TYPE_LABELS,
   POLL_TYPE_RULES,
 } from './constants/poll-types.constant'
+import { POLL_VOTE_REWARD_COINS } from './constants/poll-rewards.constant'
+import { POLLS_COMMENTS_DEFAULT_LIMIT } from './constants/polls-comments.constant'
+import { POLLS_HISTORY_DEFAULT_LIMIT } from './constants/polls-history.constant'
 import {
   buildPollShape,
   parsePollConfig,
@@ -35,6 +38,14 @@ import {
   nameColorAssets,
   toCommentAuthor,
 } from './utils/comment-author.util'
+
+/** Votos de una encuesta, contados en la base. */
+interface VoteTally {
+  total: number
+  byOption: Map<number, number>
+  /** Solo RANKING: cuántas veces se armó cada podio. */
+  podiums: { ranking: number[]; count: number }[]
+}
 
 @Injectable()
 export class PollsService {
@@ -600,8 +611,6 @@ export class PollsService {
       )
     }
 
-    const COINS_PER_VOTE = 50
-
     const voteIds = pendingVotes.map((v) => v.id)
 
     // Update condicional: con dos claims simultáneos cada voto se paga una sola vez
@@ -619,7 +628,7 @@ export class PollsService {
       await this.walletService.addCoins(
         {
           userId,
-          amount: count * COINS_PER_VOTE,
+          amount: count * POLL_VOTE_REWARD_COINS,
           type: 'POLL_VOTE',
           description: `Recompensa por participar en ${count} encuestas`,
         },
@@ -630,7 +639,7 @@ export class PollsService {
 
     await this.walletService.syncBalanceCache(userId)
 
-    const totalCoins = claimedCount * COINS_PER_VOTE
+    const totalCoins = claimedCount * POLL_VOTE_REWARD_COINS
 
     return {
       status: 'success',
@@ -647,49 +656,61 @@ export class PollsService {
         rewardClaimed: false,
       },
     })
-    return { count, potentialCoins: count * 50 }
+    return { count, potentialCoins: count * POLL_VOTE_REWARD_COINS }
   }
 
-  async getClosedPolls(page: number = 1, limit: number = 10, userId?: string) {
+  async getClosedPolls(
+    page: number = 1,
+    limit: number = POLLS_HISTORY_DEFAULT_LIMIT,
+    userId?: string,
+  ) {
     const skip = (page - 1) * limit
     const now = new Date()
+    const closedWhere: Prisma.PollWhereInput = {
+      OR: [{ status: 'CLOSED' }, { endsAt: { lt: now } }],
+    }
 
-    const polls = await this.prisma.poll.findMany({
-      where: {
-        OR: [{ status: 'CLOSED' }, { endsAt: { lt: now } }],
-      },
-      orderBy: { endsAt: 'desc' },
-      skip,
-      take: limit,
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        icon: true,
-        endsAt: true,
-        options: true,
-        type: true,
-        config: true,
-        isOfficial: true,
-        user: { select: pollAuthorSelect },
-        votes: {
-          select: { optionId: true, userId: true, ranking: true },
+    const [polls, totalItems] = await Promise.all([
+      this.prisma.poll.findMany({
+        where: closedWhere,
+        // `id` desempata: las encuestas de partido de una misma corrida del
+        // cron comparten `endsAt`, y sin un orden total la paginación repite
+        // o saltea filas entre páginas. Las cerradas sin `endsAt` (NEWS/INFO
+        // cerradas a mano) siguen primero, como siempre: Postgres pone los
+        // NULL antes en DESC.
+        orderBy: [{ endsAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          icon: true,
+          endsAt: true,
+          options: true,
+          type: true,
+          config: true,
+          isOfficial: true,
+          user: { select: pollAuthorSelect },
         },
-      },
-    })
+      }),
+      this.prisma.poll.count({ where: closedWhere }),
+    ])
+
+    // Los votos se cuentan en la base: traer una fila por votante de cada
+    // encuesta de la página crece con encuestas × votantes.
+    const { tallies, votedPollIds } = await this.tallyVotes(
+      polls.map((poll) => poll.id),
+      userId,
+    )
 
     const history = polls.map((poll) => {
-      const parsedOptions = parsePollOptions(poll.options).map((opt) => {
-        const voteCount = poll.votes.filter((v) => v.optionId === opt.id).length
-        return {
-          ...opt,
-          votes: voteCount,
-        }
-      })
+      const tally = tallies.get(poll.id)
 
-      const hasVoted = userId
-        ? poll.votes.some((v) => v.userId === userId)
-        : false
+      const parsedOptions = parsePollOptions(poll.options).map((opt) => ({
+        ...opt,
+        votes: tally?.byOption.get(opt.id) ?? 0,
+      }))
 
       return {
         id: poll.id,
@@ -705,20 +726,14 @@ export class PollsService {
         rankingResults:
           poll.type === 'RANKING'
             ? buildRankingMatrixFromVotes(
-                poll.votes,
+                tally?.podiums ?? [],
                 parsedOptions.map((opt) => opt.id),
                 parsePollConfig(poll.config).picks,
               )
             : null,
-        hasVoted,
-        totalVotes: poll.votes.length,
+        hasVoted: votedPollIds.has(poll.id),
+        totalVotes: tally?.total ?? 0,
       }
-    })
-
-    const totalItems = await this.prisma.poll.count({
-      where: {
-        OR: [{ status: 'CLOSED' }, { endsAt: { lt: now } }],
-      },
     })
 
     return {
@@ -730,6 +745,58 @@ export class PollsService {
         totalPages: Math.ceil(totalItems / limit),
       },
     }
+  }
+
+  /**
+   * Cuenta en la base los votos de varias encuestas. El `groupBy` devuelve un
+   * grupo por opción (en RANKING, por podio distinto), así que lo que viaja no
+   * crece con la cantidad de votantes. `votedPollIds` son las encuestas en las
+   * que votó `userId` (vacío sin usuario).
+   */
+  private async tallyVotes(pollIds: string[], userId?: string) {
+    const tallies = new Map<string, VoteTally>()
+    const votedPollIds = new Set<string>()
+
+    if (pollIds.length === 0) return { tallies, votedPollIds }
+
+    const [groups, ownVotes] = await Promise.all([
+      this.prisma.vote.groupBy({
+        by: ['pollId', 'optionId', 'ranking'],
+        where: { pollId: { in: pollIds } },
+        _count: { _all: true },
+      }),
+      userId
+        ? this.prisma.vote.findMany({
+            where: { userId, pollId: { in: pollIds } },
+            select: { pollId: true },
+          })
+        : [],
+    ])
+
+    for (const group of groups) {
+      const count = group._count._all
+      const tally: VoteTally = tallies.get(group.pollId) ?? {
+        total: 0,
+        byOption: new Map<number, number>(),
+        podiums: [],
+      }
+
+      tally.total += count
+      tally.byOption.set(
+        group.optionId,
+        (tally.byOption.get(group.optionId) ?? 0) + count,
+      )
+
+      if (group.ranking.length > 0) {
+        tally.podiums.push({ ranking: group.ranking, count })
+      }
+
+      tallies.set(group.pollId, tally)
+    }
+
+    for (const vote of ownVotes) votedPollIds.add(vote.pollId)
+
+    return { tallies, votedPollIds }
   }
 
   async addComment(pollId: string, userId: string, dto: CreateCommentDto) {
@@ -803,7 +870,7 @@ export class PollsService {
   async getPollComments(
     pollId: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = POLLS_COMMENTS_DEFAULT_LIMIT,
     currentUserId?: string,
   ) {
     const skip = (page - 1) * limit
@@ -827,9 +894,13 @@ export class PollsService {
         take: limit,
         // Por el plan actual del autor, como el destaque: PALCO VIP, PLATEÍSTA,
         // POPULAR (el enum ordena TIER_1 < TIER_2 < TIER_3) y después los comunes.
+        // `id` desempata: `createdAt` es TIMESTAMP(3) y varios comentarios del
+        // mismo plan pueden caer en el mismo milisegundo; sin un orden total la
+        // paginación repite o saltea filas entre páginas.
         orderBy: [
           { user: { activeSubscriptionTier: { sort: 'desc', nulls: 'last' } } },
           { createdAt: 'desc' },
+          { id: 'desc' },
         ],
         select: {
           id: true,

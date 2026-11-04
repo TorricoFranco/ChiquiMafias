@@ -166,7 +166,8 @@ Cada mercado tiene un ciclo de vida gobernado por una máquina de estados,
   **lock optimista**. Los mercados automáticos se liquidan cada 15 minutos con el
   resultado que `LiveScoreCron` guarda en `Matches` (sin llamar a API-Football). El 1X2
   es a los 90': si el partido se definió en el alargue o por penales, gana el Empate. Si
-  el partido se posterga, se cancela o se abandona, se reembolsa.
+  el partido se posterga, se cancela o se abandona, se reembolsa; si un postergado
+  vuelve a programarse, el cron de creación le abre un mercado nuevo.
 
 El desafío central es mantener la **consistencia eventual** entre tres fuentes
 (Redis, PostgreSQL y los clientes WebSocket) sin bloquear el camino caliente.
@@ -257,13 +258,13 @@ flowchart LR
 | 1 min | `events-fetch`, `prematch-tracker` | Eventos de partido (goles, tarjetas) y partidos por empezar |
 | 1 min | `bets-cron` | Cierra los mercados `OPEN → LOCKED` |
 | 1 min | `polls/task.service` | Abre y cierra encuestas según su horario |
-| 5 min | `polls/task.service` | Vuelca los votos de Redis a PostgreSQL (write-behind) |
+| 5 min | `polls/match-polls.cron` | Crea las encuestas oficiales de los partidos terminados (últimas 12 h): puntuación del árbitro, si el partido lo tiene, y "¿qué te pareció el partido?". Duran 48 h y el unique `(matchId, matchKind)` evita duplicarlas |
 | 3 min | `stats-sync` | Estadísticas de partido |
 | 5 min | `lineups-fetch` | Formaciones |
 | 5 min | `stats/*` | Rankings de chat y de rachas |
 | 1 min (tick) | `fixtures-sync`, `standings` | Fixture y tabla de cada `CompetitionSeason` con `sync_enabled`, cada una según su `fixtures_sync_minutes` / `standings_sync_minutes` (la Liga, cada 10 min). La lógica de cada formato está en `football/formats/` |
 | 15 min | `bets-cron` | Liquida los mercados de partidos terminados |
-| 30 min | `bets-cron` | Crea mercados automáticamente para los próximos partidos |
+| 30 min | `bets-cron` | Crea mercados automáticamente para los partidos que empiezan en las próximas 24 h (cierran 5 min antes del inicio) |
 | 1 h | `subscriptions.cron` | Conciliación de suscripciones vencidas |
 
 ### Estructura

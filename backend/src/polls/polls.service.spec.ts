@@ -5,6 +5,7 @@ import { PollsService } from './polls.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 import { WalletService } from '../wallet/wallet.service'
+import { POLLS_HISTORY_DEFAULT_LIMIT } from './constants/polls-history.constant'
 
 describe('PollsService', () => {
   let service: PollsService
@@ -15,7 +16,12 @@ describe('PollsService', () => {
       .mockImplementation((callback: (tx: unknown) => Promise<unknown>) =>
         callback(mockPrisma),
       ),
-    vote: { findMany: jest.fn(), updateMany: jest.fn() },
+    vote: {
+      findMany: jest.fn(),
+      updateMany: jest.fn(),
+      count: jest.fn(),
+      groupBy: jest.fn(),
+    },
     poll: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -23,6 +29,7 @@ describe('PollsService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+      count: jest.fn(),
     },
     pollReaction: { groupBy: jest.fn() },
     userInventory: {
@@ -165,7 +172,9 @@ describe('PollsService', () => {
       )[0]
       expect(select.user.select).not.toHaveProperty('name')
       expect(select.user.select).not.toHaveProperty('email')
-      // Por el plan actual (PALCO VIP primero, sin plan al final) y después por fecha.
+      // Por el plan actual (PALCO VIP primero, sin plan al final), después por
+      // fecha y, si empatan, por id: createdAt es TIMESTAMP(3) y sin un orden
+      // total la paginación repite o saltea comentarios del mismo milisegundo.
       expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: [
@@ -175,6 +184,7 @@ describe('PollsService', () => {
               },
             },
             { createdAt: 'desc' },
+            { id: 'desc' },
           ],
         }),
       )
@@ -807,7 +817,7 @@ describe('PollsService', () => {
 
   describe('claimAllPendingRewards', () => {
     it('Debe pagar solo los votos que este claim logró marcar, en la misma transacción', async () => {
-      // Un claim simultáneo ya se llevó uno de los tres votos
+      // Un claim simultáneo ya se llevó uno de los tres votos; cada voto paga 10 monedas
       mockPrisma.vote.updateMany.mockResolvedValue({ count: 2 })
 
       const result = await service.claimAllPendingRewards('user-1')
@@ -821,11 +831,11 @@ describe('PollsService', () => {
       })
       expect(addCoinsCall()[0]).toMatchObject({
         userId: 'user-1',
-        amount: 100,
+        amount: 20,
       })
       expect(addCoinsCall()[1]).toBe(mockPrisma)
       expect(mockWalletService.syncBalanceCache).toHaveBeenCalledWith('user-1')
-      expect(result).toMatchObject({ claimedCount: 2, coinsAwarded: 100 })
+      expect(result).toMatchObject({ claimedCount: 2, coinsAwarded: 20 })
     })
 
     it('Debe lanzar BadRequestException si otro claim simultáneo ya marcó todos los votos', async () => {
@@ -845,6 +855,308 @@ describe('PollsService', () => {
         BadRequestException,
       )
       expect(mockPrisma.$transaction).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getPendingRewardsCount', () => {
+    it('Debe calcular las monedas pendientes a 10 por cada voto sin reclamar', async () => {
+      mockPrisma.vote.count.mockResolvedValue(3)
+
+      const result = await service.getPendingRewardsCount('user-1')
+
+      expect(mockPrisma.vote.count).toHaveBeenCalledWith({
+        where: { userId: 'user-1', rewardClaimed: false },
+      })
+      expect(result).toEqual({ count: 3, potentialCoins: 30 })
+    })
+
+    it('Debe devolver cero monedas si no hay votos sin reclamar', async () => {
+      mockPrisma.vote.count.mockResolvedValue(0)
+
+      const result = await service.getPendingRewardsCount('user-1')
+
+      expect(result).toEqual({ count: 0, potentialCoins: 0 })
+    })
+  })
+
+  describe('getClosedPolls', () => {
+    const NOW = new Date('2026-11-03T12:00:00.000Z')
+    const CLOSED_WHERE = {
+      OR: [{ status: 'CLOSED' }, { endsAt: { lt: NOW } }],
+    }
+
+    const closedPoll = (over: Record<string, unknown> = {}) => ({
+      id: 'poll-1',
+      title: '¿Quién gana el clásico?',
+      description: null,
+      icon: 'USER',
+      endsAt: new Date('2026-11-01T12:00:00.000Z'),
+      options: [
+        { id: 1, label: 'Boca' },
+        { id: 2, label: 'River' },
+        { id: 3, label: 'Empate' },
+      ],
+      type: 'CLASSIC',
+      config: null,
+      isOfficial: true,
+      user: null,
+      ...over,
+    })
+
+    /** Una fila del `groupBy` de votos: cuántos votos tiene esa opción (y ese podio). */
+    const voteGroup = (
+      pollId: string,
+      optionId: number,
+      count: number,
+      ranking: number[] = [],
+    ) => ({ pollId, optionId, ranking, _count: { _all: count } })
+
+    type FindManyArg = { select: Record<string, unknown>; orderBy: unknown }
+    const pollsQueries = () =>
+      (mockPrisma.poll.findMany.mock.calls as FindManyArg[][]).map(
+        ([query]) => query,
+      )
+    const pollsQuery = () => pollsQueries()[0]
+
+    beforeEach(() => {
+      jest.useFakeTimers({ now: NOW })
+      mockPrisma.poll.findMany.mockResolvedValue([closedPoll()])
+      mockPrisma.poll.count.mockResolvedValue(1)
+      mockPrisma.vote.groupBy.mockResolvedValue([])
+      mockPrisma.vote.findMany.mockResolvedValue([])
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('Debe contar los votos en la base en vez de traer una fila por votante', async () => {
+      mockPrisma.vote.groupBy.mockResolvedValue([
+        voteGroup('poll-1', 1, 40),
+        voteGroup('poll-1', 2, 25),
+      ])
+
+      const { data } = await service.getClosedPolls(1, 10, 'user-1')
+
+      expect(mockPrisma.vote.groupBy).toHaveBeenCalledTimes(1)
+      expect(mockPrisma.vote.groupBy).toHaveBeenCalledWith({
+        by: ['pollId', 'optionId', 'ranking'],
+        where: { pollId: { in: ['poll-1'] } },
+        _count: { _all: true },
+      })
+      expect(pollsQuery().select).not.toHaveProperty('votes')
+      expect(data[0].options).toEqual([
+        { id: 1, label: 'Boca', votes: 40 },
+        { id: 2, label: 'River', votes: 25 },
+        { id: 3, label: 'Empate', votes: 0 },
+      ])
+      expect(data[0].totalVotes).toBe(65)
+      expect(data[0].rankingResults).toBeNull()
+    })
+
+    it('Debe contar en el total los votos de opciones que ya no existen', async () => {
+      mockPrisma.vote.groupBy.mockResolvedValue([
+        voteGroup('poll-1', 1, 2),
+        voteGroup('poll-1', 9, 3),
+      ])
+
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(data[0].options.map((option) => option.votes)).toEqual([2, 0, 0])
+      expect(data[0].totalVotes).toBe(5)
+    })
+
+    it('Debe dejar en cero una encuesta que nadie votó', async () => {
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(data[0].totalVotes).toBe(0)
+      expect(data[0].options.every((option) => option.votes === 0)).toBe(true)
+    })
+
+    it('Debe sumar cada opción de cada encuesta por separado', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        closedPoll(),
+        closedPoll({ id: 'poll-2' }),
+      ])
+      mockPrisma.vote.groupBy.mockResolvedValue([
+        voteGroup('poll-1', 1, 4),
+        voteGroup('poll-2', 1, 7),
+        voteGroup('poll-2', 3, 1),
+      ])
+
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(mockPrisma.vote.groupBy).toHaveBeenCalledTimes(1)
+      expect(data.map((poll) => poll.totalVotes)).toEqual([4, 8])
+      expect(data[1].options.map((option) => option.votes)).toEqual([7, 0, 1])
+    })
+
+    it('Debe sumar los grupos de una misma opción, como los votos viejos con ranking NULL y con ranking vacío', async () => {
+      // Postgres agrupa NULL y '{}' por separado: la misma opción llega en dos filas.
+      mockPrisma.vote.groupBy.mockResolvedValue([
+        voteGroup('poll-1', 1, 2),
+        voteGroup('poll-1', 1, 3),
+      ])
+
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(data[0].options.map((option) => option.votes)).toEqual([5, 0, 0])
+      expect(data[0].totalVotes).toBe(5)
+    })
+
+    it('Debe sumar los primeros puestos de podios distintos que comparten la opción ganadora', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        closedPoll({ type: 'RANKING', config: { picks: 3 } }),
+      ])
+      mockPrisma.vote.groupBy.mockResolvedValue([
+        voteGroup('poll-1', 1, 2, [1, 2, 3]),
+        voteGroup('poll-1', 1, 1, [1, 3, 2]),
+      ])
+
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(data[0].options.map((option) => option.votes)).toEqual([3, 0, 0])
+      expect(data[0].totalVotes).toBe(3)
+      expect(data[0].rankingResults).toEqual({
+        '1': [3, 0, 0],
+        '2': [0, 2, 1],
+        '3': [0, 1, 2],
+      })
+    })
+
+    it('Debe marcar hasVoted solo en las encuestas donde votó el usuario', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        closedPoll(),
+        closedPoll({ id: 'poll-2' }),
+      ])
+      mockPrisma.vote.findMany.mockResolvedValue([{ pollId: 'poll-2' }])
+
+      const { data } = await service.getClosedPolls(1, 10, 'user-1')
+
+      expect(mockPrisma.vote.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', pollId: { in: ['poll-1', 'poll-2'] } },
+        select: { pollId: true },
+      })
+      expect(data.map((poll) => poll.hasVoted)).toEqual([false, true])
+    })
+
+    it('Debe devolver hasVoted en false sin consultar votos si no hay sesión', async () => {
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(mockPrisma.vote.findMany).not.toHaveBeenCalled()
+      expect(data[0].hasVoted).toBe(false)
+    })
+
+    it('Debe armar el podio de RANKING con los podios agrupados', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        closedPoll({ type: 'RANKING', config: { picks: 3 } }),
+      ])
+      mockPrisma.vote.groupBy.mockResolvedValue([
+        voteGroup('poll-1', 1, 2, [1, 2, 3]),
+        voteGroup('poll-1', 2, 2, [2, 1, 3]),
+        voteGroup('poll-1', 3, 1, [3, 1, 2]),
+      ])
+
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(data[0].rankingResults).toEqual({
+        '1': [2, 3, 0],
+        '2': [2, 2, 1],
+        '3': [1, 0, 4],
+      })
+      // Cada opción cuenta los primeros puestos, y el total es la cantidad de votantes
+      expect(data[0].options.map((option) => option.votes)).toEqual([2, 2, 1])
+      expect(data[0].totalVotes).toBe(5)
+    })
+
+    it('Debe devolver el podio en cero si una encuesta de RANKING no tiene votos', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([
+        closedPoll({ type: 'RANKING' }),
+      ])
+
+      const { data } = await service.getClosedPolls(1, 10)
+
+      expect(data[0].rankingResults).toEqual({
+        '1': [0, 0, 0],
+        '2': [0, 0, 0],
+        '3': [0, 0, 0],
+      })
+    })
+
+    it('Debe devolver la página vacía sin consultar votos', async () => {
+      mockPrisma.poll.findMany.mockResolvedValue([])
+      mockPrisma.poll.count.mockResolvedValue(0)
+
+      const result = await service.getClosedPolls(3, 10, 'user-1')
+
+      expect(mockPrisma.vote.groupBy).not.toHaveBeenCalled()
+      expect(mockPrisma.vote.findMany).not.toHaveBeenCalled()
+      expect(result).toEqual({
+        data: [],
+        meta: { total: 0, page: 3, limit: 10, totalPages: 0 },
+      })
+    })
+
+    it('Debe ordenar por endsAt descendente y desempatar por id en cada página', async () => {
+      await service.getClosedPolls(1, 10)
+      await service.getClosedPolls(2, 10)
+
+      // Las de partido que arma una misma corrida del cron comparten endsAt: sin
+      // desempate, Postgres puede acomodarlas distinto en cada página. Las
+      // cerradas sin endsAt (NEWS/INFO a mano) siguen primero, como siempre: el
+      // orden no lleva `nulls`.
+      expect(pollsQueries().map((query) => query.orderBy)).toEqual([
+        [{ endsAt: 'desc' }, { id: 'desc' }],
+        [{ endsAt: 'desc' }, { id: 'desc' }],
+      ])
+    })
+
+    it('Debe pedir la página 1 con el límite por defecto si no se indican', async () => {
+      const { meta } = await service.getClosedPolls()
+
+      expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: POLLS_HISTORY_DEFAULT_LIMIT }),
+      )
+      expect(meta).toMatchObject({
+        page: 1,
+        limit: POLLS_HISTORY_DEFAULT_LIMIT,
+      })
+    })
+
+    it('Debe paginar las cerradas y mantener la forma de la respuesta', async () => {
+      mockPrisma.poll.count.mockResolvedValue(23)
+
+      const { data, meta } = await service.getClosedPolls(2, 10, 'user-1')
+
+      expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: CLOSED_WHERE,
+          orderBy: [{ endsAt: 'desc' }, { id: 'desc' }],
+          skip: 10,
+          take: 10,
+        }),
+      )
+      expect(mockPrisma.poll.count).toHaveBeenCalledWith({
+        where: CLOSED_WHERE,
+      })
+      expect(meta).toEqual({ total: 23, page: 2, limit: 10, totalPages: 3 })
+      expect(Object.keys(data[0]).sort()).toEqual(
+        [
+          'config',
+          'description',
+          'endsAt',
+          'hasVoted',
+          'icon',
+          'id',
+          'isOfficial',
+          'options',
+          'rankingResults',
+          'title',
+          'totalVotes',
+          'type',
+          'user',
+        ].sort(),
+      )
     })
   })
 })

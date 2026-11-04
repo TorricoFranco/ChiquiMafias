@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { publicUserSelect } from 'src/prisma/constants/publicUserSelect'
+import { STATS_RANKING_DEFAULT_LIMIT } from './constants/stats-ranking.constant'
 
 @Injectable()
 export class StatsService {
@@ -33,7 +34,7 @@ export class StatsService {
     }
   }
 
-  async getTopEarners(limit: number = 10) {
+  async getTopEarners(limit: number = STATS_RANKING_DEFAULT_LIMIT) {
     return this.prisma.userStats.findMany({
       take: limit,
       orderBy: { totalCoinsWon: 'desc' },
@@ -43,7 +44,7 @@ export class StatsService {
     })
   }
 
-  async getTopStreaks(limit: number = 10) {
+  async getTopStreaks(limit: number = STATS_RANKING_DEFAULT_LIMIT) {
     return this.prisma.userStats.findMany({
       take: limit,
       orderBy: { longestWinStreak: 'desc' },
@@ -53,7 +54,7 @@ export class StatsService {
     })
   }
 
-  async getHighestMultipliers(limit: number = 10) {
+  async getHighestMultipliers(limit: number = STATS_RANKING_DEFAULT_LIMIT) {
     return this.prisma.userStats.findMany({
       take: limit,
       orderBy: { highestMultiplier: 'desc' },
@@ -63,7 +64,7 @@ export class StatsService {
     })
   }
 
-  async getMostActive(limit: number = 10) {
+  async getMostActive(limit: number = STATS_RANKING_DEFAULT_LIMIT) {
     return this.prisma.userStats.findMany({
       take: limit,
       orderBy: { totalBetsPlaced: 'desc' },
@@ -73,7 +74,7 @@ export class StatsService {
     })
   }
 
-  async getTopStakers(limit: number = 10) {
+  async getTopStakers(limit: number = STATS_RANKING_DEFAULT_LIMIT) {
     return this.prisma.userStats.findMany({
       take: limit,
       orderBy: { totalCoinsStaked: 'desc' },

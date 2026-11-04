@@ -1,16 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
-import { RedisService } from 'src/redis/redis.service'
 import { PollsService } from './polls.service'
 
+/**
+ * Abre y cierra las encuestas según su horario. Los votos no pasan por acá:
+ * `VoteService` crea el `Vote` en el momento de votar, así que volcarlos de
+ * nuevo desde Redis cada 5 minutos solo repetía escrituras que ya existían.
+ */
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name)
 
   constructor(
     private prisma: PrismaService,
-    private redisService: RedisService,
     private pollsService: PollsService,
   ) {}
 
@@ -47,42 +50,6 @@ export class TasksService {
           `Encuesta cerrada automáticamente y programada para limpieza: ${poll.id}`,
         )
       }
-    }
-  }
-
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async syncVotesToDatabase() {
-    const activePolls = await this.prisma.poll.findMany({
-      where: { status: 'ACTIVE' },
-    })
-
-    for (const poll of activePolls) {
-      const detailKey = `poll:${poll.id}:details`
-      const allVotes = await this.redisService.redis.hgetall(detailKey)
-
-      if (Object.keys(allVotes).length === 0) continue
-
-      // En RANKING el detalle es el podio en CSV ("5,2,7"); en el resto, un id suelto.
-      const voteData = Object.entries(allVotes).map(([userId, detail]) => {
-        const ranking = detail.includes(',')
-          ? detail
-              .split(',')
-              .map((id) => parseInt(id, 10))
-              .filter((id) => Number.isInteger(id))
-          : []
-
-        return {
-          pollId: poll.id,
-          userId: userId,
-          optionId: ranking.length > 0 ? ranking[0] : parseInt(detail, 10),
-          ranking,
-        }
-      })
-
-      await this.prisma.vote.createMany({
-        data: voteData,
-        skipDuplicates: true,
-      })
     }
   }
 }
