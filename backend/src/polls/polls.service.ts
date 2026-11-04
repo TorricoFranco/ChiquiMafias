@@ -893,9 +893,13 @@ export class PollsService {
         take: limit,
         // Por el plan actual del autor, como el destaque: PALCO VIP, PLATEÍSTA,
         // POPULAR (el enum ordena TIER_1 < TIER_2 < TIER_3) y después los comunes.
+        // `id` desempata: `createdAt` es TIMESTAMP(3) y varios comentarios del
+        // mismo plan pueden caer en el mismo milisegundo; sin un orden total la
+        // paginación repite o saltea filas entre páginas.
         orderBy: [
           { user: { activeSubscriptionTier: { sort: 'desc', nulls: 'last' } } },
           { createdAt: 'desc' },
+          { id: 'desc' },
         ],
         select: {
           id: true,
